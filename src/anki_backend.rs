@@ -1439,6 +1439,37 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
     }
 
     #[test]
+    fn persisted_collection_stats_match_notes_cards_and_review_log() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "stats").unwrap();
+        assert_eq!(backend.collection_stats().unwrap(), CollectionStats::default());
+        backend.add_basic_note(1, "banqueta", "sidewalk").unwrap();
+        assert_eq!(
+            backend.collection_stats().unwrap(),
+            CollectionStats {
+                notes: 1,
+                cards: 1,
+                review_events: 0
+            }
+        );
+        let card = backend.next_review_preview().unwrap().unwrap();
+        backend.grade_previewed_card(card.card_id, 4).unwrap();
+        assert_eq!(backend.collection_stats().unwrap().review_events, 1);
+        backend.close().unwrap();
+
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "stats").unwrap();
+        assert_eq!(
+            reopened.collection_stats().unwrap(),
+            CollectionStats {
+                notes: 1,
+                cards: 1,
+                review_events: 1
+            }
+        );
+        reopened.close().unwrap();
+    }
+
+    #[test]
     fn rendered_due_card_preview_reuses_anki_scheduler_without_grading() {
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "review").unwrap();

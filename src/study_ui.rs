@@ -30,10 +30,9 @@ impl BrowseScope {
     fn matches(self, note: &NoteRow) -> bool {
         match self {
             Self::All => true,
-            Self::SourceLinked => matches!(
-                StudyPanel::source_provenance(&note.tags),
-                Ok(Some(_))
-            ),
+            Self::SourceLinked => {
+                matches!(StudyPanel::source_provenance(&note.tags), Ok(Some(_)))
+            }
             Self::Plain => matches!(StudyPanel::source_provenance(&note.tags), Ok(None)),
             Self::Conflicts => StudyPanel::source_provenance(&note.tags).is_err(),
         }
@@ -409,7 +408,8 @@ impl StudyPanel {
                     ui.weak(format!("{matching} matching of {} loaded (50 maximum)", self.notes.len()));
                 });
                 egui::ScrollArea::vertical().max_height(135.0).show(ui, |ui| {
-                    for note in self.notes.clone().into_iter().filter(|note| self.browse_scope.matches(note)) {
+                    let scope = self.browse_scope;
+                    for note in self.notes.clone().into_iter().filter(|note| scope.matches(note)) {
                         let summary = note.fields.first().map_or("(empty note)", String::as_str);
                         let label = format!("{} · {}", note.id, summary);
                         if ui.selectable_label(self.selected_note == Some(note.id), label).clicked() {
@@ -554,6 +554,44 @@ impl StudyPanel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn browse_scope_distinguishes_source_notes_plain_notes_and_identity_conflicts() {
+        fn note(tags: Vec<String>) -> NoteRow {
+            NoteRow {
+                id: 42,
+                fields: vec!["word".into(), "definition".into()],
+                tags,
+            }
+        }
+        let candidate = SourceCardCandidate {
+            provenance: retivus::source_adapter::SourceInfo {
+                provider_id: "fixture".into(),
+                edition: "v1".into(),
+                lexical_language: "es-MX".into(),
+                definition_language: "en".into(),
+                license_notice: "Synthetic".into(),
+            },
+            snapshot: "v1".into(),
+            entry_id: "one".into(),
+            sense_id: "s1".into(),
+            word: "banqueta".into(),
+            part_of_speech: "noun".into(),
+            definition: "sidewalk".into(),
+        };
+        let good = note(vec![candidate.source_tag()]);
+        let plain = note(vec!["ordinary".into()]);
+        let corrupt = note(vec![format!("{}::extra", candidate.source_tag())]);
+        let duplicate = note(vec![candidate.source_tag(), candidate.source_tag()]);
+        assert!(BrowseScope::All.matches(&good));
+        assert!(BrowseScope::SourceLinked.matches(&good));
+        assert!(!BrowseScope::Plain.matches(&good));
+        assert!(BrowseScope::Plain.matches(&plain));
+        assert!(!BrowseScope::SourceLinked.matches(&plain));
+        assert!(BrowseScope::Conflicts.matches(&corrupt));
+        assert!(BrowseScope::Conflicts.matches(&duplicate));
+        assert!(!BrowseScope::SourceLinked.matches(&corrupt));
+    }
 
     #[test]
     fn stateful_native_study_flow_requires_reveal_and_preserves_review_after_reopen() {
