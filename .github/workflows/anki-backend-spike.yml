@@ -149,6 +149,88 @@ jobs:
           path: /tmp/retivus-feature-*.png
           if-no-files-found: ignore
           retention-days: 7
+      - name: Smoke feature-enabled native learner window under Wayland
+        env:
+          WLR_BACKENDS: headless
+          WLR_HEADLESS_OUTPUTS: "1"
+          WLR_RENDERER: pixman
+          WLR_LIBINPUT_NO_DEVICES: "1"
+          WLR_RENDERER_ALLOW_SOFTWARE: "1"
+          XDG_CURRENT_DESKTOP: sway
+          XDG_SESSION_TYPE: wayland
+          XDG_RUNTIME_DIR: ${{ runner.temp }}/retivus-wayland
+          LIBGL_ALWAYS_SOFTWARE: "1"
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq sway grim jq libegl1-mesa
+          mkdir -p "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          cat > "$RUNNER_TEMP/retivus-sway.conf" <<'SWAY'
+          output * resolution 1080x800
+          default_border pixel 1
+          xwayland disable
+          SWAY
+          sway -c "$RUNNER_TEMP/retivus-sway.conf" > /tmp/retivus-sway.log 2>&1 &
+          sway_pid=$!
+          app_pid=""
+          trap 'test -z "$app_pid" || kill "$app_pid" 2>/dev/null || true; kill "$sway_pid" 2>/dev/null || true' EXIT
+          unset WAYLAND_DISPLAY DISPLAY
+          for attempt in $(seq 1 70); do
+            for socket in "$XDG_RUNTIME_DIR"/wayland-*; do
+              if test -S "$socket"; then
+                export WAYLAND_DISPLAY="$(basename "$socket")"
+                break 2
+              fi
+            done
+            if ! kill -0 "$sway_pid" 2>/dev/null; then
+              cat /tmp/retivus-sway.log
+              exit 1
+            fi
+            sleep 0.25
+          done
+          test -n "${WAYLAND_DISPLAY:-}" || { cat /tmp/retivus-sway.log; exit 1; }
+          for attempt in $(seq 1 40); do
+            for socket in "$XDG_RUNTIME_DIR"/sway-ipc.*.sock; do
+              if test -S "$socket"; then
+                export SWAYSOCK="$socket"
+                break 2
+              fi
+            done
+            sleep 0.25
+          done
+          test -n "${SWAYSOCK:-}" || { cat /tmp/retivus-sway.log; exit 1; }
+          swaymsg -t get_outputs
+          ./upstream-anki/target/debug/retivus > /tmp/retivus-wayland-app.log 2>&1 &
+          app_pid=$!
+          opened=0
+          for attempt in $(seq 1 80); do
+            if swaymsg -t get_tree | jq -e '.. | objects | select(.name? == "Retivus")' >/dev/null; then
+              opened=1
+              break
+            fi
+            if ! kill -0 "$app_pid" 2>/dev/null; then
+              cat /tmp/retivus-wayland-app.log
+              exit 1
+            fi
+            sleep 0.25
+          done
+          test "$opened" -eq 1 || { cat /tmp/retivus-wayland-app.log; exit 1; }
+          sleep 1
+          grim -o HEADLESS-1 /tmp/retivus-wayland-wide.png
+          test "$(wc -c < /tmp/retivus-wayland-wide.png)" -gt 8000
+          swaymsg output HEADLESS-1 mode 720x650
+          sleep 1
+          grim -o HEADLESS-1 /tmp/retivus-wayland-narrow.png
+          test "$(wc -c < /tmp/retivus-wayland-narrow.png)" -gt 8000
+          kill -0 "$app_pid"
+      - name: Archive feature-enabled Wayland screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-anki-wayland-window
+          path: /tmp/retivus-wayland-*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Verify official Anki Desktop collection copy
         env:
           CARGO_BUILD_JOBS: "2"
