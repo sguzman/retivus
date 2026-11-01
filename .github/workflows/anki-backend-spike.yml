@@ -90,3 +90,15 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           cargo test --features anki-backend --lib
+      - name: Verify independent public Anki packages
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 "https://raw.githubusercontent.com/ankidroid/Anki-Android/210a8a2e30be1dc9b21dabb63ae39dc5c1b37963/AnkiDroid/src/androidTest/assets/update1.apkg" -o "$RUNNER_TEMP/retivus-ankidroid.apkg"
+          test "$(git hash-object "$RUNNER_TEMP/retivus-ankidroid.apkg")" = "5a0643b673d44d7e362f3353792460fe5e9b1eca"
+          curl --fail --location --silent --show-error --retry 3 "https://raw.githubusercontent.com/rhgg2/AnkiTemplate/49013896cabb62608b5c915bcd855bd5f6f419dc/Sample%20deck.apkg" -o "$RUNNER_TEMP/retivus-public-sample.apkg"
+          test "$(git hash-object "$RUNNER_TEMP/retivus-public-sample.apkg")" = "efa7d43b142b626a5b8ca038bcbf0fe5659980b5"
+          RETIVUS_ANKIDROID_APKG="$RUNNER_TEMP/retivus-ankidroid.apkg" RETIVUS_PUBLIC_SAMPLE_APKG="$RUNNER_TEMP/retivus-public-sample.apkg" cargo test --features anki-backend --lib independent_public_apkg_fixtures -- --ignored

@@ -698,6 +698,78 @@ mod tests {
     use anki::storage::SchemaVersion;
     use tempfile::tempdir;
 
+    /// These public assets are downloaded by CI at pinned commits and validated
+    /// by their Git blob hashes; no third-party binaries are bundled in Retivus.
+    #[test]
+    #[ignore = "requires public package fixtures downloaded by integration CI"]
+    fn independent_public_apkg_fixtures_match_import_export_note_and_card_counts() {
+        for (env_key, minimum_notes, exact_counts) in [
+            ("RETIVUS_ANKIDROID_APKG", 1_usize, Some((1_usize, 1_usize))),
+            ("RETIVUS_PUBLIC_SAMPLE_APKG", 3_usize, None),
+        ] {
+            let path = std::path::PathBuf::from(
+                std::env::var_os(env_key).expect("CI must provide the pinned public package"),
+            );
+            let root = tempdir().unwrap();
+            let mut original =
+                AnkiBackend::create_managed_profile(root.path(), "independent").unwrap();
+            original.import_apkg(&path).unwrap();
+            let note_count = original
+                .collection
+                .search_notes("", SortMode::NoOrder)
+                .unwrap()
+                .len();
+            let card_count = original
+                .collection
+                .search_cards("", SortMode::NoOrder)
+                .unwrap()
+                .len();
+            assert!(
+                note_count >= minimum_notes && card_count >= note_count,
+                "unexpected public package counts for {env_key}"
+            );
+            if let Some((notes, cards)) = exact_counts {
+                assert_eq!((note_count, card_count), (notes, cards));
+            }
+            let exported = root.path().join("independent-roundtrip.apkg");
+            assert_eq!(original.export_apkg_to(&exported).unwrap(), note_count);
+
+            let damaged = root.path().join("malformed.apkg");
+            fs::write(&damaged, b"not a zip archive").unwrap();
+            assert!(original.import_apkg(&damaged).is_err());
+            assert_eq!(
+                original
+                    .collection
+                    .search_notes("", SortMode::NoOrder)
+                    .unwrap()
+                    .len(),
+                note_count
+            );
+            original.close().unwrap();
+
+            let mut reimport =
+                AnkiBackend::create_managed_profile(root.path(), "independent-again").unwrap();
+            reimport.import_apkg(&exported).unwrap();
+            assert_eq!(
+                reimport
+                    .collection
+                    .search_notes("", SortMode::NoOrder)
+                    .unwrap()
+                    .len(),
+                note_count
+            );
+            assert_eq!(
+                reimport
+                    .collection
+                    .search_cards("", SortMode::NoOrder)
+                    .unwrap()
+                    .len(),
+                card_count
+            );
+            reimport.close().unwrap();
+        }
+    }
+
     #[test]
     fn package_round_trip_preserves_media_notes_decks_templates_and_tags() {
         let root = tempdir().unwrap();
