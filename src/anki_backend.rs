@@ -1289,7 +1289,9 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         assert_eq!(matched[0].fields, ["banco", "bank"]);
         assert!(backend.browse_notes("front:banco", 0).is_err());
         assert!(backend.browse_notes("", 101).is_err());
-        backend.edit_note_fields(needle, &["banca", "bench"]).unwrap();
+        backend
+            .edit_note_fields(needle, &["banca", "bench"])
+            .unwrap();
         assert_eq!(backend.browse_notes("front:banca", 10).unwrap().len(), 1);
         backend.undo_last().unwrap();
         assert_eq!(backend.browse_notes("front:banco", 10).unwrap().len(), 1);
