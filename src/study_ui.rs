@@ -333,7 +333,8 @@ impl StudyPanel {
         };
         match backend.remove_note(note_id) {
             Ok(()) => {
-                self.status = format!("Deleted note {note_id}; Undo last Anki edit can restore it.");
+                self.status =
+                    format!("Deleted note {note_id}; Undo last Anki edit can restore it.");
                 self.selected_note = None;
                 self.front.clear();
                 self.back.clear();
@@ -850,7 +851,12 @@ mod tests {
         panel.delete_selected_note();
         assert!(panel.status.contains("Confirm deletion"));
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
             ["keep me", "safe"]
         );
         panel.close();
@@ -886,7 +892,12 @@ mod tests {
         panel.root = original.path().to_string_lossy().into_owned();
         panel.profile_id = "original".into();
         panel.connect(true);
-        let deck = panel.backend.as_mut().unwrap().create_deck("Spanish").unwrap();
+        let deck = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Spanish")
+            .unwrap();
         panel.deck_id = Some(deck);
         panel.root = other.path().to_string_lossy().into_owned();
         panel.profile_id = "unrelated".into();
@@ -912,7 +923,12 @@ mod tests {
         panel.profile_id = "ui-frame".into();
         panel.connect(true);
         assert!(panel.backend.is_some(), "{}", panel.status);
-        let deck = panel.backend.as_mut().unwrap().create_deck("Visible").unwrap();
+        let deck = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Visible")
+            .unwrap();
         panel
             .backend
             .as_mut()
@@ -955,7 +971,12 @@ mod tests {
         panel.delete_selected_note();
         assert!(panel.status.contains("Confirm deletion"));
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
             ["árbol", "tree"]
         );
         panel.confirm_delete = true;
@@ -963,16 +984,31 @@ mod tests {
         assert!(panel.status.contains("Deleted note"), "{}", panel.status);
         assert!(!panel.confirm_delete);
         assert!(panel.selected_note.is_none());
-        assert!(panel.backend.as_ref().unwrap().note_fields(note_id).is_err());
+        assert!(panel
+            .backend
+            .as_ref()
+            .unwrap()
+            .note_fields(note_id)
+            .is_err());
         panel.undo_last_edit();
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
             ["árbol", "tree"]
         );
         panel.close();
         panel.connect(false);
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
             ["árbol", "tree"]
         );
         panel.close();
