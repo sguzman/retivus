@@ -1375,7 +1375,8 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
     #[test]
     fn review_deck_selection_scopes_queue_and_survives_profile_reopen() {
         let root = tempdir().unwrap();
-        let mut backend = AnkiBackend::create_managed_profile(root.path(), "deck-selection").unwrap();
+        let mut backend =
+            AnkiBackend::create_managed_profile(root.path(), "deck-selection").unwrap();
         let first_deck = backend.create_deck("First").unwrap();
         let second_deck = backend.create_deck("Second").unwrap();
         backend.add_basic_note(first_deck, "uno", "one").unwrap();

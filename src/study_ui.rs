@@ -211,7 +211,9 @@ impl StudyPanel {
     /// Accept exactly one valid Retivus source identity. Multiple source
     /// identities are a conflict, never a basis for automatic reconciliation.
     fn source_provenance(tags: &[String]) -> Result<Option<[String; 4]>, String> {
-        let mut source_tags = tags.iter().filter(|tag| tag.starts_with("retivus::source::"));
+        let mut source_tags = tags
+            .iter()
+            .filter(|tag| tag.starts_with("retivus::source::"));
         let Some(tag) = source_tags.next() else {
             return Ok(None);
         };
