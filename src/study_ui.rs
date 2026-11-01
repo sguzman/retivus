@@ -115,8 +115,22 @@ impl StudyPanel {
                         .map(|(id, _)| *id);
                 }
                 self.notes = notes;
+                if self
+                    .selected_note
+                    .is_some_and(|id| !self.notes.iter().any(|note| note.id == id))
+                {
+                    self.selected_note = None;
+                    self.confirm_delete = false;
+                    self.front.clear();
+                    self.back.clear();
+                }
             }
             (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
+                self.notes.clear();
+                self.selected_note = None;
+                self.confirm_delete = false;
+                self.front.clear();
+                self.back.clear();
                 self.status = format!("Could not browse profile: {error}");
             }
         }
@@ -496,9 +510,12 @@ impl StudyPanel {
                 }
                 if self.selected_note.is_some() {
                     ui.horizontal_wrapped(|ui| {
-                        ui.checkbox(&mut self.confirm_delete, "Confirm permanent note deletion");
+                        ui.checkbox(&mut self.confirm_delete, "Confirm removal of selected note");
                         if ui
-                            .add_enabled(self.confirm_delete, egui::Button::new("Delete selected note"))
+                            .add_enabled(
+                                self.confirm_delete,
+                                egui::Button::new("Delete selected note"),
+                            )
                             .clicked()
                         {
                             self.delete_selected_note();
@@ -778,6 +795,37 @@ mod tests {
         assert_eq!(
             panel.backend.as_ref().unwrap().note_fields(second).unwrap(),
             ["橋", "connect"]
+        );
+        panel.close();
+    }
+
+    #[test]
+    fn filtering_out_selected_note_clears_destructive_confirmation() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "filtered".into();
+        panel.connect(true);
+        let note_id = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .add_basic_note(1, "keep me", "safe")
+            .unwrap();
+        panel.selected_note = Some(note_id);
+        panel.front = "keep me".into();
+        panel.back = "safe".into();
+        panel.confirm_delete = true;
+        panel.query = "front:unmatched".into();
+        panel.refresh();
+        assert!(panel.notes.is_empty());
+        assert!(panel.selected_note.is_none());
+        assert!(!panel.confirm_delete);
+        panel.delete_selected_note();
+        assert!(panel.status.contains("Confirm deletion"));
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            ["keep me", "safe"]
         );
         panel.close();
     }
