@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Active development. The [weighted implementation roadmap](ROADMAP.md) records only verified task completions. M0–M3 are verified, including Anki-backed FSRS grading and local recovery. The opt-in native learner workspace has verified real Anki due-queue review, grading, undo and persistence on X11, with managed-profile notes, source selection, and package import/export. Complete keyboard-and-mouse import-to-review UX, source-conflict management, native Wayland QA, independent Anki Desktop/AnkiWeb interoperability and release acceptance remain in progress.
+Active development; **66% of the weighted acceptance roadmap is verified** at the latest published checkpoint. M0–M3 and all of M5 are complete, including actual keyboard/pointer source-to-review workflows, guarded source conflicts, persistent Anki FSRS grading, managed profiles, and native X11/Wayland wide/narrow screenshots. The real 124,444-entry Mexilex source passed bounded memory and indexed-search benchmarks (M6.2). Independently validated Anki Desktop round-trip, AnkiWeb sync, remaining security/integration hardening and release acceptance are unfinished. The [weighted implementation roadmap](ROADMAP.md) is authoritative for current completion.
 
 ## Architecture
 
@@ -36,7 +36,7 @@ cargo run --features anki-backend --bin retivus
 cargo test --features anki-backend --bin retivus
 ```
 
-The learner workspace never automatically opens your ordinary Anki profile. Choose an existing profile root and a separate Retivus profile ID, then explicitly create/open it. Review grades and undo use the pinned Anki scheduler. Package import/export accepts explicitly chosen absolute `.apkg` paths and refuses export overwrites. The preview can stage exact senses from a user-described generic TSV source into the profile's SQLite source catalog; raw Mexilex JSONL is **preview-only** until its release archive has been independently checksum/rights-verified and imported into that catalog. Source identities are never guessed from word spellings. Rendered card HTML is currently shown as inert text, not executed as a web page. This is a development feature, **not** a finished release or AnkiWeb sync client.
+The learner workspace never automatically opens your ordinary Anki profile. Choose an existing profile root and a separate Retivus profile ID, then explicitly create/open it. Review grades and undo use the pinned Anki scheduler. Package import/export accepts explicitly chosen absolute `.apkg` paths, checks archives before importing, and refuses export overwrites. Imports and exports each exclude personal review/scheduling history by default, with separate explicit opt-ins. The preview can stage exact senses from a user-described generic TSV source into the profile's SQLite source catalog; raw Mexilex JSONL is **preview-only** until its release archive has been independently checksum/rights-verified and imported into that catalog. Source identities are never guessed from word spellings. Rendered card HTML is currently shown as inert text, not executed as a web page. This is a development feature, **not** a finished release or AnkiWeb sync client.
 
 ## License
 
