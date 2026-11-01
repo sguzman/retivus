@@ -838,6 +838,53 @@ fn check_apkg_path(path: &Path) -> BackendResult<()> {
         return Err("an absolute .apkg file path is required".into());
     }
     check_regular(path, false)?;
+    reject_unsafe_package_members(path)?;
+    Ok(())
+}
+
+/// Validate archive metadata before letting Anki extract media. This scan does
+/// not unzip anything, access learner data, or follow filesystem paths.
+fn reject_unsafe_package_members(path: &Path) -> BackendResult<()> {
+    let archive = fs::File::open(path)?;
+    let mut zip = zip::ZipArchive::new(archive)?;
+    if zip.len() > 1_000_000 {
+        return Err("package has too many archive entries".into());
+    }
+    let mut expanded = 0_u64;
+    for index in 0..zip.len() {
+        let file = zip.by_index(index)?;
+        let raw = file.name()?;
+        let enclosed = file
+            .enclosed_name()
+            .ok_or("package contains a path outside the archive root")?;
+        if raw.starts_with('/')
+            || raw.starts_with('\\')
+            || raw.contains('\\')
+            || raw.contains(':')
+            || raw.chars().any(char::is_control)
+            || enclosed.components().any(|part| !matches!(part, std::path::Component::Normal(_)))
+        {
+            return Err("package contains an unsafe media path".into());
+        }
+        if file
+            .unix_mode()
+            .is_some_and(|mode| (mode & 0o170000) == 0o120000)
+        {
+            return Err("package contains a symbolic link".into());
+        }
+        expanded = expanded
+            .checked_add(file.size())
+            .ok_or("package expanded size overflow")?;
+        if expanded > 64 * 1024 * 1024 * 1024 {
+            return Err("package exceeds maximum expanded archive size".into());
+        }
+        if file.size() > 1024 * 1024
+            && (file.compressed_size() == 0
+                || file.size() / file.compressed_size() > 100)
+        {
+            return Err("package contains suspiciously compressed media".into());
+        }
+    }
     Ok(())
 }
 
@@ -1201,6 +1248,66 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             assert!(managed.import_apkg(&path).is_err());
         }
         managed.close().unwrap();
+    }
+
+    #[test]
+    fn apkg_archive_preflight_blocks_traversal_windows_paths_and_zip_bombs() {
+        use std::io::Write;
+        use zip::write::SimpleFileOptions;
+
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "archive-safe").unwrap();
+        let intact = backend.add_basic_note(1, "original", "safe").unwrap();
+        for (index, archive_member) in [
+            "../outside.txt",
+            "C:\\windows\\outside.txt",
+            "/absolute.txt",
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let package = root.path().join(format!("unsafe-{index}.apkg"));
+            let mut zip = zip::ZipWriter::new(fs::File::create(&package).unwrap());
+            zip.start_file(archive_member, SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"not a collection").unwrap();
+            zip.finish().unwrap();
+            assert!(
+                reject_unsafe_package_members(&package).is_err(),
+                "{archive_member}"
+            );
+            assert!(backend.import_apkg(&package).is_err(), "{archive_member}");
+            assert!(!root.path().join("outside.txt").exists());
+            assert_eq!(
+                backend.note_fields(intact).unwrap(),
+                ["original", "safe"]
+            );
+        }
+
+        let bomb = root.path().join("compressed-bomb.apkg");
+        let mut zip = zip::ZipWriter::new(fs::File::create(&bomb).unwrap());
+        zip.start_file(
+            "0",
+            SimpleFileOptions::default().compression_method(zip::CompressionMethod::Deflated),
+        )
+        .unwrap();
+        zip.write_all(&vec![0_u8; 2_000_000]).unwrap();
+        zip.finish().unwrap();
+        assert!(reject_unsafe_package_members(&bomb).is_err());
+        assert!(backend.import_apkg(&bomb).is_err());
+        assert_eq!(backend.note_fields(intact).unwrap(), ["original", "safe"]);
+
+        let valid_unicode = root.path().join("unicode-media.apkg");
+        let mut zip = zip::ZipWriter::new(fs::File::create(&valid_unicode).unwrap());
+        zip.start_file(
+            "écriture/日本語.txt",
+            SimpleFileOptions::default(),
+        )
+        .unwrap();
+        zip.write_all(b"safe unicode path").unwrap();
+        zip.finish().unwrap();
+        assert!(reject_unsafe_package_members(&valid_unicode).is_ok());
+        backend.close().unwrap();
     }
 
     #[test]
