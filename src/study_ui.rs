@@ -553,7 +553,12 @@ mod tests {
             };
             ui.connect(true);
             assert!(ui.backend.is_some(), "{}", ui.status);
-            note_id = ui.backend.as_mut().unwrap().add_basic_note(1, "vida", "life").unwrap();
+            note_id = ui
+                .backend
+                .as_mut()
+                .unwrap()
+                .add_basic_note(1, "vida", "life")
+                .unwrap();
             // No explicit close: dropping the window must shut down Anki cleanly.
         }
         let reopened = AnkiBackend::open_managed_profile(root.path(), "shutdown").unwrap();
@@ -571,7 +576,12 @@ mod tests {
             ..StudyPanel::default()
         };
         panel.connect(true);
-        let deck = panel.backend.as_mut().unwrap().create_deck("Vocabulary").unwrap();
+        let deck = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Vocabulary")
+            .unwrap();
         panel.deck_id = Some(deck);
         let adapter = MexilexV1::default();
         let row = SourceRecord {
@@ -587,8 +597,17 @@ mod tests {
         assert!(panel
             .add_validated_source_choice(&adapter, &root.path().join("raw.jsonl"), &row, "sense")
             .is_err());
-        assert!(!root.path().join("protected/source-catalog.sqlite3").exists());
-        assert!(panel.backend.as_mut().unwrap().browse_notes("", 10).unwrap().is_empty());
+        assert!(!root
+            .path()
+            .join("protected/source-catalog.sqlite3")
+            .exists());
+        assert!(panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .browse_notes("", 10)
+            .unwrap()
+            .is_empty());
         panel.close();
     }
 
