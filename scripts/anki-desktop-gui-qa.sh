@@ -46,13 +46,67 @@ for i in $(seq 1 120); do
   [[ "$notes" == 4 && "$cards" == 5 ]] && break
   if [[ "$i" == 8 || "$i" == 20 || "$i" == 40 ]]; then
     capture "import-dialog-$i"
-    xdotool key --clearmodifiers Return || true
+  fi
+  if [[ "$i" == 8 ]]; then
+    # Official Anki's Svelte Import File toolbar binds Ctrl+Enter to Import.
+    xdotool key --clearmodifiers ctrl+Return
   fi
   sleep 1
 done
 capture desktop-import-result
 [[ "$notes" == 4 && "$cards" == 5 ]] || { echo "Official GUI import did not create 4 notes / 5 cards"; exit 1; }
 echo "Official Anki Desktop imported 4 notes / 5 cards"
+# Dismiss the completed import window; Ctrl+E must reach the main UI.
+import_window="$(xdotool search --onlyvisible --name '^Import File
+sleep 3
+capture desktop-export-dialog
+dialog="$(xdotool search --onlyvisible --name Export 2>/dev/null | tail -n 1 || true)"
+[[ -n "$dialog" ]] || { echo "Official Desktop Export dialog missing"; exit 1; }
+xdotool windowactivate --sync "$dialog" || true
+xdotool mousemove --window "$dialog" 220 50 click 1 || true
+xdotool key --clearmodifiers Home Return
+sleep 1
+capture desktop-apkg-selected
+xdotool key --clearmodifiers Return
+sleep 2
+capture desktop-save-chooser
+xdotool key --clearmodifiers ctrl+a
+xdotool type --clearmodifiers --delay 5 "$root/anki-desktop-reexport.apkg"
+xdotool key --clearmodifiers Return
+for i in $(seq 1 50); do
+  [[ -s "$root/anki-desktop-reexport.apkg" ]] && exit 0
+  sleep 1
+done
+echo "Official Desktop .apkg reexport did not appear"; exit 1
+ 2>/dev/null | tail -n 1 || true)"
+if [[ -n "$import_window" ]]; then
+  xdotool windowclose "$import_window" || true
+  sleep 1
+fi
+main_window="$(xdotool search --onlyvisible --name ' - Anki
+sleep 3
+capture desktop-export-dialog
+dialog="$(xdotool search --onlyvisible --name Export 2>/dev/null | tail -n 1 || true)"
+[[ -n "$dialog" ]] || { echo "Official Desktop Export dialog missing"; exit 1; }
+xdotool windowactivate --sync "$dialog" || true
+xdotool mousemove --window "$dialog" 220 50 click 1 || true
+xdotool key --clearmodifiers Home Return
+sleep 1
+capture desktop-apkg-selected
+xdotool key --clearmodifiers Return
+sleep 2
+capture desktop-save-chooser
+xdotool key --clearmodifiers ctrl+a
+xdotool type --clearmodifiers --delay 5 "$root/anki-desktop-reexport.apkg"
+xdotool key --clearmodifiers Return
+for i in $(seq 1 50); do
+  [[ -s "$root/anki-desktop-reexport.apkg" ]] && exit 0
+  sleep 1
+done
+echo "Official Desktop .apkg reexport did not appear"; exit 1
+ 2>/dev/null | head -n 1 || true)"
+[[ -n "$main_window" ]] || { echo "Anki main window disappeared after import"; exit 1; }
+xdotool windowactivate --sync "$main_window" || true
 xdotool key --clearmodifiers ctrl+e
 sleep 3
 capture desktop-export-dialog
