@@ -28,7 +28,7 @@ jobs:
           CARGO_BUILD_JOBS: '2'
           PROTOC: /usr/bin/protoc
         run: |
-          cargo generate-lockfile
+          echo 'e062551fb2452c43fe3e8c8bfe2c17150ad3ea4847cbb0d8a98110eee9e00f13  Cargo.lock' | sha256sum -c -
           cargo build --locked --release --features anki-backend --bin retivus
       - name: Package source-accompanied candidate
         run: |

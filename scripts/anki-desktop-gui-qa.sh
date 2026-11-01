@@ -29,11 +29,11 @@ done
 [[ -n "$window" ]] || { echo "Official Anki window not found"; exit 1; }
 capture desktop-startup
 # Official Anki's first launch asks for a UI language and then requires
-# explicit confirmation. The confirmation defaults to No; an unqualified
-# Return sends the wizard back to the language picker indefinitely.
+# explicit confirmation. The confirmation defaults to No; select the observed
+# Yes button directly rather than looping back through the language chooser.
 xdotool key --clearmodifiers Return
 sleep 2
-xdotool key --clearmodifiers Left Return
+xdotool mousemove --sync 743 437 click 1
 sleep 5
 capture desktop-after-language-confirmation
 notes=0; cards=0

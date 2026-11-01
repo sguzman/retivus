@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Introduced source-accompanied Linux release-candidate packaging and safe, checksum-guarded local installation; green isolated build, GUI, update and uninstall CI 41356859751. The exact generated Cargo.lock is pinned for future builds. No production release has been published.
 - Verified adversarial archive and profile privacy regression coverage in [Anki CI 41354009838](https://github.com/sguzman/retivus/actions/runs/41354009838); raw nested traversal components are rejected before ZIP path normalization. The feature fixture build also reuses the existing Cargo target directory to avoid duplicate compilation.
 - Verified independent AnkiDroid/third-party `.apkg` source SQLite note/card counts, rich cloze/HTML/CSS/media package parity, and copy-only offline Anki collection migration. Actual Anki Desktop GUI reexport and AnkiWeb sync are still pending.
 - Added independently measured full Mexilex preview, catalog import and 1,000 indexed lookup benchmarks on the pinned 124,444-entry release; memory bounds passed [provider CI 41342157443](https://github.com/sguzman/retivus/actions/runs/41342157443).
