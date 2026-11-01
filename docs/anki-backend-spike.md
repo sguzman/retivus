@@ -26,6 +26,12 @@ Shareable package export now defaults to excluding scheduling and private review
 
 An automated regression compares ordinary and opted-in exports by reimporting both into isolated profiles and inspecting their persisted review logs. Importing the foreign review log is also a separate explicit opt-in: Anki's upstream import options default to disabling scheduling transfer, even when the package contains it. This behavior is not credited until feature CI passes. Exports remain no-clobber and include deck definitions, notes and media.
 
+## Independent shared-deck count verification (pending)
+
+The Anki feature workflow already imports pinned public AnkiDroid and third-party sample packages, exports them with the pinned engine, and verifies note/card counts after reimport. A stronger pending regression reads the original package's embedded SQLite database *directly*, rather than relying on the Retivus importer as its own baseline. It selects the zstd-compressed collection from modern packages and the raw SQLite collection from legacy packages, then compares the source's exact note/card totals with the Retivus import before any reexport.
+
+This is independent count evidence for real public packages, not proof that the Anki Desktop GUI can open, display and export every card or that CSS/media rendering matches desktop. M4 acceptance is not credited before the new feature CI passes and the separate desktop requirements are met.
+
 ## Repeatable build experiment
 
 [Anki Rust integration feasibility workflow](../.github/workflows/anki-backend-spike.yml) checks out the exact upstream commit into an isolated temporary directory and attempts `cargo check --locked -p anki` on GitHub's Linux worker. It never writes to the Retivus source tree, modifies Anki, or opens a user's collection. An experiment failure must be documented verbatim, classified (toolchain/dependency/build-script/API/license), and resolved before any claim of successful direct integration.
