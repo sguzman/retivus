@@ -6,7 +6,10 @@ use std::time::{Duration, Instant};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let path = PathBuf::from(args.next().ok_or("usage: benchmark-catalog <catalog.sqlite3>")?);
+    let path = PathBuf::from(
+        args.next()
+            .ok_or("usage: benchmark-catalog <catalog.sqlite3>")?,
+    );
     if args.next().is_some() {
         return Err("usage: benchmark-catalog <catalog.sqlite3>".into());
     }
@@ -30,6 +33,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     if elapsed > Duration::from_secs(10) {
         return Err("1000 indexed catalog lookups exceeded the 10-second benchmark gate".into());
     }
-    println!("Performed 1000 indexed source catalog lookups in {} ms", elapsed.as_millis());
+    println!(
+        "Performed 1000 indexed source catalog lookups in {} ms",
+        elapsed.as_millis()
+    );
     Ok(())
 }

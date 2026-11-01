@@ -1392,7 +1392,10 @@ mod tests {
             .get_by_role_and_label(egui::accesskit::Role::TextInput, "Front")
             .focus();
         harness.run();
-        harness.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::A);
+        harness.key_press_modifiers(
+            egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+            egui::Key::A,
+        );
         harness.run();
         harness
             .get_by_role_and_label(egui::accesskit::Role::TextInput, "Front")
@@ -1441,7 +1444,10 @@ mod tests {
             .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
             .focus();
         harness.run();
-        harness.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::A);
+        harness.key_press_modifiers(
+            egui::Modifiers::CTRL | egui::Modifiers::COMMAND,
+            egui::Key::A,
+        );
         harness.run();
         harness
             .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")

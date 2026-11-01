@@ -60,7 +60,7 @@ jobs:
           peak_kib="$(cat data/preview-peak-rss-kib.txt)"
           test "$peak_kib" -gt 0
           test "$peak_kib" -lt 524288
-          echo "Bounded full-release preview peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Bounded full-release preview peak RSS: ${peak_kib} KiB (< 512 MiB)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Import entire verified snapshot atomically within memory budget
         run: |
           set -euo pipefail
@@ -73,7 +73,7 @@ jobs:
           peak_kib="$(cat data/catalog-peak-rss-kib.txt)"
           test "$peak_kib" -gt 0
           test "$peak_kib" -lt 524288
-          echo "Full-release SQLite catalog import peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
+          echo "Full-release SQLite catalog import peak RSS: ${peak_kib} KiB (< 512 MiB)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Benchmark indexed source lookup after full catalog import
         run: |
           set -euo pipefail
@@ -85,7 +85,7 @@ jobs:
           peak_kib="$(cat data/lookup-peak-rss-kib.txt)"
           test "$peak_kib" -gt 0
           test "$peak_kib" -lt 524288
-          echo "1000 indexed source lookups peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
+          echo "1000 indexed source lookups peak RSS: ${peak_kib} KiB (< 512 MiB)" | tee -a "$GITHUB_STEP_SUMMARY"
       - name: Report independent consumer evidence
         run: |
           echo '## Mexilex published source integration' >> "$GITHUB_STEP_SUMMARY"

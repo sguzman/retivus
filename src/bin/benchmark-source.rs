@@ -6,7 +6,9 @@ use std::io::BufReader;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let path = args.next().ok_or("usage: benchmark-source <verified-study.jsonl>")?;
+    let path = args
+        .next()
+        .ok_or("usage: benchmark-source <verified-study.jsonl>")?;
     if args.next().is_some() {
         return Err("usage: benchmark-source <verified-study.jsonl>".into());
     }
