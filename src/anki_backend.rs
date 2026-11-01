@@ -638,7 +638,9 @@ mod tests {
         reopened.close().unwrap();
     }
 
- {
+    #[cfg(unix)]
+    #[test]
+    fn refuses_profile_or_database_symlink_redirects() {
         use std::os::unix::fs::symlink;
 
         let tmp = tempdir().unwrap();
