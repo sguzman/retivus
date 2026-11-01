@@ -606,7 +606,7 @@ mod tests {
 
     #[test]
     fn native_gui_keyboard_and_mouse_select_a_validated_source_sense() {
-        use egui_kittest::{Harness, kittest::Queryable as _};
+        use egui_kittest::{kittest::Queryable as _, Harness};
 
         let root = tempfile::tempdir().unwrap();
         let file = root.path().join("words.tsv");
@@ -628,20 +628,14 @@ mod tests {
         }
         harness.run();
 
-        let file_field = harness.get_by_role_and_label(
-            egui::accesskit::Role::TextInput,
-            "File",
-        );
+        let file_field = harness.get_by_role_and_label(egui::accesskit::Role::TextInput, "File");
         file_field.focus();
         harness.run();
         harness
             .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
             .type_text(&file.to_string_lossy());
         harness.run();
-        assert_eq!(
-            harness.state().source_path,
-            file.to_string_lossy().as_ref()
-        );
+        assert_eq!(harness.state().source_path, file.to_string_lossy().as_ref());
 
         harness.get_by_label("Validate source").click();
         harness.run();

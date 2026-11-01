@@ -1358,7 +1358,7 @@ mod tests {
 
     #[test]
     fn accessible_native_ui_completes_source_to_study_review_with_pointer_events() {
-        use egui_kittest::{Harness, kittest::Queryable as _};
+        use egui_kittest::{kittest::Queryable as _, Harness};
 
         let root = tempfile::tempdir().unwrap();
         let source_path = root.path().join("words.tsv");
@@ -1381,7 +1381,13 @@ mod tests {
             app.study.profile_id = "qa".into();
             app.study.connect(true);
             assert!(app.study.backend.is_some(), "{}", app.study.status);
-            let deck = app.study.backend.as_mut().unwrap().create_deck("Words").unwrap();
+            let deck = app
+                .study
+                .backend
+                .as_mut()
+                .unwrap()
+                .create_deck("Words")
+                .unwrap();
             app.study.deck_id = Some(deck);
             app.study.refresh_review();
         }
@@ -1401,7 +1407,10 @@ mod tests {
             .get_by_label("Stage complete source snapshot (no cards)")
             .click();
         harness.run();
-        assert!(harness.state().import_status.contains("Staged 1 source entries"));
+        assert!(harness
+            .state()
+            .import_status
+            .contains("Staged 1 source entries"));
         assert_eq!(harness.state().study.stats.notes, 0);
 
         harness.get_by_label("Select sense").scroll_to_me();
