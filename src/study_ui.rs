@@ -1479,16 +1479,51 @@ mod tests {
                 )),
             )
             .unwrap();
-        let source = catalog
-            .select_sense("version-fixture", "v1", "1", "a")
-            .unwrap();
-        let target = catalog
-            .select_sense("version-fixture", "v2", "1", "a")
-            .unwrap();
-        catalog.record_reconciliation(&source, &target).unwrap();
         drop(catalog);
+        let review_id = panel.review.as_ref().unwrap().card_id;
+        panel.revealed = true;
+        panel.grade_revealed(4);
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(review_id)
+                .unwrap(),
+            1
+        );
+        panel.mapping_to_snapshot = "v2".into();
+        panel.mapping_to_entry = "1".into();
+        panel.mapping_to_sense = "a".into();
+        panel.preview_source_mapping();
+        assert!(panel.mapping_preview.is_some(), "{}", panel.status);
+        panel.record_source_mapping();
+        assert!(panel.status.contains("not recorded"));
+        panel.mapping_approved = true;
+        panel.record_source_mapping();
+        assert!(panel.status.contains("Recorded explicit mapping"));
         panel.inspect_selected_source();
         assert!(panel.source_report.contains("Update available"));
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(id).unwrap(),
+            ["mar", "sea"]
+        );
+        panel.apply_recorded_source_mapping();
+        assert!(panel.status.contains("Source revision applied"));
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(id).unwrap(),
+            ["mar", "ocean"]
+        );
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(review_id)
+                .unwrap(),
+            1
+        );
+        panel.backend.as_mut().unwrap().undo_last().unwrap();
         assert_eq!(
             panel.backend.as_ref().unwrap().note_fields(id).unwrap(),
             ["mar", "sea"]
