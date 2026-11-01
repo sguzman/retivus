@@ -1357,6 +1357,109 @@ mod tests {
     }
 
     #[test]
+    fn native_mouse_selection_keyboard_note_edit_and_search_workflow() {
+        use egui_kittest::{kittest::Queryable as _, Harness};
+
+        let root = tempfile::tempdir().unwrap();
+        let mut harness = Harness::new_eframe(|_| crate::Retivus::default());
+        let note_id = {
+            let app = harness.state_mut();
+            app.study.root = root.path().to_string_lossy().into_owned();
+            app.study.profile_id = "edit".into();
+            app.study.connect(true);
+            let backend = app.study.backend.as_mut().unwrap();
+            let deck = backend.create_deck("Browse").unwrap();
+            let note = backend.add_basic_note(deck, "uno", "one").unwrap();
+            app.study.deck_id = Some(deck);
+            app.study.refresh();
+            app.study.refresh_review();
+            note
+        };
+        harness.run();
+
+        let label = format!("{note_id} · uno");
+        harness.get_by_label(&label).scroll_to_me();
+        harness.run();
+        harness.get_by_label(&label).click();
+        harness.run();
+        assert_eq!(harness.state().study.selected_note, Some(note_id));
+
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Front")
+            .scroll_to_me();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Front")
+            .focus();
+        harness.run();
+        harness.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::A);
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Front")
+            .type_text("dos");
+        harness.run();
+        harness.get_by_label("Save edited note").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Save edited note").click();
+        harness.run();
+        assert_eq!(
+            harness
+                .state()
+                .study
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
+            ["dos", "one"]
+        );
+
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
+            .scroll_to_me();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
+            .focus();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
+            .type_text("front:dos");
+        harness.run();
+        harness.get_by_label("Search / refresh").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Search / refresh").click();
+        harness.run();
+        assert_eq!(harness.state().study.notes.len(), 1);
+        assert_eq!(harness.state().study.notes[0].id, note_id);
+
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
+            .scroll_to_me();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
+            .focus();
+        harness.run();
+        harness.key_press_modifiers(egui::Modifiers::CTRL, egui::Key::A);
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Search notes")
+            .type_text("front:missing");
+        harness.run();
+        harness.get_by_label("Search / refresh").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Search / refresh").click();
+        harness.run();
+        assert!(harness.state().study.notes.is_empty());
+        assert!(harness.state().study.selected_note.is_none());
+        drop(harness);
+        let mut reopened = AnkiBackend::open_managed_profile(root.path(), "edit").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["dos", "one"]);
+        reopened.close().unwrap();
+    }
+
+    #[test]
     fn accessible_native_ui_completes_source_to_study_review_with_pointer_events() {
         use egui_kittest::{kittest::Queryable as _, Harness};
 
