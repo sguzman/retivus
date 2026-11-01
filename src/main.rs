@@ -42,7 +42,11 @@ impl eframe::App for Retivus {
         });
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.label(egui::RichText::new("Retivus").heading().color(brand::accent(ctx.theme())));
+                ui.label(
+                    egui::RichText::new("Retivus")
+                        .heading()
+                        .color(brand::accent(ctx.theme())),
+                );
                 ui.separator();
                 ui.label("Appearance");
                 egui::ComboBox::from_id_salt("appearance")

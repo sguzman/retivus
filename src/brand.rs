@@ -52,7 +52,13 @@ mod tests {
         let ctx = egui::Context::default();
         ctx.set_theme(egui::ThemePreference::System);
         apply_to_context(&ctx);
-        assert_eq!(ctx.style_of(Theme::Light).visuals.selection.bg_fill, LIGHT_ACCENT);
-        assert_eq!(ctx.style_of(Theme::Dark).visuals.selection.bg_fill, DARK_ACCENT);
+        assert_eq!(
+            ctx.style_of(Theme::Light).visuals.selection.bg_fill,
+            LIGHT_ACCENT
+        );
+        assert_eq!(
+            ctx.style_of(Theme::Dark).visuals.selection.bg_fill,
+            DARK_ACCENT
+        );
     }
 }
