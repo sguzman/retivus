@@ -426,7 +426,7 @@ impl SourceCatalog {
                  ORDER BY 1, 2 LIMIT ?4 OFFSET ?5",
             )
             .map_err(|e| e.to_string())?;
-        query
+        let changes = query
             .query_map(params![provider, before, after, limit, offset], |row| {
                 let before_word: Option<String> = row.get(2)?;
                 let after_word: Option<String> = row.get(5)?;
@@ -455,7 +455,8 @@ impl SourceCatalog {
             })
             .map_err(|e| e.to_string())?
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| e.to_string())
+            .map_err(|e| e.to_string())?;
+        Ok(changes)
     }
 
     /// Record an explicit one-to-one source identity migration. It changes no
