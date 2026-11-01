@@ -250,10 +250,12 @@ impl StudyPanel {
     fn inspect_selected_source(&mut self) {
         let outcome = (|| -> Result<String, String> {
             let note_id = self.selected_note.ok_or("Select a learner note first")?;
-            let backend = self.backend.as_ref().ok_or("Open a learner profile first")?;
+            let backend = self
+                .backend
+                .as_ref()
+                .ok_or("Open a learner profile first")?;
             let tags = backend.note_tags(note_id).map_err(|e| e.to_string())?;
-            let Some([provider, snapshot, entry, sense]) = Self::source_provenance(&tags)?
-            else {
+            let Some([provider, snapshot, entry, sense]) = Self::source_provenance(&tags)? else {
                 return Ok("This note has no linked external source.".into());
             };
             let path = self.managed_catalog_path()?;
@@ -263,10 +265,7 @@ impl StudyPanel {
                 .select_sense(&provider, &snapshot, &entry, &sense)
                 .map_err(|e| format!("Source identity missing or invalid: {e}"))?;
             let fields = backend.note_fields(note_id).map_err(|e| e.to_string())?;
-            if fields.len() != 2
-                || fields[0] != original.word
-                || fields[1] != original.definition
-            {
+            if fields.len() != 2 || fields[0] != original.word || fields[1] != original.definition {
                 return Ok("Conflict: this note was edited independently of its source; automatic reconciliation is prohibited.".into());
             }
             let mapped = catalog
@@ -1243,7 +1242,8 @@ mod tests {
 
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("source.tsv");
-        let original = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ta\tsea\n";
+        let original =
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ta\tsea\n";
         fs::write(&path, original).unwrap();
         let v1 = StudyTsvV1::new(SourceInfo {
             provider_id: "version-fixture".into(),
@@ -1254,13 +1254,20 @@ mod tests {
         })
         .unwrap();
         let mut rows = Vec::new();
-        v1.visit(&mut BufReader::new(Cursor::new(original)), &mut |row| rows.push(row))
-            .unwrap();
+        v1.visit(&mut BufReader::new(Cursor::new(original)), &mut |row| {
+            rows.push(row)
+        })
+        .unwrap();
         let mut panel = StudyPanel::default();
         panel.root = root.path().to_string_lossy().into_owned();
         panel.profile_id = "versioned".into();
         panel.connect(true);
-        let deck = panel.backend.as_mut().unwrap().create_deck("Spanish").unwrap();
+        let deck = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Spanish")
+            .unwrap();
         panel.deck_id = Some(deck);
         let id = panel
             .add_validated_source_choice(&v1, &path, &rows[0], "a")
