@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **61%** of 100% (previous verified checkpoint 58%, this continuation **+3 percentage points**). Real egui keyboard/pointer source validation, sense selection, note creation, review grading and reopening passed. Backend/state tests cover native note editing and browsing; additional pointer-driven edit/search QA and Wayland visual QA remain pending. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **64%** of 100% (previous verified checkpoint 61%, this continuation **+3 percentage points**). Real keyboard/mouse GUI acceptance remains verified. Full Mexilex preview, import and indexed-search memory benchmarks passed against the pinned 124,444-entry release. Wayland visual QA and Anki Desktop interoperability remain pending. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the final 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -14,7 +14,7 @@
 | 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
 | 🎨 M5 Complete native egui study experience | 14% | 12% | 🟡 |
-| 🧪 M6 Integration hardening, performance and correctness | 12% | 0% | ⏳ |
+| 🧪 M6 Integration hardening, performance and correctness | 12% | 3% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
 ## Milestones, phases and objective criteria
@@ -69,7 +69,7 @@
 ### 🧪 M6: Integration hardening, performance and correctness (12% of project)
 
 - ⏳ **M6.1 🧪 Repeatable fixtures/CI for backend, provider, scheduler and .apkg** — **3%**. Acceptance: End-to-end regression tests green. Depends on: M2,M3,M4. **pending.**
-- ⏳ **M6.2 ⚡ Large dataset streaming, search and memory benchmarks** — **3%**. Acceptance: 124444-record Mexilex load without unbounded UI RAM. Depends on: M3.2,M5.3. **pending.**
+- ✅ **M6.2 ⚡ Large dataset streaming, search and memory benchmarks** — **3%**. Acceptance: 124444-record Mexilex load without unbounded UI RAM. Depends on: M3.2,M5.3. **verified complete.**
 - ⏳ **M6.3 🛡️ Corrupt/malicious archive, Unicode, media path and credential guards** — **3%**. Acceptance: Adversarial tests block zip slip, malformed data and leaks. Depends on: M4.1,M3.2. **pending.**
 - ⏳ **M6.4 ♿ Keyboard, screen scaling, focus and accessibility regression** — **3%**. Acceptance: Real system QA checklist and automated smoke pass. Depends on: M5.6. **pending.**
 
@@ -174,3 +174,10 @@
 
 - ✅ **M5.3 🗂️ (+3 pp):** [Anki feature CI 41335716113](https://github.com/sguzman/retivus/actions/runs/41335716113) passed **44 backend and 22 native application tests**, including real egui keyboard and pointer source-to-review acceptance. Real egui_kittest/AccessKit events drive keyboard source-file editing and pointer actions to validate a source, stage its immutable snapshot, select an exact lexical sense, add its card, reveal/grade, then close and reopen to check persistent card/review state. The [formatting-corrected Rust foundation CI 41339975585](https://github.com/sguzman/retivus/actions/runs/41339975585) passed rustfmt, Clippy, provider tests, compilation and X11 smoke. GUI note-editor and search follow-up tests are additionally staged for the next CI cycle, not counted separately.
 - ⏳ **M5.6 0/2:** Native Wayland compositor screenshots at wide/narrow window sizes remain to be executed and inspected. M4/M6/M7 are not credited by native GUI testing alone.
+
+## Verified continuation checkpoint — 2026-11-01 (64%)
+
+**Progress: 61% → 64% (+3 percentage points).** M0: 8/8; M1: 12/12; M2: 15/15; M3: 14/14; M4: 0/17; M5: 12/14; **M6: 3/12**; M7: 0/8.
+
+- ✅ **M6.2 ⚡ (+3 pp):** [Published Mexilex CI 41342157443](https://github.com/sguzman/retivus/actions/runs/41342157443) imported the checksum-verified **124,444-entry, 155,586-sense** v0.3.0 release, with peak Linux RSS of **22,428 KiB** for streaming native preview validation (only **12 retained UI rows**) and **26,512 KiB** for the isolated, atomic SQLite source catalog import. **1,000 indexed lookups** completed in **41 ms** at **6,168 KiB** peak RSS. Each operation passed the independently enforced **512 MiB** resource ceiling. [Rust foundation run 41342157434](https://github.com/sguzman/retivus/actions/runs/41342157434) verified formatting, Clippy, provider acceptance and native smoke. These bounded figures apply to this pinned release and Linux runner, not arbitrary future sources or hostile data.
+- ⏳ **M5.6 remains open:** Headless native Wayland screenshots and multi-size visual QA have not passed yet. M4 and other M6/M7 requirements are independently outstanding.
