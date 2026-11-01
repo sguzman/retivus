@@ -424,13 +424,16 @@ impl AnkiBackend {
             || note.fields()[0] != from.word
             || note.fields()[1] != from.definition
         {
-            return Err("source note has manual edits; explicit conflict resolution required".into());
+            return Err(
+                "source note has manual edits; explicit conflict resolution required".into(),
+            );
         }
         if note
             .tags
             .iter()
             .filter(|tag| tag.starts_with("retivus::source::"))
-            .count() != 1
+            .count()
+            != 1
             || !note.tags.contains(&old_tag)
         {
             return Err("source provenance identity does not match this note".into());
@@ -954,8 +957,14 @@ mod tests {
         backend
             .apply_approved_source_reconciliation(&sources, note_id, &old)
             .unwrap();
-        assert_eq!(backend.note_fields(note_id).unwrap(), ["banqueta", "pavement"]);
-        assert!(backend.note_tags(note_id).unwrap().contains(&new.source_tag()));
+        assert_eq!(
+            backend.note_fields(note_id).unwrap(),
+            ["banqueta", "pavement"]
+        );
+        assert!(backend
+            .note_tags(note_id)
+            .unwrap()
+            .contains(&new.source_tag()));
         let history: i64 = backend
             .collection
             .storage
@@ -969,8 +978,14 @@ mod tests {
         assert_eq!(history, 1);
 
         backend.undo_last().unwrap();
-        assert_eq!(backend.note_fields(note_id).unwrap(), ["banqueta", "sidewalk"]);
-        assert!(backend.note_tags(note_id).unwrap().contains(&old.source_tag()));
+        assert_eq!(
+            backend.note_fields(note_id).unwrap(),
+            ["banqueta", "sidewalk"]
+        );
+        assert!(backend
+            .note_tags(note_id)
+            .unwrap()
+            .contains(&old.source_tag()));
 
         backend
             .edit_note_fields(note_id, &["custom text", "custom answer"])
@@ -989,8 +1004,14 @@ mod tests {
         backend.close().unwrap();
 
         let reopened = AnkiBackend::open_managed_profile(root.path(), "learner").unwrap();
-        assert_eq!(reopened.note_fields(note_id).unwrap(), ["banqueta", "pavement"]);
-        assert!(reopened.note_tags(note_id).unwrap().contains(&new.source_tag()));
+        assert_eq!(
+            reopened.note_fields(note_id).unwrap(),
+            ["banqueta", "pavement"]
+        );
+        assert!(reopened
+            .note_tags(note_id)
+            .unwrap()
+            .contains(&new.source_tag()));
         let history: i64 = reopened
             .collection
             .storage
