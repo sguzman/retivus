@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **64%** of 100% (previous verified checkpoint 61%, this continuation **+3 percentage points**). Real keyboard/mouse GUI acceptance remains verified. Full Mexilex preview, import and indexed-search memory benchmarks passed against the pinned 124,444-entry release. Wayland visual QA and Anki Desktop interoperability remain pending. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the final 10%.
+**Verified progress:** **66%** of 100% (previous verified checkpoint 64%, this continuation **+2 percentage points**). All native egui M5 acceptance is now verified, including actual Wayland window launch and visual inspection of screenshots at two window sizes. Anki Desktop interchange and M6/M7 work remain pending. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the final 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -13,7 +13,7 @@
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 15% | ✅ |
 | 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
-| 🎨 M5 Complete native egui study experience | 14% | 12% | 🟡 |
+| 🎨 M5 Complete native egui study experience | 14% | 14% | ✅ |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 3% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
@@ -64,7 +64,7 @@
 - ✅ **M5.3 🗂️ Deck browser, note editor, browse/search and import preview** — **3%**. Acceptance: Full keyboard-and-mouse workflow from import to cards. Depends on: M2.1,M3.3. **verified complete.**
 - ✅ **M5.4 🎯 Review UI, grading, undo, due counts and session transitions** — **3%**. Acceptance: Actual due queue and review state persisted across restart. Depends on: M2.2,M2.3. **verified complete.**
 - ✅ **M5.5 📊 Statistics, browse filters, source provenance and visible conflict UX** — **2%**. Acceptance: Metrics match backend and all provenance/conflict states visible. Depends on: M5.4. **verified complete.**
-- ⏳ **M5.6 🖥️ Real GUI visual QA on Linux Wayland and window sizes** — **2%**. Acceptance: Screenshots/video evidence on actual app, not just compilation. Depends on: M5.1,M5.3,M5.4. **pending.**
+- ✅ **M5.6 🖥️ Real GUI visual QA on Linux Wayland and window sizes** — **2%**. Acceptance: Screenshots/video evidence on actual app, not just compilation. Depends on: M5.1,M5.3,M5.4. **verified complete.**
 
 ### 🧪 M6: Integration hardening, performance and correctness (12% of project)
 
@@ -181,3 +181,10 @@
 
 - ✅ **M6.2 ⚡ (+3 pp):** [Published Mexilex CI 41342157443](https://github.com/sguzman/retivus/actions/runs/41342157443) imported the checksum-verified **124,444-entry, 155,586-sense** v0.3.0 release, with peak Linux RSS of **22,428 KiB** for streaming native preview validation (only **12 retained UI rows**) and **26,512 KiB** for the isolated, atomic SQLite source catalog import. **1,000 indexed lookups** completed in **41 ms** at **6,168 KiB** peak RSS. Each operation passed the independently enforced **512 MiB** resource ceiling. [Rust foundation run 41342157434](https://github.com/sguzman/retivus/actions/runs/41342157434) verified formatting, Clippy, provider acceptance and native smoke. These bounded figures apply to this pinned release and Linux runner, not arbitrary future sources or hostile data.
 - ⏳ **M5.6 remains open:** Headless native Wayland screenshots and multi-size visual QA have not passed yet. M4 and other M6/M7 requirements are independently outstanding.
+
+## Verified continuation checkpoint — 2026-11-01 (66%)
+
+**Progress: 64% → 66% (+2 percentage points).** M0: 8/8; M1: 12/12; M2: 15/15; M3: 14/14; M4: 0/17; **M5: 14/14**; M6: 3/12; M7: 0/8.
+
+- ✅ **M5.6 🖥️ (+2 pp):** [Anki CI 41343238570](https://github.com/sguzman/retivus/actions/runs/41343238570) passed native backend/GUI tests, actual Sway Wayland launch, two retained screenshots at **1080×800** and **720×650**, and official collection/public-package checks. The [Wayland artifact](https://github.com/sguzman/retivus/actions/runs/41343238570/artifacts/13098740421) was downloaded and inspected at both sizes; the initial screen showed no visible clipping or missing glyphs. [Rust foundation CI 41343238538](https://github.com/sguzman/retivus/actions/runs/41343238538) passed formatting, Clippy, provider tests and X11 smoke. The screenshots cover the initial screen, not every populated state or Hyprland configuration.
+- ⏳ **M4 (0/17), M6 (3/12), M7 (0/8)** remain. Wayland smoke does not imply full Anki Desktop package interchange or authenticated AnkiWeb sync.
