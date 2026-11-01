@@ -184,6 +184,67 @@ impl Retivus {
         }
     }
 
+    /// Single validation path shared by the button and real-profile regression.
+    /// A failed replacement source must never leave an earlier choice selected.
+    fn validate_source_file(&mut self) {
+        self.preview.clear();
+        self.selected_sense = None;
+        self.import_status = match self.source_adapter() {
+            Err(error) => format!("Invalid source descriptor: {error}"),
+            Ok(adapter) => match File::open(&self.source_path) {
+                Err(error) => format!("Could not open source: {error}"),
+                Ok(file) => {
+                    let mut reader = BufReader::new(file);
+                    match retivus::preview::validate_preview(adapter.as_ref(), &mut reader) {
+                        Ok(result) => {
+                            self.preview = result.rows;
+                            format!(
+                                "Valid records: {} · no learner data changed",
+                                result.validated_count
+                            )
+                        }
+                        Err(error) => format!("Validation failed: {error}"),
+                    }
+                }
+            },
+        };
+    }
+
+    #[cfg(feature = "anki-backend")]
+    fn add_selected_sense_to_study(&mut self) {
+        let result = (|| {
+            let chosen = self
+                .selected_sense
+                .as_ref()
+                .ok_or("select a validated source sense first")?;
+            let record = self
+                .preview
+                .iter()
+                .find(|record| {
+                    record.provenance.provider_id == chosen.provider_id
+                        && record.provenance.edition == chosen.edition
+                        && record.entry_id == chosen.entry_id
+                        && record.word == chosen.word
+                        && record.senses.iter().any(|sense| {
+                            sense.sense_id == chosen.sense_id
+                                && sense.definition == chosen.definition
+                        })
+                })
+                .ok_or("selected source sense is not in validated preview")?;
+            let adapter = self.source_adapter()?;
+            self.study.add_validated_source_choice(
+                adapter.as_ref(),
+                std::path::Path::new(&self.source_path),
+                record,
+                &chosen.sense_id,
+            )
+        })();
+        self.import_status = match result {
+            Ok(note) => format!("Created study note {note} from selected meaning."),
+            Err(error) => format!("Not added to learner profile: {error}"),
+        };
+    }
+
     fn restore(storage: Option<&dyn eframe::Storage>) -> Self {
         let theme = storage.and_then(|value| value.get_string(THEME_STORAGE_KEY));
         let scale = storage.and_then(|value| value.get_string(SCALE_STORAGE_KEY));
@@ -303,25 +364,7 @@ impl eframe::App for Retivus {
                     ui.add(egui::TextEdit::singleline(&mut self.source_path).desired_width(ui.available_width().min(300.0)));
                 });
                 if ui.button("Validate source").clicked() {
-                    self.preview.clear();
-                    self.selected_sense = None;
-                    let adapter = self.source_adapter();
-                    self.import_status = match adapter {
-                        Err(error) => format!("Invalid source descriptor: {error}"),
-                        Ok(adapter) => match File::open(&self.source_path) {
-                            Err(error) => format!("Could not open source: {error}"),
-                            Ok(file) => {
-                                let mut reader = BufReader::new(file);
-                                match retivus::preview::validate_preview(adapter.as_ref(), &mut reader) {
-                                    Ok(result) => {
-                                        self.preview = result.rows;
-                                        format!("Valid records: {} · no learner data changed", result.validated_count)
-                                    }
-                                    Err(error) => format!("Validation failed: {error}"),
-                                }
-                            }
-                        },
-                    };
+                    self.validate_source_file();
                 }
                 ui.label(&self.import_status);
                 if let Some(chosen) = self.selected_sense.clone() {
@@ -338,30 +381,7 @@ impl eframe::App for Retivus {
                         ui.label("Add this sense only to an explicitly opened Retivus learner profile and selected deck.");
                         #[cfg(feature = "anki-backend")]
                         if ui.button("Add selected meaning to learner deck").clicked() {
-                            let match_record = self.preview.iter().find(|record| {
-                                record.provenance.provider_id == chosen.provider_id
-                                    && record.provenance.edition == chosen.edition
-                                    && record.entry_id == chosen.entry_id
-                                    && record.word == chosen.word
-                                    && record.senses.iter().any(|sense| {
-                                        sense.sense_id == chosen.sense_id
-                                            && sense.definition == chosen.definition
-                                    })
-                            });
-                            let result = match (self.source_adapter(), match_record) {
-                                (Ok(adapter), Some(record)) => self.study.add_validated_source_choice(
-                                    adapter.as_ref(),
-                                    std::path::Path::new(&self.source_path),
-                                    record,
-                                    &chosen.sense_id,
-                                ),
-                                (Err(error), _) => Err(error),
-                                (_, None) => Err("selected source sense is not in validated preview".into()),
-                            };
-                            self.import_status = match result {
-                                Ok(note) => format!("Created study note {note} from selected meaning."),
-                                Err(error) => format!("Not added to learner profile: {error}"),
-                            };
+                            self.add_selected_sense_to_study();
                         }
                     });
                 }

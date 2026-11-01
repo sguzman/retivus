@@ -632,6 +632,102 @@ mod tests {
     }
 
     #[test]
+    fn validated_file_selection_creates_exact_study_card_and_survives_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let source_path = root.path().join("japanese.tsv");
+        fs::write(
+            &source_path,
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\t生\tnoun\ts1\tlife\n2\t生\tverb\ts1\tlive\n",
+        )
+        .unwrap();
+        let mut app = crate::Retivus::default();
+        app.source_format = crate::SourceFormat::GenericTsv;
+        app.source_id = "study-integration-fixture".into();
+        app.source_edition = "v1".into();
+        app.source_language = "ja".into();
+        app.definition_language = "en".into();
+        app.license_notice = "Synthetic fixture".into();
+        app.source_path = source_path.to_string_lossy().into_owned();
+        app.study.root = root.path().to_string_lossy().into_owned();
+        app.study.profile_id = "learner".into();
+        app.study.connect(true);
+        assert!(app.study.backend.is_some(), "{}", app.study.status);
+        let deck = app
+            .study
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Vocabulary")
+            .unwrap();
+        app.study.deck_id = Some(deck);
+        app.study.refresh_review();
+
+        app.validate_source_file();
+        assert!(app.import_status.contains("Valid records: 2"));
+        assert_eq!(app.preview.len(), 2);
+        assert_eq!(app.preview[0].word, app.preview[1].word);
+        app.selected_sense = crate::SelectedSense::from_record(&app.preview[1], "s1");
+        app.add_selected_sense_to_study();
+        assert!(
+            app.import_status.contains("Created study note"),
+            "{}",
+            app.import_status
+        );
+        assert_eq!(app.study.notes.len(), 1);
+        assert_eq!(app.study.notes[0].fields, ["生", "live"]);
+        let note_id = app.study.notes[0].id;
+        let provenance = StudyPanel::source_provenance(&app.study.notes[0].tags).unwrap();
+        assert_eq!(
+            provenance,
+            Some([
+                "study-integration-fixture".into(),
+                "v1".into(),
+                "2".into(),
+                "s1".into()
+            ])
+        );
+        assert_eq!(app.study.due.0, 1);
+        let review_id = app.study.review.as_ref().unwrap().card_id;
+        assert!(app
+            .study
+            .review
+            .as_ref()
+            .unwrap()
+            .question_html
+            .contains("生"));
+        app.study.revealed = true;
+        app.study.grade_revealed(4);
+        assert!(
+            app.study.status.contains("Recorded rating 4"),
+            "{}",
+            app.study.status
+        );
+        app.study.close();
+        app.study.connect(false);
+        assert_eq!(
+            app.study
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
+            ["生", "live"]
+        );
+        assert_eq!(
+            app.study.backend.as_ref().unwrap().review_event_count(review_id).unwrap(),
+            1
+        );
+
+        // Failed replacement validation clears the previous preview and choice.
+        fs::write(&source_path, "corrupted").unwrap();
+        app.validate_source_file();
+        assert!(app.import_status.contains("Validation failed"));
+        assert!(app.preview.is_empty());
+        assert!(app.selected_sense.is_none());
+        app.study.close();
+    }
+
+    #[test]
     fn quitting_with_open_managed_profile_releases_collection_for_restart() {
         let root = tempfile::tempdir().unwrap();
         let note_id;
