@@ -23,6 +23,10 @@ jobs:
         run: cargo clippy --all-targets -- -D warnings
       - name: Test provider boundary
         run: cargo test --all-targets
+      - name: Independent Japanese-to-Spanish provider acceptance
+        run: |
+          cargo run --bin import-generic -- tests/fixtures/independent-ja-es.tsv /tmp/retivus-ja-es.sqlite3 ja-es-v1 independent-ja-es 2026-11-01 ja es CC0-1.0 | tee /tmp/retivus-ja-es-result.txt
+          grep -q 'Imported 3 entries and 3 senses from independent provider independent-ja-es' /tmp/retivus-ja-es-result.txt
       - name: Compile native UI
         run: cargo build --locked
       - name: Smoke-launch real egui window under virtual X11

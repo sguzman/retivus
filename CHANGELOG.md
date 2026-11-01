@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Verified independent Japanese-to-Spanish TSV provider through a standalone CLI, persistent catalog retrieval, source-identity separation, and GUI-compatible preview contract tests.
 - Added Anki-backed deck/notetype enumeration, bidirectional templates, note field CRUD and undo, with persistent disposable integration tests.
 - Added transactional SQLite source-snapshot catalog with rollback, duplicate and persistent-reopen tests, plus full real Mexilex study-import CI.
 - Introduced restricted Retivus-owned Anki profile create/reopen APIs and disposable schema migration, isolation, symlink and unsupported-future-version regression tests.

@@ -48,3 +48,7 @@ This is an import/staging foundation, not a complete provider lifecycle: manifes
 ## Verified public-release ingestion
 
 The [2026-11-01 integration run](https://github.com/sguzman/retivus/actions/runs/41268497201) checked the public Mexilex v0.3.0 release and successfully committed **124,444 entries and 155,586 senses** to the separate SQLite catalog. The [Rust regression run](https://github.com/sguzman/retivus/actions/runs/41268551513) also verified rollback after late input failure and refusal to overwrite an existing snapshot. This is a source ingestion milestone, not a deck/card import or learner-history migration.
+
+## Independent second-provider acceptance
+
+The `import-generic` executable accepts a versioned TSV and **explicit** provider ID, edition, lexical/definition language tags and license notice. It writes a new, independent SQLite source catalog; it never opens or touches an Anki profile. The cross-format fixture `tests/fixtures/independent-ja-es.tsv` contains original Japanese-to-Spanish sample records, including homographs with distinct entry IDs. `tests/generic_provider.rs` exercises bounded previews, a disk-backed import, reopening, immutable identity and sense/rights provenance. The `Rust foundation` workflow also runs a real standalone CLI import and verifies row/sense counts. This is an integration acceptance test for a second format; it does **not** create flashcards or validate arbitrary third-party license claims.
