@@ -162,7 +162,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          sudo apt-get install -y -qq sway grim jq libegl1-mesa
+          sudo apt-get install -y -qq sway grim jq libegl1
           mkdir -p "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
           cat > "$RUNNER_TEMP/retivus-sway.conf" <<'SWAY'
