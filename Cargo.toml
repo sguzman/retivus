@@ -1,5 +1,6 @@
 [package]
 name = "retivus"
+default-run = "retivus"
 version = "0.1.0"
 edition = "2021"
 description = "Rust/egui spaced repetition with Anki ecosystem and external data provider support"
