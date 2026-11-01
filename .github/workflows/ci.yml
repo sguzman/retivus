@@ -46,6 +46,23 @@ jobs:
                 for frame in $(seq 1 25); do
                   scrot --window "$window" /tmp/retivus-ui.png
                   if test -s /tmp/retivus-ui.png && test "$(wc -c < /tmp/retivus-ui.png)" -gt 8000; then
+                    # Exercise native focus navigation and responsive layouts on
+                    # an actual X11 window; never rely only on unit tests.
+                    xdotool key --clearmodifiers Tab
+                    xdotool key --clearmodifiers shift+Tab
+                    xdotool windowsize "$window" 680 560
+                    sleep 1
+                    scrot --window "$window" /tmp/retivus-narrow.png
+                    test -s /tmp/retivus-narrow.png
+                    test "$(wc -c < /tmp/retivus-narrow.png)" -gt 8000
+                    xdotool key --clearmodifiers Tab
+                    xdotool key --clearmodifiers Return
+                    xdotool windowsize "$window" 1100 760
+                    sleep 1
+                    scrot --window "$window" /tmp/retivus-wide.png
+                    test -s /tmp/retivus-wide.png
+                    test "$(wc -c < /tmp/retivus-wide.png)" -gt 8000
+                    kill -0 "$app"
                     exit 0
                   fi
                   if ! kill -0 "$app" 2>/dev/null; then
@@ -74,6 +91,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: retivus-xvfb-screenshot
-          path: /tmp/retivus-ui.png
+          path: |
+            /tmp/retivus-ui.png
+            /tmp/retivus-narrow.png
+            /tmp/retivus-wide.png
           if-no-files-found: ignore
           retention-days: 7
