@@ -33,4 +33,4 @@ An experimental `anki-backend` Cargo feature links the pinned Anki Rust engine a
 
 ## License
 
-**Retivus is licensed under AGPL-3.0-or-later.** It was initially intended to use MIT, but we adopted AGPL to support direct reuse of Anki's AGPL-licensed Rust backend in compliance with its terms. **Anki's backend is not yet incorporated into the main application.** Earlier MIT-licensed revisions retain their original terms; see [licensing history and attribution](docs/licensing.md). External vocabulary datasets and personal study content have separate ownership and licenses.
+**Retivus is licensed under AGPL-3.0-or-later.** It was initially intended to use MIT, but we adopted AGPL to support direct reuse of Anki's AGPL-licensed Rust backend in compliance with its terms. **Anki's backend is not yet incorporated into the main application.** Earlier MIT-licensed revisions retain their original terms; see [licensing history and attribution](docs/licensing.md) and [Anki upstream notice](LICENSES/ANKI-ATTRIBUTION.md). External vocabulary datasets and personal study content have separate ownership and licenses.

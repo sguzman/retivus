@@ -18,6 +18,8 @@ Retivus's **original revisions** were published under MIT, with copyright attrib
 
 The repository's current license is AGPL-3.0-or-later, **not a promise that all future versions will also be available under MIT**. Original independently authored Retivus code remains owned by its copyright holders; copyright ownership and permissions are separate from the license terms for distribution.
 
+The committed [Anki attribution notice](../LICENSES/ANKI-ATTRIBUTION.md) identifies the exact pinned backend source and the currently unmodified Cargo integration. The optional adapter's CI test must pass before this boundary is considered technically verified.
+
 ## Requirements when Anki is integrated
 
 Anki's [upstream source](https://github.com/ankitects/anki) uses **AGPL-3.0-or-later**, with some separately licensed components. Before distributing a linked or otherwise combined Anki-backed Retivus application, confirm:
