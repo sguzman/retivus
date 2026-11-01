@@ -905,6 +905,38 @@ mod tests {
     }
 
     #[test]
+    fn populated_native_study_panel_renders_in_real_egui_frame() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "ui-frame".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let deck = panel.backend.as_mut().unwrap().create_deck("Visible").unwrap();
+        panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .add_basic_note(deck, "hola", "hello")
+            .unwrap();
+        panel.deck_id = Some(deck);
+        panel.refresh();
+        panel.refresh_review();
+        assert_eq!(panel.due.0, 1);
+
+        let ctx = egui::Context::default();
+        let frame = ctx.run(egui::RawInput::default(), |ctx| {
+            egui::CentralPanel::default().show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| panel.ui(ui));
+            });
+        });
+        assert!(!frame.shapes.is_empty());
+        assert_eq!(panel.stats.notes, 1);
+        assert_eq!(panel.stats.cards, 1);
+        panel.close();
+    }
+
+    #[test]
     fn native_note_deletion_requires_confirmation_and_allows_undo() {
         let root = tempfile::tempdir().unwrap();
         let mut panel = StudyPanel::default();
