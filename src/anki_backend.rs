@@ -20,7 +20,6 @@ impl AnkiBackend {
         })
     }
 
-
     /// Create a brand-new Retivus-owned profile under an existing user-selected root.
     ///
     /// Never opens an arbitrary Anki profile; refuses existing names and symlink paths.
@@ -125,7 +124,6 @@ impl AnkiBackend {
     }
 }
 
-
 fn validate_profile_id(profile_id: &str) -> BackendResult<()> {
     if profile_id.is_empty()
         || profile_id.len() > 64
@@ -175,10 +173,17 @@ mod tests {
 
         let mut first = AnkiBackend::create_managed_profile(tmp.path(), "first").unwrap();
         assert!(AnkiBackend::create_managed_profile(tmp.path(), "first").is_err());
-        let id = first.add_basic_note(1, "retivus", "spaced repetition").unwrap();
+        let id = first
+            .add_basic_note(1, "retivus", "spaced repetition")
+            .unwrap();
         first.close().unwrap();
         let reopened = AnkiBackend::open_managed_profile(tmp.path(), "first").unwrap();
-        assert!(reopened.collection.storage.get_note(anki::notes::NoteId(id)).unwrap().is_some());
+        assert!(reopened
+            .collection
+            .storage
+            .get_note(anki::notes::NoteId(id))
+            .unwrap()
+            .is_some());
         reopened.close().unwrap();
 
         let mut other = AnkiBackend::create_managed_profile(tmp.path(), "second").unwrap();
@@ -196,7 +201,9 @@ mod tests {
     fn pinned_backend_upgrades_supported_schema_11_without_losing_note() {
         let tmp = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "upgrade").unwrap();
-        let note_id = backend.add_basic_note(1, "schema safety", "existing answer").unwrap();
+        let note_id = backend
+            .add_basic_note(1, "schema safety", "existing answer")
+            .unwrap();
         backend.collection.close(Some(SchemaVersion::V11)).unwrap();
 
         let reopened = AnkiBackend::open_managed_profile(tmp.path(), "upgrade").unwrap();
@@ -218,7 +225,9 @@ mod tests {
     fn unknown_future_schema_never_silently_resets_the_profile() {
         let tmp = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "future").unwrap();
-        backend.add_basic_note(1, "future note", "must survive").unwrap();
+        backend
+            .add_basic_note(1, "future note", "must survive")
+            .unwrap();
         backend
             .collection
             .storage
@@ -255,5 +264,4 @@ mod tests {
         .unwrap();
         assert!(AnkiBackend::open_managed_profile(tmp.path(), "redirect").is_err());
     }
-
 }
