@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **41%** of 100% (previous verified checkpoint 37%, this continuation **+4 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **45%** of 100% (previous verified checkpoint 41%, this continuation **+4 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -10,7 +10,7 @@
 | --- | ---: | ---: | --- |
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
-| 🗃️ M2 Local collection engine and learner-safe core | 15% | 8% | 🟡 |
+| 🗃️ M2 Local collection engine and learner-safe core | 15% | 12% | 🟡 |
 | 🌍 M3 Generic external-source provider engine | 14% | 11% | 🟡 |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
 | 🎨 M5 Complete native egui study experience | 14% | 2% | 🟡 |
@@ -38,7 +38,7 @@
 
 - ✅ **M2.1 🗂️ Manage profiles, decks, notes, templates and multiple cards** — **4%**. Acceptance: Create/edit/delete/restore round-trips via selected backend. Depends on: M1.5. **verified complete.**
 - ✅ **M2.2 ⏱️ Schedule learning/review with actual FSRS and due queues** — **4%**. Acceptance: Known scheduler fixtures and interrupted review restart pass. Depends on: M2.1. **verified complete.**
-- ⏳ **M2.3 💾 Persist review events/undo/backup/recovery atomically** — **4%**. Acceptance: Crash+rollback tests preserve previous state. Depends on: M2.1. **pending.**
+- ✅ **M2.3 💾 Persist review events/undo/backup/recovery atomically** — **4%**. Acceptance: Crash+rollback tests preserve previous state. Depends on: M2.1. **verified complete.**
 - ⏳ **M2.4 🔐 Profile isolation, path safety, migrations, export backups** — **3%**. Acceptance: Two-profile and corrupt-file tests pass. Depends on: M2.3. **pending.**
 
 ### 🌍 M3: Generic external-source provider engine (14% of project)
@@ -111,3 +111,11 @@
 
 - ✅ **M2.2 ⏱️ (+4 pp):** [Anki feature CI 41310578538](https://github.com/sguzman/retivus/actions/runs/41310578538) passed **30 tests**: all Again/Hard/Good/Easy ratings, persisted upstream FSRS scheduling state and revlog, queue restart, and explicit undo of a review. [Rust foundation 41310578551](https://github.com/sguzman/retivus/actions/runs/41310578551) passed format, clippy, provider and native smoke.
 - 🟡 **M2.3 💾 0/4 pp, implementation in verification:** Non-clobber SQLite snapshot and restore-as-new-profile paths under development; no backup/recovery credit until destructive, corrupt-file and rollback tests actually pass. Media packaging and migration remain separate.
+
+## Verified continuation checkpoint — 2026-11-01 (45%)
+
+**Progress:** **41% → 45% (+4 percentage points)**. M0: 8/8 (100%); M1: 12/12 (100%); M2: 12/15 (80%); M3: 11/14 (78.6%); M4: 0/17 (0%); M5: 2/14 (14.3%); M6: 0/12 (0%); M7: 0/8 (0%).
+
+- ✅ **M2.3 💾 (+4 pp):** [Anki feature CI 41312321565](https://github.com/sguzman/retivus/actions/runs/41312321565) passed **32** library tests including a live SQLite snapshot preserving one FSRS review while newer original-profile notes remain untouched, restore into a separate managed profile, refusal of corrupt/symlinked input and existing backup/profile targets, review-event undo and restart. [Rust foundation 41312321541](https://github.com/sguzman/retivus/actions/runs/41312321541) passed native build, Clippy and GUI smoke. Anki's registered `unicase` collation is used for staged integrity verification, rather than invalid checking with a raw connection. A full forced power-failure fixture remains M6 hardening; the backup is the collection DB only, not media.
+- 🟡 **M2.4 🔐 0/3 pp:** Existing isolation/schema/symlink/backup tests are green. An explicit corrupted original-collection refusal regression is newly authored and requires feature-CI acceptance before this milestone is counted.
+- ⏳ **Next:** Finish M2.4 acceptance, then implement undoable provider snapshot reconciliation (M3.4). Native GUI deck browser, review UX and Anki package round trips remain separately scoped.

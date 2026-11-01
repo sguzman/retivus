@@ -645,6 +645,23 @@ mod tests {
     }
 
     #[test]
+    fn corrupt_managed_collection_is_never_reinitialized_or_overwritten() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "damaged").unwrap();
+        backend.add_basic_note(1, "original", "important").unwrap();
+        backend.close().unwrap();
+
+        // Model interrupted or damaged storage on a disposable profile only.
+        let db = root.path().join("damaged/collection.anki2");
+        let broken = b"simulated truncated sqlite collection";
+        fs::write(&db, broken).unwrap();
+        assert!(AnkiBackend::open_managed_profile(root.path(), "damaged").is_err());
+        assert_eq!(fs::read(&db).unwrap(), broken);
+        assert!(AnkiBackend::create_managed_profile(root.path(), "damaged").is_err());
+        assert_eq!(fs::read(&db).unwrap(), broken);
+    }
+
+    #[test]
     fn deck_note_template_edit_delete_undo_and_reopen_roundtrip() {
         let tmp = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "learning").unwrap();

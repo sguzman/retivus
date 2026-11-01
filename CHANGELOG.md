@@ -5,8 +5,9 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
-- Added optional FSRS-backed Anki queue grading, event persistence, and interrupted-review restart regression coverage; feature CI acceptance remains pending.
+- Verified Anki FSRS four-rating transitions, due queue restart, review persistence and undo using the pinned upstream scheduler.
 - Added explicit sense-specific source card candidates and Anki note creation with immutable provenance tags; homographs and multiple senses retain distinct identities.
+- Added non-clobber managed-profile SQLite snapshots and restore-as-new recovery, verified through pinned Anki integrity checks and isolated feature-CI regression tests.
 - Added undoable deck/note-type/template editing and guarded destructive deck deletion in the feature-gated Anki adapter.
 - Optional local Krypton Nerd Font discovery and validated loading, with native fallback and no bundled font assets.
 - Verified independent Japanese-to-Spanish TSV provider through a standalone CLI, persistent catalog retrieval, source-identity separation, and GUI-compatible preview contract tests.
@@ -29,5 +30,5 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - Adopted AGPL-3.0-or-later for the project in anticipation of direct Anki Rust backend integration; retained the original MIT grant and documented the provenance and remaining compliance gates.
 
 ### Known limitations
-- Neither selected-source note generation nor Anki grading is exposed in the shipping GUI yet; backup/recovery, full FSRS scheduling fixtures, package import/export, and AnkiWeb interoperability remain incomplete.
+- Neither selected-source note generation nor Anki grading is exposed in the shipping GUI yet; database-only backups do not cover media. Anki package import/export, full power-failure testing, and AnkiWeb interoperability remain incomplete.
 - Pinned Anki engine feasibility is verified, but release-grade corresponding-source notices, packaging, and distribution compliance remain unfinished.
