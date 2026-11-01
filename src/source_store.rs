@@ -1,7 +1,7 @@
 //! Transactional provider source catalog. This contains published source content,
 //! never learner-owned notes, cards, ratings or review history.
-use crate::source_adapter::{SourceAdapter, SourceRecord};
-use rusqlite::{params, Connection};
+use crate::source_adapter::{SourceAdapter, SourceInfo, SourceMeaning, SourceRecord};
+use rusqlite::{params, Connection, OptionalExtension};
 use std::fs;
 use std::io::BufRead;
 use std::path::Path;
@@ -161,6 +161,73 @@ impl SourceCatalog {
         Ok(count)
     }
 
+    /// Fetch one entry by immutable provider/snapshot/entry identity.
+    /// Homographs and senses remain separate; no learner-owned data is queried.
+    pub fn lookup_entry(
+        &self,
+        provider: &str,
+        snapshot: &str,
+        entry_id: &str,
+    ) -> Result<Option<SourceRecord>, String> {
+        let found: Option<(String, String, String, String, String, String)> = self
+            .connection
+            .query_row(
+                "SELECT e.source_edition, e.word, e.part_of_speech,
+                        s.lexical_language, s.definition_language, s.license_notice
+                 FROM entries e JOIN snapshots s
+                   ON s.provider = e.provider AND s.snapshot = e.snapshot
+                 WHERE e.provider=?1 AND e.snapshot=?2 AND e.entry_id=?3",
+                params![provider, snapshot, entry_id],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                        row.get(5)?,
+                    ))
+                },
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        let Some((edition, word, part_of_speech, lexical_language, definition_language, license_notice)) = found else {
+            return Ok(None);
+        };
+
+        let mut stmt = self
+            .connection
+            .prepare(
+                "SELECT sense_id, definition FROM senses
+                 WHERE provider=?1 AND snapshot=?2 AND entry_id=?3
+                 ORDER BY sense_id",
+            )
+            .map_err(|e| e.to_string())?;
+        let senses = stmt
+            .query_map(params![provider, snapshot, entry_id], |row| {
+                Ok(SourceMeaning {
+                    sense_id: row.get(0)?,
+                    definition: row.get(1)?,
+                })
+            })
+            .map_err(|e| e.to_string())?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?;
+        Ok(Some(SourceRecord {
+            provenance: SourceInfo {
+                provider_id: provider.to_owned(),
+                edition,
+                lexical_language,
+                definition_language,
+                license_notice,
+            },
+            entry_id: entry_id.to_owned(),
+            word,
+            part_of_speech,
+            senses,
+        }))
+    }
+
     pub fn counts(&self, provider: &str, snapshot: &str) -> Result<(i64, i64), String> {
         let entries = self
             .connection
@@ -221,6 +288,49 @@ mod tests {
         );
         assert_eq!(catalog.counts("mexilex", "v0.3.0").unwrap(), (1, 2));
         assert_eq!(catalog.counts("other-dictionary", "v1").unwrap(), (2, 2));
+    }
+
+    #[test]
+    fn distinct_provider_preview_import_and_exact_sense_lookup() {
+        use crate::preview::validate_preview;
+
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("other.sqlite3");
+        let adapter = tsv();
+        let data = format!(
+            "{HEADER}ja1\t生\tverb\ts1\tto live\nja2\t生\tnoun\ts1\tlife\n"
+        );
+        let preview = validate_preview(&adapter, &mut Cursor::new(&data)).unwrap();
+        assert_eq!(preview.validated_count, 2);
+        assert_eq!(preview.rows[0].entry_id, "ja1");
+        assert_eq!(preview.rows[1].entry_id, "ja2");
+
+        let mut catalog = SourceCatalog::create_new(&path).unwrap();
+        assert_eq!(
+            catalog
+                .import_snapshot("v1", &adapter, &mut Cursor::new(data))
+                .unwrap(),
+            2
+        );
+        drop(catalog);
+        let catalog = SourceCatalog::open_existing(&path).unwrap();
+        let first = catalog
+            .lookup_entry("other-dictionary", "v1", "ja1")
+            .unwrap()
+            .unwrap();
+        let second = catalog
+            .lookup_entry("other-dictionary", "v1", "ja2")
+            .unwrap()
+            .unwrap();
+        assert_eq!(first.word, second.word);
+        assert_ne!(first.entry_id, second.entry_id);
+        assert_eq!(first.senses[0].definition, "to live");
+        assert_eq!(second.senses[0].definition, "life");
+        assert_eq!(first.provenance.lexical_language, "ja");
+        assert_eq!(first.provenance.license_notice, adapter.descriptor().license_notice);
+        assert!(catalog.lookup_entry("mexilex", "v1", "ja1").unwrap().is_none());
+        assert!(catalog.lookup_entry("other-dictionary", "v2", "ja1").unwrap().is_none());
+        assert!(catalog.lookup_entry("other-dictionary", "v1", "missing").unwrap().is_none());
     }
 
     #[test]
