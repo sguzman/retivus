@@ -38,16 +38,34 @@ fn separate_provider_preview_and_persistent_round_trip_without_anki_or_mexilex()
             .unwrap(),
         3
     );
-    assert_eq!(catalog.counts("independent-ja-es", "ja-es-v1").unwrap(), (3, 3));
+    assert_eq!(
+        catalog.counts("independent-ja-es", "ja-es-v1").unwrap(),
+        (3, 3)
+    );
     drop(catalog);
     let saved = SourceCatalog::open_existing(&location).unwrap();
-    let first = saved.lookup_entry("independent-ja-es", "ja-es-v1", "ja1").unwrap().unwrap();
-    let second = saved.lookup_entry("independent-ja-es", "ja-es-v1", "ja2").unwrap().unwrap();
+    let first = saved
+        .lookup_entry("independent-ja-es", "ja-es-v1", "ja1")
+        .unwrap()
+        .unwrap();
+    let second = saved
+        .lookup_entry("independent-ja-es", "ja-es-v1", "ja2")
+        .unwrap()
+        .unwrap();
     assert_eq!(first.word, second.word);
     assert_ne!(first.entry_id, second.entry_id);
     assert_eq!(first.senses[0].definition, "vida");
     assert_eq!(second.senses[0].definition, "vivir");
-    assert_eq!(first.provenance.license_notice, adapter.descriptor().license_notice);
-    assert!(saved.lookup_entry("mexilex", "ja-es-v1", "ja1").unwrap().is_none());
-    assert!(saved.lookup_entry("independent-ja-es", "other", "ja1").unwrap().is_none());
+    assert_eq!(
+        first.provenance.license_notice,
+        adapter.descriptor().license_notice
+    );
+    assert!(saved
+        .lookup_entry("mexilex", "ja-es-v1", "ja1")
+        .unwrap()
+        .is_none());
+    assert!(saved
+        .lookup_entry("independent-ja-es", "other", "ja1")
+        .unwrap()
+        .is_none());
 }

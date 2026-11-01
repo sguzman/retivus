@@ -8,7 +8,9 @@ use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let mut next = || args.next().ok_or("usage: import-generic <input.tsv> <new-catalog.sqlite3> <snapshot> <provider> <edition> <source-language> <meaning-language> <license-notice>");
+    let mut next = || {
+        args.next().ok_or("usage: import-generic <input.tsv> <new-catalog.sqlite3> <snapshot> <provider> <edition> <source-language> <meaning-language> <license-notice>")
+    };
     let input = next()?;
     let target = next()?;
     let snapshot = next()?;
