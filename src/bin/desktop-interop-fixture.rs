@@ -80,7 +80,9 @@ fn verify(package: &Path) -> Result<(), Box<dyn Error>> {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut args = std::env::args().skip(1);
-    let mode = args.next().ok_or("usage: desktop-interop-fixture <generate|verify> <absolute path>")?;
+    let mode = args
+        .next()
+        .ok_or("usage: desktop-interop-fixture <generate|verify> <absolute path>")?;
     let path = PathBuf::from(args.next().ok_or("missing absolute path")?);
     if args.next().is_some() {
         return Err("expected exactly one subcommand and one absolute path".into());
@@ -89,7 +91,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "generate" => println!("Generated: {}", generate(&path)?.display()),
         "verify" => {
             verify(&path)?;
-            println!("Verified Desktop-exported fixture: 4 notes, 5 cards, preserved fields/deck/template");
+            println!(
+                "Verified Desktop-exported fixture: 4 notes, 5 cards, preserved fields/deck/template"
+            );
         }
         _ => return Err("expected generate or verify".into()),
     }
