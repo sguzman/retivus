@@ -795,11 +795,9 @@ mod tests {
                 .collection
                 .storage
                 .db()
-                .query_row(
-                    "select ease from revlog where cid=?1",
-                    [card_id],
-                    |row| row.get(0),
-                )
+                .query_row("select ease from revlog where cid=?1", [card_id], |row| {
+                    row.get(0)
+                })
                 .unwrap();
             assert_eq!(recorded_rating, i64::from(rating));
         }

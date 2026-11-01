@@ -46,13 +46,13 @@ impl SourceCardCandidate {
         let mut parts = payload.split("::");
         fn decode(part: &str) -> Result<String, String> {
             if part.is_empty()
-                || part.len() % 2 != 0
+                || !part.len().is_multiple_of(2)
                 || !part.bytes().all(|b| b.is_ascii_hexdigit())
             {
                 return Err("invalid source-identity hex component".into());
             }
             let mut bytes = Vec::with_capacity(part.len() / 2);
-            for pair in part.as_bytes().chunks_exact(2) {
+            for pair in part.as_bytes().as_chunks::<2>().0 {
                 let hex = std::str::from_utf8(pair).map_err(|e| e.to_string())?;
                 bytes.push(u8::from_str_radix(hex, 16).map_err(|e| e.to_string())?);
             }
