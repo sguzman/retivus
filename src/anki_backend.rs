@@ -821,25 +821,34 @@ mod tests {
             .unwrap()
             .unwrap())
         .clone();
-        cloze.config.css.push_str("\n.retivus-cloze { font-weight: 700; }\n");
+        cloze
+            .config
+            .css
+            .push_str("\n.retivus-cloze { font-weight: 700; }\n");
         cloze.templates[0].config.q_format =
             "<section class=\"retivus-cloze\">{{cloze:Text}}</section>".into();
         cloze.templates[0].config.a_format =
-            "<article class=\"retivus-cloze\">{{cloze:Text}}<p>{{Extra}}</p></article>".into();
-        source.collection.update_notetype(&mut cloze, false).unwrap();
+            "<article class=\"retivus-cloze\">{{cloze:Text}}<p>{{Back Extra}}</p></article>"
+                .into();
+        source
+            .collection
+            .update_notetype(&mut cloze, false)
+            .unwrap();
 
+        let image_bytes = br#"<svg xmlns="http://www.w3.org/2000/svg"
+width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         source
             .collection
             .media()
             .unwrap()
-            .add_file("cloze-image.png", b"independent image fixture")
+            .add_file("cloze-image.svg", image_bytes)
             .unwrap();
         let note_id = source
             .add_note_with_notetype(
                 deck,
                 "Cloze",
                 &[
-                    "{{c1::gato}} tiene {{c2::bigotes}} <img src=\"cloze-image.png\">",
+                    "{{c1::gato}} tiene {{c2::bigotes}} <img src=\"cloze-image.svg\">",
                     "<em>animal doméstico</em>",
                 ],
             )
@@ -861,7 +870,7 @@ mod tests {
                 && css.contains("font-weight: 700")
         }));
         assert!(original.iter().all(|(question, answer, _)| {
-            question.contains("cloze-image.png") && answer.contains("cloze-image.png")
+            question.contains("cloze-image.svg") && answer.contains("cloze-image.svg")
         }));
         let package = root.path().join("cloze-roundtrip.apkg");
         assert_eq!(source.export_apkg_to(&package).unwrap(), 1);
@@ -871,13 +880,16 @@ mod tests {
         imported.import_apkg(&package).unwrap();
         assert_eq!(render_cloze(&mut imported), original);
         assert_eq!(
-            fs::read(root.path().join("rich-target/collection.media/cloze-image.png")).unwrap(),
-            b"independent image fixture"
+            fs::read(
+                root.path()
+                    .join("rich-target/collection.media/cloze-image.svg")
+            )
+            .unwrap(),
+            image_bytes
         );
         imported.close().unwrap();
 
-        let mut reopened =
-            AnkiBackend::open_managed_profile(root.path(), "rich-target").unwrap();
+        let mut reopened = AnkiBackend::open_managed_profile(root.path(), "rich-target").unwrap();
         assert_eq!(render_cloze(&mut reopened), original);
         reopened.close().unwrap();
     }
