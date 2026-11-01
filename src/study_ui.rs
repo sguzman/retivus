@@ -6,7 +6,7 @@ use retivus::source_adapter::{SourceAdapter, SourceRecord};
 use retivus::source_store::{SourceCardCandidate, SourceCatalog};
 use std::fs;
 use std::io::BufReader;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum BrowseScope {
@@ -43,6 +43,8 @@ impl BrowseScope {
 pub struct StudyPanel {
     root: String,
     profile_id: String,
+    active_root: Option<PathBuf>,
+    active_profile_id: Option<String>,
     package: String,
     snapshot_id: String,
     backend: Option<AnkiBackend>,
@@ -79,6 +81,13 @@ impl StudyPanel {
             return;
         }
         let root = Path::new(&self.root);
+        let canonical_root = match fs::canonicalize(root) {
+            Ok(canonical) => canonical,
+            Err(error) => {
+                self.status = format!("Profile root cannot be opened: {error}");
+                return;
+            }
+        };
         let result = if create {
             AnkiBackend::create_managed_profile(root, &self.profile_id)
         } else {
@@ -86,6 +95,8 @@ impl StudyPanel {
         };
         match result {
             Ok(backend) => {
+                self.active_root = Some(canonical_root);
+                self.active_profile_id = Some(self.profile_id.clone());
                 self.backend = Some(backend);
                 self.status = format!("Opened Retivus-managed profile {}.", self.profile_id);
                 self.refresh();
@@ -210,8 +221,15 @@ impl StudyPanel {
             part_of_speech: record.part_of_speech.clone(),
             definition: sense.definition.clone(),
         };
-        let profile_root = fs::canonicalize(&self.root).map_err(|e| e.to_string())?;
-        let profile_dir = profile_root.join(&self.profile_id);
+        let profile_root = self
+            .active_root
+            .as_ref()
+            .ok_or("learner profile root is not pinned")?;
+        let profile_id = self
+            .active_profile_id
+            .as_deref()
+            .ok_or("learner profile identity is not pinned")?;
+        let profile_dir = profile_root.join(profile_id);
         let directory = fs::symlink_metadata(&profile_dir).map_err(|e| e.to_string())?;
         if !directory.is_dir() || directory.file_type().is_symlink() {
             return Err("learner profile must be a real Retivus-managed directory".into());
@@ -348,6 +366,8 @@ impl StudyPanel {
                 Err(error) => format!("Profile close reported an error: {error}"),
             };
         }
+        self.active_root = None;
+        self.active_profile_id = None;
         self.decks.clear();
         self.notes.clear();
         self.browse_scope = BrowseScope::All;
@@ -375,9 +395,15 @@ impl StudyPanel {
             ui.label("Choose an existing root directory and a Retivus profile ID. No ordinary Anki profile is opened automatically.");
             ui.horizontal_wrapped(|ui| {
                 ui.label("Profile root");
-                ui.add(egui::TextEdit::singleline(&mut self.root).desired_width(280.0));
+                ui.add_enabled(
+                    self.backend.is_none(),
+                    egui::TextEdit::singleline(&mut self.root).desired_width(280.0),
+                );
                 ui.label("Profile ID");
-                ui.add(egui::TextEdit::singleline(&mut self.profile_id).desired_width(160.0));
+                ui.add_enabled(
+                    self.backend.is_none(),
+                    egui::TextEdit::singleline(&mut self.profile_id).desired_width(160.0),
+                );
             });
             ui.horizontal_wrapped(|ui| {
                 ui.label("Source snapshot ID");
@@ -828,6 +854,54 @@ mod tests {
             ["keep me", "safe"]
         );
         panel.close();
+    }
+
+    #[test]
+    fn active_profile_identity_is_pinned_even_if_input_fields_change() {
+        use retivus::source_adapter::{SourceInfo, StudyTsvV1};
+        let original = tempfile::tempdir().unwrap();
+        let other = tempfile::tempdir().unwrap();
+        let source = original.path().join("safe.tsv");
+        fs::write(
+            &source,
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ts1\tsea\n",
+        )
+        .unwrap();
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "fixture-identity".into(),
+            edition: "v1".into(),
+            lexical_language: "es".into(),
+            definition_language: "en".into(),
+            license_notice: "Synthetic".into(),
+        })
+        .unwrap();
+        let mut rows = Vec::new();
+        adapter
+            .visit(
+                &mut BufReader::new(fs::File::open(&source).unwrap()),
+                &mut |record| rows.push(record),
+            )
+            .unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = original.path().to_string_lossy().into_owned();
+        panel.profile_id = "original".into();
+        panel.connect(true);
+        let deck = panel.backend.as_mut().unwrap().create_deck("Spanish").unwrap();
+        panel.deck_id = Some(deck);
+        panel.root = other.path().to_string_lossy().into_owned();
+        panel.profile_id = "unrelated".into();
+        panel
+            .add_validated_source_choice(&adapter, &source, &rows[0], "s1")
+            .unwrap();
+        assert!(original
+            .path()
+            .join("original/source-catalog.sqlite3")
+            .exists());
+        assert!(!other.path().join("unrelated").exists());
+        assert_eq!(panel.stats.notes, 1);
+        panel.close();
+        assert!(panel.active_root.is_none());
+        assert!(panel.active_profile_id.is_none());
     }
 
     #[test]
