@@ -1,5 +1,5 @@
-use retivus::provider;
 use eframe::egui;
+use retivus::provider;
 use std::fs::File;
 use std::io::BufReader;
 
