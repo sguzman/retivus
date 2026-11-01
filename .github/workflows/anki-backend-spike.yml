@@ -33,6 +33,12 @@ jobs:
           grep -q 'publish = false' rslib/Cargo.toml
           grep -q 'pub struct CollectionBuilder' rslib/src/collection/mod.rs
           cargo --version
+      - name: Retrieve only required upstream translation submodules
+        working-directory: upstream-anki
+        run: |
+          git submodule update --init --depth 1 ftl/core-repo ftl/qt-repo
+          test -d ftl/core-repo/core
+          test -d ftl/qt-repo/desktop
       - name: Install upstream native codegen requirements
         run: |
           sudo apt-get update -qq
