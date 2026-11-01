@@ -631,6 +631,16 @@ mod tests {
         let file_field = harness.get_by_role_and_label(egui::accesskit::Role::TextInput, "File");
         file_field.focus();
         harness.run();
+        harness.key_press(egui::Key::Tab);
+        harness.run();
+        harness.key_press_modifiers(egui::Modifiers::SHIFT, egui::Key::Tab);
+        harness.run();
+        assert!(
+            harness
+                .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
+                .is_focused(),
+            "Shift+Tab must restore keyboard focus to the source-file input"
+        );
         harness
             .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
             .type_text(&file.to_string_lossy());
