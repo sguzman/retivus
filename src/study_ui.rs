@@ -335,12 +335,7 @@ mod tests {
             panel.backend.as_ref().unwrap().note_fields(note).unwrap(),
             ["¿Qué tal?", "How are you?"]
         );
-        let revlogs: i64 = panel.backend.as_mut().unwrap().collection
-            .storage
-            .db()
-            .query_row("select count(*) from revlog where cid=?1", [first], |row| row.get(0))
-            .unwrap();
-        assert_eq!(revlogs, 1);
+        assert_eq!(panel.backend.as_ref().unwrap().review_event_count(first).unwrap(), 1);
         panel.close();
     }
 

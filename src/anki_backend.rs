@@ -588,6 +588,19 @@ impl AnkiBackend {
         Ok(rows)
     }
 
+    /// Inspect persisted Anki review history without changing scheduler state.
+    pub fn review_event_count(&self, card_id: i64) -> BackendResult<usize> {
+        if card_id <= 0 {
+            return Err("card ID must be positive".into());
+        }
+        let count: i64 = self.collection.storage.db().query_row(
+            "SELECT count(*) FROM revlog WHERE cid=?1",
+            [card_id],
+            |row| row.get(0),
+        )?;
+        Ok(usize::try_from(count)?)
+    }
+
     pub fn note_tags(&self, note_id: i64) -> BackendResult<Vec<String>> {
         let note = self
             .collection
