@@ -80,6 +80,10 @@
 - ⏳ **M7.3 🧯 Upgrade/recovery test matrix and no known critical defects** — **2%**. Acceptance: Backups/migration/release gate CI pass. Depends on: M7.2. **pending.**
 - ⏳ **M7.4 🏁 Publish release, tag and final acceptance ledger** — **1%**. Acceptance: Release assets independently downloaded and verified. Depends on: M7.1,M7.2,M7.3. **pending.**
 
+## 🌍 Provider adapter groundwork (unweighted until verified)
+
+Added a source-neutral trait and a distinct TSV v1 adapter with explicit languages and licensing metadata; M3.1 earns its 3% only after CI confirms both adapter contract tests. This is not the full Mexilex transactional import, note creation, or provider upgrade story.
+
 ## ⚖️ License decision (unweighted)
 
 The project adopted **AGPL-3.0-or-later**, in anticipation of combining Retivus with Anki's upstream AGPL Rust backend. The original MIT grant is preserved in `LICENSES/MIT-original.txt` and [licensing history](docs/licensing.md). **M1.4 remains pending** until the backend integration is verified and its actual redistribution/notice obligations are implemented; the license declaration alone earns no points.

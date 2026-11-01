@@ -2,3 +2,5 @@
 pub mod provider;
 
 pub mod brand;
+
+pub mod source_adapter;

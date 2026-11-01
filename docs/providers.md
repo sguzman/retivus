@@ -1,6 +1,6 @@
 # External data providers
 
-Retivus is not a Mexilex GUI. The first importer validates the existing **Mexilex study JSONL format v1**, and a generic internal provider abstraction is planned for later formats.
+Retivus is not a Mexilex GUI. The first importer validates the existing **Mexilex study JSONL format v1**, and a source-neutral `SourceAdapter` interface supports other versioned formats.
 
 ## Mexilex v0.3.0
 
@@ -18,6 +18,18 @@ Other evidence (ACTIV-ES film dialogue frequency, CIEMPIESS radio frequencies, W
 ## Import validation v0 (initial foundation)
 
 `src/provider.rs` provides a strict streaming boundary that accepts one JSON record per line, checks required version/language/source/IDs/word/POS/senses, rejects repeated entries and sense IDs, and returns source records without creating cards. It is an intentionally **partial** importer: it does not yet verify downloaded checksums, archive manifests, transactionally install into a profile, or update existing study cards. Those are separately tracked milestones.
+
+## Source-neutral adapters (implementation)
+
+`src/source_adapter.rs` exposes a stable read-only abstraction, `SourceAdapter`, with:
+- explicit `SourceInfo` for provider ID, edition, lexical/definition language pair and license notice;
+- `SourceRecord` / `SourceMeaning` independent of Mexilex's schema;
+- an object-safe `visit` method that streams validated records to a caller-supplied staging/preview sink, never directly to the learner's personal cards;
+- two independent formats: `mexilex-study-jsonl-v1` and `retivus-study-tsv-v1`.
+
+The explicit TSV v1 format is a minimal second provider used to verify the interface without coupling it to Mexilex. It requires a UTF-8 header `entry_id<TAB>word<TAB>part_of_speech<TAB>sense_id<TAB>definition` and one complete entry/sense per line. Repeated spellings with distinct IDs are accepted; duplicate IDs and missing fields are refused. The source descriptor is provided externally, not guessed from filename. A sample source might use Japanese words with Spanish meanings, distinct from Mexilex's es-MX/en pair. Do not treat this format as the final importer, and do not interpret a field as a license for republishing content.
+
+**Security/transaction limit:** adapters validate streaming records and can emit earlier records before a later invalid one is discovered. Callers **must stage and roll back** the entire import on failure. Validation alone is not permission to change cards or review history.
 
 ## Future providers
 
