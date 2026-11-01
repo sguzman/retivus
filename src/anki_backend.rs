@@ -1006,8 +1006,10 @@ mod tests {
             )
             .unwrap();
             let count = |table: &str| -> usize {
-                db.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
-                    .unwrap()
+                db.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| {
+                    row.get(0)
+                })
+                .unwrap()
             };
             (count("notes"), count("cards"))
         }
