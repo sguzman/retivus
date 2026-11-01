@@ -3,6 +3,9 @@ use retivus::{brand, source_adapter, typography};
 use std::fs::File;
 use std::io::BufReader;
 
+#[cfg(feature = "anki-backend")]
+mod study_ui;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Theme {
     System,
@@ -139,6 +142,8 @@ struct Retivus {
     preview: Vec<source_adapter::SourceRecord>,
     selected_sense: Option<SelectedSense>,
     krypton_font_loaded: bool,
+    #[cfg(feature = "anki-backend")]
+    study: study_ui::StudyPanel,
 }
 impl Default for Retivus {
     fn default() -> Self {
@@ -157,6 +162,8 @@ impl Default for Retivus {
             preview: Vec::new(),
             selected_sense: None,
             krypton_font_loaded: false,
+            #[cfg(feature = "anki-backend")]
+            study: study_ui::StudyPanel::default(),
         }
     }
 }
@@ -225,9 +232,13 @@ impl eframe::App for Retivus {
             ui.heading("Learn from any source.");
             ui.label("Anki ecosystem compatibility and versioned external data providers.");
             ui.separator();
+            #[cfg(not(feature = "anki-backend"))]
             ui.weak("Preview mode: validated sources only. Study, editing and review controls are not available in this window yet.");
+            #[cfg(feature = "anki-backend")]
+            self.study.ui(ui);
             ui.weak("Keyboard: Tab and Shift+Tab move between controls; Enter or Space activates the focused control.");
             ui.label("First data source: Mexilex · es-MX → en");
+            #[cfg(not(feature = "anki-backend"))]
             ui.label("Anki Rust backend: separately feature-gated and under integration; this preview never opens learner collections.");
             ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| {

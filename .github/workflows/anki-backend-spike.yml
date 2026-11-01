@@ -90,6 +90,14 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           cargo test --features anki-backend --lib
+      - name: Compile and test feature-enabled native learner workspace
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          cargo check --features anki-backend --bin retivus
+          cargo test --features anki-backend --bin retivus
       - name: Verify official Anki Desktop collection copy
         env:
           CARGO_BUILD_JOBS: "2"
