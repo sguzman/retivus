@@ -45,6 +45,13 @@ jobs:
           sudo apt-get install -y -qq protobuf-compiler
           command -v protoc
           protoc --version
+      - name: Apply isolated Tokio io-util compatibility feature
+        working-directory: upstream-anki
+        run: |
+          grep -Fq 'features = ["fs", "rt-multi-thread", "macros", "signal"]' Cargo.toml
+          sed -i 's/features = \["fs", "rt-multi-thread", "macros", "signal"\]/features = ["fs", "io-util", "rt-multi-thread", "macros", "signal"]/' Cargo.toml
+          grep -Fq 'features = ["fs", "io-util", "rt-multi-thread", "macros", "signal"]' Cargo.toml
+          git diff -- Cargo.toml
       - name: Compile Anki Rust library from pinned workspace
         working-directory: upstream-anki
         env:

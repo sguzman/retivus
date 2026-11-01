@@ -26,3 +26,7 @@ This is an **inventory**, not proof of a portable API. The workspace has substan
 4. Retain an explicit fallback study: Anki native backend service/protobuf or compatible export/import if direct embedding is unworkable. Avoid reimplementation before measuring this gate.
 
 No Anki API, package, scheduling, synchronization or add-on compatibility is claimed at this stage.
+
+## Observed build incompatibility (2026-11-01)
+
+The first independent pinned build failed because `protoc` was not available; after installing it, the next attempt needed the two FTL translation submodules `ftl/core-repo` and `ftl/qt-repo`. With both resolved, `cargo check --locked -p anki` reached upstream Rust sources but failed because the workspace's `tokio` dependency lacks `io-util`, while `rslib` imports Tokio's async read/write extension traits and buffered I/O. The test workflow **does not commit any Anki source changes**: it explicitly adds only the `io-util` feature to a disposable checkout of the pinned `Cargo.toml`, displays that diff and retries. This is a feasibility workaround, not a claim that upstream builds unmodified as an independent package. If necessary, upstream integration will need a patch, an upstream issue, or a different adapter. No released Retivus binary includes this upstream code yet.
