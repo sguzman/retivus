@@ -100,6 +100,55 @@ jobs:
         run: |
           cargo check --features anki-backend --bin retivus
           cargo test --features anki-backend --bin retivus
+      - name: Smoke feature-enabled native learner window under X11
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq xvfb xdotool scrot openbox libgl1-mesa-dri libxkbcommon-x11-0
+          cargo build --features anki-backend --bin retivus
+          xvfb-run -a bash -euo pipefail -c '
+            openbox > /tmp/retivus-feature-wm.log 2>&1 &
+            wm=$!
+            LIBGL_ALWAYS_SOFTWARE=1 ./upstream-anki/target/debug/retivus > /tmp/retivus-feature.log 2>&1 &
+            app=$!
+            trap "kill $app $wm 2>/dev/null || true" EXIT
+            for attempt in $(seq 1 80); do
+              window=$(xdotool search --onlyvisible --name "Retivus" | head -n 1 || true)
+              if test -n "$window"; then
+                xdotool windowactivate --sync "$window" || true
+                xdotool windowsize "$window" 1080 800
+                sleep 1
+                scrot --window "$window" /tmp/retivus-feature-wide.png
+                test "$(wc -c < /tmp/retivus-feature-wide.png)" -gt 8000
+                xdotool key --clearmodifiers Tab
+                xdotool key --clearmodifiers shift+Tab
+                xdotool windowsize "$window" 720 650
+                sleep 1
+                scrot --window "$window" /tmp/retivus-feature-narrow.png
+                test "$(wc -c < /tmp/retivus-feature-narrow.png)" -gt 8000
+                kill -0 "$app"
+                exit 0
+              fi
+              if ! kill -0 "$app" 2>/dev/null; then
+                cat /tmp/retivus-feature.log
+                exit 1
+              fi
+              sleep 0.5
+            done
+            cat /tmp/retivus-feature.log
+            exit 1
+          '
+      - name: Archive feature-enabled native UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-anki-feature-window
+          path: /tmp/retivus-feature-*.png
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Verify official Anki Desktop collection copy
         env:
           CARGO_BUILD_JOBS: "2"

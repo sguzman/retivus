@@ -2,6 +2,10 @@
 //! No profile opens, is created, or is migrated until a user chooses an action.
 use eframe::egui;
 use retivus::anki_backend::{AnkiBackend, NoteRow, ReviewPreview};
+use retivus::source_adapter::{SourceAdapter, SourceRecord};
+use retivus::source_store::{SourceCardCandidate, SourceCatalog};
+use std::fs;
+use std::io::BufReader;
 use std::path::Path;
 
 #[derive(Default)]
@@ -9,6 +13,7 @@ pub struct StudyPanel {
     root: String,
     profile_id: String,
     package: String,
+    snapshot_id: String,
     backend: Option<AnkiBackend>,
     decks: Vec<(i64, String)>,
     deck_id: Option<i64>,
@@ -85,6 +90,99 @@ impl StudyPanel {
     }
 
     /// Use one guarded path for both the grade buttons and automated UI-state tests.
+    /// Import a validated source into a durable provider catalog before an
+    /// explicit sense can become a learner note. No homograph guessing.
+    pub fn add_validated_source_choice(
+        &mut self,
+        adapter: &dyn SourceAdapter,
+        source_path: &Path,
+        record: &SourceRecord,
+        sense_id: &str,
+    ) -> Result<i64, String> {
+        let deck_id = self.deck_id.ok_or("choose a learner deck first")?;
+        if self.backend.is_none() {
+            return Err("open a Retivus-managed profile first".into());
+        }
+        let origin = adapter.descriptor();
+        origin.validate()?;
+        if record.provenance.provider_id != origin.provider_id
+            || record.provenance.lexical_language != origin.lexical_language
+            || record.provenance.definition_language != origin.definition_language
+        {
+            return Err("preview provider identity differs from the source adapter".into());
+        }
+        let sense = record
+            .senses
+            .iter()
+            .find(|sense| sense.sense_id == sense_id)
+            .ok_or("selected sense no longer exists")?;
+        let snapshot = if self.snapshot_id.trim().is_empty() {
+            record.provenance.edition.clone()
+        } else {
+            self.snapshot_id.trim().to_owned()
+        };
+        let expected = SourceCardCandidate {
+            provenance: record.provenance.clone(),
+            snapshot: snapshot.clone(),
+            entry_id: record.entry_id.clone(),
+            sense_id: sense_id.to_owned(),
+            word: record.word.clone(),
+            part_of_speech: record.part_of_speech.clone(),
+            definition: sense.definition.clone(),
+        };
+        let profile_root = fs::canonicalize(&self.root).map_err(|e| e.to_string())?;
+        let profile_dir = profile_root.join(&self.profile_id);
+        let directory = fs::symlink_metadata(&profile_dir).map_err(|e| e.to_string())?;
+        if !directory.is_dir() || directory.file_type().is_symlink() {
+            return Err("learner profile must be a real Retivus-managed directory".into());
+        }
+        let catalog_file = profile_dir.join("source-catalog.sqlite3");
+        let is_mexilex = adapter.format_id() == "mexilex-study-jsonl-v1";
+        let mut catalog = match fs::symlink_metadata(&catalog_file) {
+            Ok(_) => SourceCatalog::open_existing(&catalog_file)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                if is_mexilex {
+                    return Err("Mexilex must first be imported from the checksum-verified release into this profile's source catalog".into());
+                }
+                SourceCatalog::create_new(&catalog_file)?
+            }
+            Err(error) => return Err(error.to_string()),
+        };
+        if catalog
+            .lookup_entry(&origin.provider_id, &snapshot, &record.entry_id)?
+            .is_none()
+        {
+            if is_mexilex {
+                return Err("Mexilex source snapshot is not in the verified release catalog".into());
+            }
+            let file = fs::symlink_metadata(source_path).map_err(|e| e.to_string())?;
+            if !file.is_file() || file.file_type().is_symlink() {
+                return Err("source must be a regular file, not a symlink".into());
+            }
+            let input = fs::File::open(source_path).map_err(|e| e.to_string())?;
+            catalog.import_snapshot(&snapshot, adapter, &mut BufReader::new(input))?;
+        }
+        let actual = catalog.select_sense(
+            &origin.provider_id,
+            &snapshot,
+            &record.entry_id,
+            sense_id,
+        )?;
+        if actual != expected {
+            return Err("source selection differs from the immutable imported snapshot".into());
+        }
+        let note_id = self
+            .backend
+            .as_mut()
+            .ok_or("learner profile closed during import")?
+            .add_source_candidate(deck_id, &actual)
+            .map_err(|e| e.to_string())?;
+        self.status = format!("Created note {note_id} from an exact source sense; provenance saved.");
+        self.refresh();
+        self.refresh_review();
+        Ok(note_id)
+    }
+
     fn grade_revealed(&mut self, rating: u8) {
         if !self.revealed {
             self.status = "Reveal the answer before choosing a rating.".into();
@@ -122,13 +220,20 @@ impl StudyPanel {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        ui.collapsing("Learner workspace · managed Anki collections", |ui| {
+        egui::CollapsingHeader::new("Learner workspace · managed Anki collections")
+            .default_open(true)
+            .show(ui, |ui| {
             ui.label("Choose an existing root directory and a Retivus profile ID. No ordinary Anki profile is opened automatically.");
             ui.horizontal_wrapped(|ui| {
                 ui.label("Profile root");
                 ui.add(egui::TextEdit::singleline(&mut self.root).desired_width(280.0));
                 ui.label("Profile ID");
                 ui.add(egui::TextEdit::singleline(&mut self.profile_id).desired_width(160.0));
+            });
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Source snapshot ID");
+                ui.add(egui::TextEdit::singleline(&mut self.snapshot_id).hint_text("blank = source edition").desired_width(240.0));
+                ui.weak("Mexilex must use its already checksum-verified catalog; raw JSONL is preview-only.");
             });
             ui.horizontal_wrapped(|ui| {
                 ui.add_enabled_ui(self.backend.is_none(), |ui| {
@@ -307,10 +412,15 @@ mod tests {
         let backend = panel.backend.as_mut().unwrap();
         backend.enable_fsrs().unwrap();
         let deck = backend.create_deck("Sentences").unwrap();
-        let note = backend.add_basic_note(deck, "¿Qué tal?", "How are you?").unwrap();
-        panel.query = "front:tal".into();
+        let note = backend
+            .add_basic_note(deck, "¿Qué tal?", "How are you?")
+            .unwrap();
+        panel.query = "front:*tal*".into();
         panel.refresh();
-        assert!(panel.decks.iter().any(|(id, name)| *id == deck && name == "Sentences"));
+        assert!(panel
+            .decks
+            .iter()
+            .any(|(id, name)| *id == deck && name == "Sentences"));
         assert_eq!(panel.notes.len(), 1);
         assert_eq!(panel.notes[0].id, note);
         panel.refresh_review();
@@ -335,7 +445,71 @@ mod tests {
             panel.backend.as_ref().unwrap().note_fields(note).unwrap(),
             ["¿Qué tal?", "How are you?"]
         );
-        assert_eq!(panel.backend.as_ref().unwrap().review_event_count(first).unwrap(), 1);
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(first)
+                .unwrap(),
+            1
+        );
+        panel.close();
+    }
+
+    #[test]
+    fn source_preview_must_match_durable_snapshot_before_creating_study_note() {
+        use retivus::source_adapter::{SourceInfo, StudyTsvV1};
+        let dir = tempfile::tempdir().unwrap();
+        let source_file = dir.path().join("source.tsv");
+        let data = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\t橋\tnoun\ta\tbridge\n2\t橋\tverb\ta\tconnect\n";
+        fs::write(&source_file, data).unwrap();
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "independent-japanese".into(),
+            edition: "2026-edition".into(),
+            lexical_language: "ja".into(),
+            definition_language: "en".into(),
+            license_notice: "Synthetic CC0 test".into(),
+        })
+        .unwrap();
+        let mut preview = Vec::new();
+        adapter
+            .visit(&mut BufReader::new(fs::File::open(&source_file).unwrap()), &mut |row| {
+                preview.push(row);
+            })
+            .unwrap();
+        let mut panel = StudyPanel {
+            root: dir.path().to_string_lossy().into_owned(),
+            profile_id: "source-learner".into(),
+            ..StudyPanel::default()
+        };
+        panel.connect(true);
+        let deck = panel.backend.as_mut().unwrap().create_deck("Japanese").unwrap();
+        panel.deck_id = Some(deck);
+        let first = panel
+            .add_validated_source_choice(&adapter, &source_file, &preview[0], "a")
+            .unwrap();
+        assert!(dir
+            .path()
+            .join("source-learner/source-catalog.sqlite3")
+            .exists());
+        let mut forged = preview[1].clone();
+        forged.senses[0].definition = "forged meaning".into();
+        assert!(panel
+            .add_validated_source_choice(&adapter, &source_file, &forged, "a")
+            .is_err());
+        let second = panel
+            .add_validated_source_choice(&adapter, &source_file, &preview[1], "a")
+            .unwrap();
+        assert_ne!(first, second);
+        let first_tags = panel.backend.as_ref().unwrap().note_tags(first).unwrap();
+        let second_tags = panel.backend.as_ref().unwrap().note_tags(second).unwrap();
+        assert_ne!(first_tags, second_tags, "homographs retain distinct source identities");
+        assert_eq!(panel.backend.as_ref().unwrap().note_fields(first).unwrap(), ["橋", "bridge"]);
+        assert_eq!(panel.backend.as_ref().unwrap().note_fields(second).unwrap(), ["橋", "connect"]);
+        panel.close();
+        panel.connect(false);
+        assert_eq!(panel.backend.as_ref().unwrap().note_fields(second).unwrap(), ["橋", "connect"]);
         panel.close();
     }
 

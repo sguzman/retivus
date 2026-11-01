@@ -168,6 +168,20 @@ impl Default for Retivus {
     }
 }
 impl Retivus {
+    fn source_adapter(&self) -> Result<Box<dyn source_adapter::SourceAdapter>, String> {
+        match self.source_format {
+            SourceFormat::Mexilex => Ok(Box::new(source_adapter::MexilexV1::default())),
+            SourceFormat::GenericTsv => source_adapter::StudyTsvV1::new(source_adapter::SourceInfo {
+                provider_id: self.source_id.clone(),
+                edition: self.source_edition.clone(),
+                lexical_language: self.source_language.clone(),
+                definition_language: self.definition_language.clone(),
+                license_notice: self.license_notice.clone(),
+            })
+            .map(|adapter| Box::new(adapter) as Box<dyn source_adapter::SourceAdapter>),
+        }
+    }
+
     fn restore(storage: Option<&dyn eframe::Storage>) -> Self {
         let theme = storage.and_then(|value| value.get_string(THEME_STORAGE_KEY));
         let scale = storage.and_then(|value| value.get_string(SCALE_STORAGE_KEY));
@@ -286,22 +300,7 @@ impl eframe::App for Retivus {
                 if ui.button("Validate source").clicked() {
                     self.preview.clear();
                     self.selected_sense = None;
-                    let adapter: Result<Box<dyn source_adapter::SourceAdapter>, String> =
-                        match self.source_format {
-                            SourceFormat::Mexilex => {
-                                Ok(Box::new(source_adapter::MexilexV1::default()))
-                            }
-                            SourceFormat::GenericTsv => {
-                                source_adapter::StudyTsvV1::new(source_adapter::SourceInfo {
-                                    provider_id: self.source_id.clone(),
-                                    edition: self.source_edition.clone(),
-                                    lexical_language: self.source_language.clone(),
-                                    definition_language: self.definition_language.clone(),
-                                    license_notice: self.license_notice.clone(),
-                                })
-                                .map(|adapter| Box::new(adapter) as Box<dyn source_adapter::SourceAdapter>)
-                            }
-                        };
+                    let adapter = self.source_adapter();
                     self.import_status = match adapter {
                         Err(error) => format!("Invalid source descriptor: {error}"),
                         Ok(adapter) => match File::open(&self.source_path) {
@@ -328,7 +327,37 @@ impl eframe::App for Retivus {
                             "Provider {} · edition {} · entry {} · sense {}",
                             chosen.provider_id, chosen.edition, chosen.entry_id, chosen.sense_id
                         ));
-                        ui.label("No card was created. A verified source snapshot and an explicit learner profile are required before adding cards.");
+                        #[cfg(not(feature = "anki-backend"))]
+                        ui.label("Preview only. Enable the Anki backend to create study notes from validated source senses.");
+                        #[cfg(feature = "anki-backend")]
+                        ui.label("No card was created yet. Adding this sense requires an explicitly opened Retivus learner profile and selected deck.");
+                        #[cfg(feature = "anki-backend")]
+                        if ui.button("Add selected meaning to learner deck").clicked() {
+                            let match_record = self.preview.iter().find(|record| {
+                                record.provenance.provider_id == chosen.provider_id
+                                    && record.provenance.edition == chosen.edition
+                                    && record.entry_id == chosen.entry_id
+                                    && record.word == chosen.word
+                                    && record.senses.iter().any(|sense| {
+                                        sense.sense_id == chosen.sense_id
+                                            && sense.definition == chosen.definition
+                                    })
+                            });
+                            let result = match (self.source_adapter(), match_record) {
+                                (Ok(adapter), Some(record)) => self.study.add_validated_source_choice(
+                                    adapter.as_ref(),
+                                    std::path::Path::new(&self.source_path),
+                                    record,
+                                    &chosen.sense_id,
+                                ),
+                                (Err(error), _) => Err(error),
+                                (_, None) => Err("selected source sense is not in validated preview".into()),
+                            };
+                            self.import_status = match result {
+                                Ok(note) => format!("Created study note {note} from selected meaning."),
+                                Err(error) => format!("Not added to learner profile: {error}"),
+                            };
+                        }
                     });
                 }
                 if !self.preview.is_empty() {
