@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **66%** of 100% (previous verified checkpoint 64%, this continuation **+2 percentage points**). All native egui M5 acceptance is now verified, including actual Wayland window launch and visual inspection of screenshots at two window sizes. Anki Desktop interchange and M6/M7 work remain pending. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the final 10%.
+**Verified progress:** **77%** of 100% (previous verified checkpoint 66%, this continuation **+11 percentage points**). Source-independent public package counts, rich-card rendering round-trips, and guarded offline collection-copy migration are verified. Anki Desktop GUI reexport, authenticated AnkiWeb sync, remaining security and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -12,7 +12,7 @@
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 15% | ✅ |
 | 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
-| 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
+| 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 11% | 🟡 |
 | 🎨 M5 Complete native egui study experience | 14% | 14% | ✅ |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 3% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
@@ -51,10 +51,10 @@
 
 ### 🃏 M4: Anki ecosystem round-trip compatibility (17% of project)
 
-- ⏳ **M4.1 📥 Import .apkg notes/decks/templates/tags/media safely** — **4%**. Acceptance: Official representative shared decks open and counts compare. Depends on: M1.5,M2.1. **pending.**
+- ✅ **M4.1 📥 Import .apkg notes/decks/templates/tags/media safely** — **4%**. Acceptance: Official representative shared decks open and counts compare. Depends on: M1.5,M2.1. **verified complete.**
 - ⏳ **M4.2 📤 Export .apkg with media and round-trip reimport** — **4%**. Acceptance: Anki desktop imports and reexports equivalent notes/cards. Depends on: M4.1. **pending.**
-- ⏳ **M4.3 🧠 Preserve cloze, image/media, HTML card templates and CSS** — **4%**. Acceptance: Cloze and media rich fixture render parity passes. Depends on: M4.1. **pending.**
-- ⏳ **M4.4 🔄 Safely open/migrate copy of real Anki collection** — **3%**. Acceptance: Copy-only migration, backup and version mismatch tests. Depends on: M2.3,M4.1. **pending.**
+- ✅ **M4.3 🧠 Preserve cloze, image/media, HTML card templates and CSS** — **4%**. Acceptance: Cloze and media rich fixture render parity passes. Depends on: M4.1. **verified complete.**
+- ✅ **M4.4 🔄 Safely open/migrate copy of real Anki collection** — **3%**. Acceptance: Copy-only migration, backup and version mismatch tests. Depends on: M2.3,M4.1. **verified complete.**
 - ⏳ **M4.5 🌐 AnkiWeb sync compatibility or explicit separately agreed post-v1 classification** — **2%**. Acceptance: Authenticated test sync with conflicts, media and credential safety OR approved scope decision. Depends on: M4.4. **pending.**
 
 ### 🎨 M5: Complete native egui study experience (14% of project)
@@ -188,3 +188,12 @@
 
 - ✅ **M5.6 🖥️ (+2 pp):** [Anki CI 41343238570](https://github.com/sguzman/retivus/actions/runs/41343238570) passed native backend/GUI tests, actual Sway Wayland launch, two retained screenshots at **1080×800** and **720×650**, and official collection/public-package checks. The [Wayland artifact](https://github.com/sguzman/retivus/actions/runs/41343238570/artifacts/13098740421) was downloaded and inspected at both sizes; the initial screen showed no visible clipping or missing glyphs. [Rust foundation CI 41343238538](https://github.com/sguzman/retivus/actions/runs/41343238538) passed formatting, Clippy, provider tests and X11 smoke. The screenshots cover the initial screen, not every populated state or Hyprland configuration.
 - ⏳ **M4 (0/17), M6 (3/12), M7 (0/8)** remain. Wayland smoke does not imply full Anki Desktop package interchange or authenticated AnkiWeb sync.
+
+## Verified continuation checkpoint — 2026-11-01 (77%)
+
+**Progress: 66% → 77% (+11 percentage points).** M0: 8/8; M1: 12/12; M2: 15/15; M3: 14/14; **M4: 11/17**; M5: 14/14; M6: 3/12; M7: 0/8.
+
+- ✅ **M4.1 📥 (+4 pp):** [Anki feature CI 41349110895](https://github.com/sguzman/retivus/actions/runs/41349110895) verifies pinned official AnkiDroid and independent third-party shared-deck archives, with imported note/card totals independently compared to legacy SQLite and modern zstd-compressed SQLite inside source packages. Both real fixtures reexport and reimport to isolated profiles. Media, tags, deck names and templates pass pinned Anki native round-trip regressions. Actual Anki Desktop GUI behavior is separately scoped to M4.2.
+- ✅ **M4.3 🧠 (+4 pp):** The pinned Anki engine's cloze/HTML/CSS/image parity regression verifies rendered cloze cards and styles before/after full .apkg export/reimport/reopen. Inert egui text rendering is not embedded HTML execution; this acceptance covers preservation of Anki package content, not building a new HTML browser.
+- ✅ **M4.4 🔄 (+3 pp):** Offline copy-only import of closed .anki2 collections passed source-byte preservation, Anki schema/unknown-version refusal, WAL refusal, backup/restore-as-new and profile isolation. The [official Anki Desktop collection-copy fixture, CI 41347374839](https://github.com/sguzman/retivus/actions/runs/41347374839) passed. No user Anki profile was modified.
+- ⏳ **M4.2 and M4.5 remain open:** Desktop GUI reexport and authenticated AnkiWeb sync (or approved deferral) have not been demonstrated. Remaining M6/M7 acceptance remains separately outstanding.
