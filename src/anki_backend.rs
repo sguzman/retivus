@@ -318,6 +318,24 @@ impl AnkiBackend {
         Ok(deck.id.0)
     }
 
+    /// The review queue is scoped to Anki's persisted current deck, rather
+    /// than whichever deck was most recently used to create a note.
+    pub fn current_review_deck(&mut self) -> BackendResult<i64> {
+        Ok(self.collection.get_current_deck()?.id.0)
+    }
+
+    /// Change Anki's real review-queue scope, not just the egui selector.
+    /// Refuse missing decks instead of silently falling back to Default.
+    pub fn select_review_deck(&mut self, deck_id: i64) -> BackendResult<()> {
+        if deck_id <= 0 || self.collection.get_deck(DeckId(deck_id))?.is_none() {
+            return Err("selected review deck does not exist".into());
+        }
+        if self.current_review_deck()? != deck_id {
+            self.collection.set_current_deck(DeckId(deck_id))?;
+        }
+        Ok(())
+    }
+
     pub fn add_basic_note(&mut self, deck_id: i64, front: &str, back: &str) -> BackendResult<i64> {
         if front.trim().is_empty() || back.trim().is_empty() {
             return Err("front and back must not be blank".into());

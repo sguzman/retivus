@@ -65,15 +65,24 @@ impl StudyPanel {
         let Some(backend) = self.backend.as_mut() else {
             return;
         };
-        match (backend.list_decks(), backend.browse_notes(&self.query, 50)) {
-            (Ok(decks), Ok(notes)) => {
+        match (
+            backend.list_decks(),
+            backend.browse_notes(&self.query, 50),
+            backend.current_review_deck(),
+        ) {
+            (Ok(decks), Ok(notes), Ok(current_deck)) => {
                 self.decks = decks;
                 if !self.decks.iter().any(|(id, _)| Some(*id) == self.deck_id) {
-                    self.deck_id = self.decks.first().map(|(id, _)| *id);
+                    self.deck_id = self
+                        .decks
+                        .iter()
+                        .find(|(id, _)| *id == current_deck)
+                        .or_else(|| self.decks.first())
+                        .map(|(id, _)| *id);
                 }
                 self.notes = notes;
             }
-            (Err(error), _) | (_, Err(error)) => {
+            (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
                 self.status = format!("Could not browse profile: {error}");
             }
         }
@@ -86,6 +95,14 @@ impl StudyPanel {
             return;
         };
         self.revealed = false;
+        if let Some(deck_id) = self.deck_id {
+            if let Err(error) = backend.select_review_deck(deck_id) {
+                self.review = None;
+                self.due = (0, 0, 0);
+                self.status = format!("Could not select review deck: {error}");
+                return;
+            }
+        }
         match (backend.due_counts(), backend.next_review_preview()) {
             (Ok(due), Ok(review)) => {
                 self.due = due;
@@ -279,6 +296,7 @@ impl StudyPanel {
                 ui.separator();
                 ui.heading("Decks and notes");
                 ui.horizontal_wrapped(|ui| {
+                    let previous_deck = self.deck_id;
                     egui::ComboBox::from_id_salt("retivus-active-deck")
                         .selected_text(self.decks.iter().find(|(id, _)| Some(*id) == self.deck_id)
                             .map_or("Select deck", |(_, name)| name.as_str()))
@@ -287,6 +305,9 @@ impl StudyPanel {
                                 ui.selectable_value(&mut self.deck_id, Some(*id), name);
                             }
                         });
+                    if self.deck_id != previous_deck {
+                        self.refresh_review();
+                    }
                     ui.add(egui::TextEdit::singleline(&mut self.new_deck).hint_text("New deck name").desired_width(200.0));
                     if ui.button("Create deck").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
@@ -447,6 +468,7 @@ mod tests {
             .any(|(id, name)| *id == deck && name == "Sentences"));
         assert_eq!(panel.notes.len(), 1);
         assert_eq!(panel.notes[0].id, note);
+        panel.deck_id = Some(deck);
         panel.refresh_review();
         let first = panel.review.as_ref().unwrap().card_id;
         assert!(panel.due.0 >= 1);
@@ -633,6 +655,7 @@ mod tests {
         backend.enable_fsrs().unwrap();
         let deck = backend.create_deck("Undo").unwrap();
         backend.add_basic_note(deck, "today", "hoy").unwrap();
+        panel.deck_id = Some(deck);
         panel.refresh_review();
         let card_id = panel.review.as_ref().unwrap().card_id;
         panel.revealed = true;
@@ -685,6 +708,7 @@ mod tests {
         let deck = backend.create_deck("Guarded").unwrap();
         backend.add_basic_note(deck, "first", "one").unwrap();
         backend.add_basic_note(deck, "second", "two").unwrap();
+        panel.deck_id = Some(deck);
         panel.refresh_review();
         let displayed_id = panel.review.as_ref().unwrap().card_id;
         assert_eq!(
