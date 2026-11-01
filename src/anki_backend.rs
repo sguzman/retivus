@@ -828,8 +828,7 @@ mod tests {
         cloze.templates[0].config.q_format =
             "<section class=\"retivus-cloze\">{{cloze:Text}}</section>".into();
         cloze.templates[0].config.a_format =
-            "<article class=\"retivus-cloze\">{{cloze:Text}}<p>{{Back Extra}}</p></article>"
-                .into();
+            "<article class=\"retivus-cloze\">{{cloze:Text}}<p>{{Back Extra}}</p></article>".into();
         source
             .collection
             .update_notetype(&mut cloze, false)
