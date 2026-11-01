@@ -117,6 +117,16 @@ impl AnkiBackend {
     /// Import a package through the pinned upstream Anki engine into a
     /// Retivus-managed collection only. Do not open an arbitrary Anki profile.
     pub fn import_apkg(&mut self, path: &Path) -> BackendResult<()> {
+        self.import_apkg_with_scheduling(path, false)
+    }
+
+    /// Package imports do not bring another person's review history by default.
+    /// Use the opt-in variant only when intentionally restoring that history.
+    pub fn import_apkg_with_scheduling(
+        &mut self,
+        path: &Path,
+        include_review_history: bool,
+    ) -> BackendResult<()> {
         let managed = self
             .managed_dir
             .as_ref()
@@ -124,7 +134,13 @@ impl AnkiBackend {
         check_managed_media(managed)?;
         check_apkg_path(path)?;
         self.collection
-            .import_apkg(path, ImportAnkiPackageOptions::default())?;
+            .import_apkg(
+                path,
+                ImportAnkiPackageOptions {
+                    with_scheduling: include_review_history,
+                    ..Default::default()
+                },
+            )?;
         Ok(())
     }
 
@@ -1061,7 +1077,9 @@ mod tests {
         public.close().unwrap();
 
         let mut private = AnkiBackend::create_managed_profile(root.path(), "opted-in").unwrap();
-        private.import_apkg(&opt_in_package).unwrap();
+        private
+            .import_apkg_with_scheduling(&opt_in_package, true)
+            .unwrap();
         let stats = private.collection_stats().unwrap();
         assert_eq!((stats.notes, stats.cards, stats.review_events), (1, 1, 1));
         private.close().unwrap();

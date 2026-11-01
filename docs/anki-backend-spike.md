@@ -24,7 +24,7 @@ Disposable-profile tests construct malicious packages and verify rejection witho
 
 Shareable package export now defaults to excluding scheduling and private review events. The native UI offers an explicit unchecked-by-default setting to include scheduling and personal study history when the learner intentionally needs an archive with that state. It describes the sensitivity before export and resets when closing the profile. Database backup remains a distinct, local recovery operation.
 
-An automated regression compares ordinary and opted-in exports by reimporting both into isolated profiles and inspecting their persisted review logs. This behavior is not credited until feature CI passes. Exports remain no-clobber and include deck definitions, notes and media.
+An automated regression compares ordinary and opted-in exports by reimporting both into isolated profiles and inspecting their persisted review logs. Importing the foreign review log is also a separate explicit opt-in: Anki's upstream import options default to disabling scheduling transfer, even when the package contains it. This behavior is not credited until feature CI passes. Exports remain no-clobber and include deck definitions, notes and media.
 
 ## Repeatable build experiment
 

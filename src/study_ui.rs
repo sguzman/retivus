@@ -46,6 +46,7 @@ pub struct StudyPanel {
     active_root: Option<PathBuf>,
     active_profile_id: Option<String>,
     package: String,
+    import_with_scheduling: bool,
     export_with_scheduling: bool,
     snapshot_id: String,
     backend: Option<AnkiBackend>,
@@ -676,6 +677,7 @@ impl StudyPanel {
         self.back.clear();
         self.query.clear();
         self.package.clear();
+        self.import_with_scheduling = false;
         self.export_with_scheduling = false;
         self.snapshot_id.clear();
         self.new_deck.clear();
@@ -1056,6 +1058,11 @@ impl StudyPanel {
                 ui.separator();
                 ui.heading("Anki package");
                 ui.checkbox(
+                    &mut self.import_with_scheduling,
+                    "Import review history and scheduling from package",
+                );
+                ui.weak("Off by default; enabling imports another package's study state.");
+                ui.checkbox(
                     &mut self.export_with_scheduling,
                     "Include private review history and scheduling in export",
                 );
@@ -1068,7 +1075,10 @@ impl StudyPanel {
                         .labelled_by(package_label.id);
                     if ui.button("Import package").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
-                            match backend.import_apkg(Path::new(&self.package)) {
+                            match backend.import_apkg_with_scheduling(
+                                Path::new(&self.package),
+                                self.import_with_scheduling,
+                            ) {
                                 Ok(()) => { self.status = "Package imported into this profile.".into(); self.refresh(); self.refresh_review(); }
                                 Err(error) => self.status = format!("Import refused: {error}"),
                             }
