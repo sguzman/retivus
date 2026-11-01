@@ -375,14 +375,22 @@ impl eframe::App for Retivus {
                         ("License notice", &mut self.license_notice),
                     ] {
                         ui.horizontal(|ui| {
-                            ui.label(label);
-                            ui.add(egui::TextEdit::singleline(value).desired_width(ui.available_width().min(260.0)));
+                            let description = ui.label(label);
+                            ui.add(
+                                egui::TextEdit::singleline(value)
+                                    .desired_width(ui.available_width().min(260.0)),
+                            )
+                            .labelled_by(description.id);
                         });
                     }
                 }
                 ui.horizontal(|ui| {
-                    ui.label("File");
-                    ui.add(egui::TextEdit::singleline(&mut self.source_path).desired_width(ui.available_width().min(300.0)));
+                    let label = ui.label("File");
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.source_path)
+                            .desired_width(ui.available_width().min(300.0)),
+                    )
+                    .labelled_by(label.id);
                 });
                 if ui.button("Validate source").clicked() {
                     self.validate_source_file();
@@ -594,6 +602,62 @@ mod tests {
         assert_eq!(live.definition, "vivir");
         assert!(SelectedSense::from_record(&preview.rows[0], "invalid").is_none());
         assert!(Retivus::default().selected_sense.is_none());
+    }
+
+    #[test]
+    fn native_gui_keyboard_and_mouse_select_a_validated_source_sense() {
+        use egui_kittest::{Harness, kittest::Queryable as _};
+
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("words.tsv");
+        std::fs::write(
+            &file,
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\t橋\tnoun\ts1\tbridge\n",
+        )
+        .unwrap();
+
+        let mut harness = Harness::new_eframe(|_| Retivus::default());
+        {
+            let app = harness.state_mut();
+            app.source_format = SourceFormat::GenericTsv;
+            app.source_id = "ui-kittest-fixture".into();
+            app.source_edition = "v1".into();
+            app.source_language = "ja".into();
+            app.definition_language = "en".into();
+            app.license_notice = "Synthetic original fixture".into();
+        }
+        harness.run();
+
+        let file_field = harness.get_by_role_and_label(
+            egui::accesskit::Role::TextInput,
+            "File",
+        );
+        file_field.focus();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
+            .type_text(&file.to_string_lossy());
+        harness.run();
+        assert_eq!(
+            harness.state().source_path,
+            file.to_string_lossy().as_ref()
+        );
+
+        harness.get_by_label("Validate source").click();
+        harness.run();
+        assert_eq!(harness.state().preview.len(), 1);
+        assert!(harness.state().import_status.contains("Valid records: 1"));
+        harness.get_by_label("Select sense").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Select sense").click();
+        harness.run();
+        assert_eq!(
+            harness.state().selected_sense.as_ref().unwrap().definition,
+            "bridge"
+        );
+        harness.set_size(egui::vec2(720.0, 650.0));
+        harness.run();
+        assert!(harness.state().selected_sense.is_some());
     }
 
     #[test]

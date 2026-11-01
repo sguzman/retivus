@@ -688,20 +688,27 @@ impl StudyPanel {
             .show(ui, |ui| {
             ui.label("Choose an existing root directory and a Retivus profile ID. No ordinary Anki profile is opened automatically.");
             ui.horizontal_wrapped(|ui| {
-                ui.label("Profile root");
+                let root_label = ui.label("Profile root");
                 ui.add_enabled(
                     self.backend.is_none(),
                     egui::TextEdit::singleline(&mut self.root).desired_width(280.0),
-                );
-                ui.label("Profile ID");
+                )
+                .labelled_by(root_label.id);
+                let id_label = ui.label("Profile ID");
                 ui.add_enabled(
                     self.backend.is_none(),
                     egui::TextEdit::singleline(&mut self.profile_id).desired_width(160.0),
-                );
+                )
+                .labelled_by(id_label.id);
             });
             ui.horizontal_wrapped(|ui| {
-                ui.label("Source snapshot ID");
-                ui.add(egui::TextEdit::singleline(&mut self.snapshot_id).hint_text("blank = source edition").desired_width(240.0));
+                let snapshot_label = ui.label("Source snapshot ID");
+                ui.add(
+                    egui::TextEdit::singleline(&mut self.snapshot_id)
+                        .hint_text("blank = source edition")
+                        .desired_width(240.0),
+                )
+                .labelled_by(snapshot_label.id);
                 ui.weak("Mexilex must use its already checksum-verified catalog; raw JSONL is preview-only.");
             });
             ui.horizontal_wrapped(|ui| {
@@ -746,8 +753,13 @@ impl StudyPanel {
                     }
                 });
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("Search notes");
-                    ui.add(egui::TextEdit::singleline(&mut self.query).hint_text("Anki search syntax").desired_width(280.0));
+                    let search_label = ui.label("Search notes");
+                    ui.add(
+                        egui::TextEdit::singleline(&mut self.query)
+                            .hint_text("Anki search syntax")
+                            .desired_width(280.0),
+                    )
+                    .labelled_by(search_label.id);
                     if ui.button("Search / refresh").clicked() { self.refresh(); }
                     ui.weak("Up to 50 matching notes; queries use Anki's own search parser.");
                 });
@@ -803,10 +815,12 @@ impl StudyPanel {
                     }
                 });
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("Front");
-                    ui.add(egui::TextEdit::singleline(&mut self.front).desired_width(220.0));
-                    ui.label("Back");
-                    ui.add(egui::TextEdit::singleline(&mut self.back).desired_width(220.0));
+                    let front_label = ui.label("Front");
+                    ui.add(egui::TextEdit::singleline(&mut self.front).desired_width(220.0))
+                        .labelled_by(front_label.id);
+                    let back_label = ui.label("Back");
+                    ui.add(egui::TextEdit::singleline(&mut self.back).desired_width(220.0))
+                        .labelled_by(back_label.id);
                 });
                 if let Some(note) = self
                     .notes
@@ -1040,8 +1054,9 @@ impl StudyPanel {
                 ui.separator();
                 ui.heading("Anki package");
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("Absolute .apkg path");
-                    ui.add(egui::TextEdit::singleline(&mut self.package).desired_width(300.0));
+                    let package_label = ui.label("Absolute .apkg path");
+                    ui.add(egui::TextEdit::singleline(&mut self.package).desired_width(300.0))
+                        .labelled_by(package_label.id);
                     if ui.button("Import package").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
                             match backend.import_apkg(Path::new(&self.package)) {
@@ -1339,6 +1354,98 @@ mod tests {
         panel.close();
         assert!(panel.active_root.is_none());
         assert!(panel.active_profile_id.is_none());
+    }
+
+    #[test]
+    fn accessible_native_ui_completes_source_to_study_review_with_pointer_events() {
+        use egui_kittest::{Harness, kittest::Queryable as _};
+
+        let root = tempfile::tempdir().unwrap();
+        let source_path = root.path().join("words.tsv");
+        fs::write(
+            &source_path,
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ta\tsea\n",
+        )
+        .unwrap();
+        let mut harness = Harness::new_eframe(|_| crate::Retivus::default());
+        {
+            let app = harness.state_mut();
+            app.source_format = crate::SourceFormat::GenericTsv;
+            app.source_id = "ui-qa-fixture".into();
+            app.source_edition = "v1".into();
+            app.source_language = "es".into();
+            app.definition_language = "en".into();
+            app.license_notice = "Synthetic fixture".into();
+            app.source_path = source_path.to_string_lossy().into_owned();
+            app.study.root = root.path().to_string_lossy().into_owned();
+            app.study.profile_id = "qa".into();
+            app.study.connect(true);
+            assert!(app.study.backend.is_some(), "{}", app.study.status);
+            let deck = app.study.backend.as_mut().unwrap().create_deck("Words").unwrap();
+            app.study.deck_id = Some(deck);
+            app.study.refresh_review();
+        }
+        harness.run();
+
+        harness.get_by_label("Validate source").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Validate source").click();
+        harness.run();
+        assert_eq!(harness.state().preview.len(), 1);
+
+        harness
+            .get_by_label("Stage complete source snapshot (no cards)")
+            .scroll_to_me();
+        harness.run();
+        harness
+            .get_by_label("Stage complete source snapshot (no cards)")
+            .click();
+        harness.run();
+        assert!(harness.state().import_status.contains("Staged 1 source entries"));
+        assert_eq!(harness.state().study.stats.notes, 0);
+
+        harness.get_by_label("Select sense").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Select sense").click();
+        harness.run();
+        harness
+            .get_by_label("Add selected meaning to learner deck")
+            .scroll_to_me();
+        harness.run();
+        harness
+            .get_by_label("Add selected meaning to learner deck")
+            .click();
+        harness.run();
+        assert_eq!(harness.state().study.stats.notes, 1);
+        let note_id = harness.state().study.notes[0].id;
+        let card_id = harness.state().study.review.as_ref().unwrap().card_id;
+
+        harness.get_by_label("Show answer").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Show answer").click();
+        harness.run();
+        assert!(harness.state().study.revealed);
+        harness.get_by_label("Easy").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Easy").click();
+        harness.run();
+        assert!(harness.state().study.status.contains("Recorded rating 4"));
+        assert_eq!(
+            harness
+                .state()
+                .study
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
+            1
+        );
+        drop(harness);
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "qa").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["mar", "sea"]);
+        assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
+        reopened.close().unwrap();
     }
 
     #[test]
