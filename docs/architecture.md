@@ -61,3 +61,11 @@ The feature-gated adapter offers deck listing/creation, note-type listing, a two
 
 
 **M2.1 backend acceptance (2026-11-01):** [feature test run 41268857882](https://github.com/sguzman/retivus/actions/runs/41268857882) passed 20 tests with the new bidirectional note/card generation, edit/delete/undo and reopen fixture. The engine's remaining review, backup, and UI integration work is tracked independently.
+
+## ADR-008: Explicit provider sense selection and upstream FSRS grading
+
+**Status:** implemented behind the feature gate; latest expanded regression suite awaits complete CI acceptance.
+
+A provider selection is the tuple (provider ID, snapshot, entry ID, sense ID), not a word string or a language pair alone. `SourceCatalog::select_sense` verifies every component before materializing a `SourceCardCandidate`. Anki note generation is a distinct explicit action; its provenance tag is reversible and contains no private review history. Changing a provider snapshot must not silently rewrite an existing learner card.
+
+The selected Anki backend owns scheduling. `AnkiBackend::enable_fsrs` configures upstream FSRS, and `grade_next_card` obtains the pinned upstream queue state, applies the chosen Again/Hard/Good/Easy transition through Anki's own `answer_card`, and records upstream revlog events. The feature-gated test exercises closing/reopening before a review and after an answered review. This is **not** a claim of full scheduler parity, complete FSRS fixture coverage, backup durability, or UI completion; those remain M2.2/M2.3/M5 acceptance work. CLI/source catalog operations never open personal Anki profiles automatically.

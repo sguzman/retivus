@@ -52,3 +52,9 @@ The [2026-11-01 integration run](https://github.com/sguzman/retivus/actions/runs
 ## Independent second-provider acceptance
 
 The `import-generic` executable accepts a versioned TSV and **explicit** provider ID, edition, lexical/definition language tags and license notice. It writes a new, independent SQLite source catalog; it never opens or touches an Anki profile. The cross-format fixture `tests/fixtures/independent-ja-es.tsv` contains original Japanese-to-Spanish sample records, including homographs with distinct entry IDs. `tests/generic_provider.rs` exercises bounded previews, a disk-backed import, reopening, immutable identity and sense/rights provenance. The `Rust foundation` workflow also runs a real standalone CLI import and verifies row/sense counts. This is an integration acceptance test for a second format; it does **not** create flashcards or validate arbitrary third-party license claims.
+
+## Experimental selected-sense card bridge
+
+The source catalog's `lookup_entry(provider, snapshot, entry_id)` restores a precise published entry with its individually identified senses and attribution. `select_sense(provider, snapshot, entry_id, sense_id)` returns a selected `SourceCardCandidate` without creating a learner record. The candidate's reversible `retivus::source` tag encodes provider/snapshot/entry/sense separately as hex UTF-8, so identical spellings do not collide. The feature-gated Anki adapter can then explicitly create a Basic note using that choice, retaining both the user's new Anki note identity and source provenance on a separate plane. Test fixtures cover Japanese homographs with distinct source entries and two Mexilex meanings under the same entry.
+
+This is a **backend-only experimental bridge** awaiting feature-enabled CI and GUI integration. It does not automatically import the entire catalog, reconcile updates, deduplicate intentionally repeated choices, or alter any existing personal flashcards or review history.

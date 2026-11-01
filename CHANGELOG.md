@@ -5,6 +5,9 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added optional FSRS-backed Anki queue grading, event persistence, and interrupted-review restart regression coverage; feature CI acceptance remains pending.
+- Added explicit sense-specific source card candidates and Anki note creation with immutable provenance tags; homographs and multiple senses retain distinct identities.
+- Added undoable deck/note-type/template editing and guarded destructive deck deletion in the feature-gated Anki adapter.
 - Optional local Krypton Nerd Font discovery and validated loading, with native fallback and no bundled font assets.
 - Verified independent Japanese-to-Spanish TSV provider through a standalone CLI, persistent catalog retrieval, source-identity separation, and GUI-compatible preview contract tests.
 - Added Anki-backed deck/notetype enumeration, bidirectional templates, note field CRUD and undo, with persistent disposable integration tests.
@@ -16,7 +19,8 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - Added read-only egui source format selection for Mexilex and generic provider TSV.
 - Verified persistent UI appearance and light/dark OS-following theme behavior.
 - Source-neutral adapter interface and a genuinely distinct versioned TSV provider, with independent language/licensing metadata and contract tests.
-- Persistent System/Light/Dark theme preferences, restored automatically at app launch.\n- Retivus OKLCH berry-rose identity, verified light/dark accent tokens and a shared egui color module.
+- Persistent System/Light/Dark theme preferences, restored automatically at app launch.
+- Retivus OKLCH berry-rose identity, verified light/dark accent tokens and a shared egui color module.
 - Initial Rust/egui desktop shell with explicit System, Light and Dark appearance.
 - First strict, streaming Mexilex JSONL contract validator and regression tests.
 - Product scope, weighted milestone roadmap, Anki Rust backend feasibility gate, generic-provider architecture and contributor protocol.
@@ -25,5 +29,5 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - Adopted AGPL-3.0-or-later for the project in anticipation of direct Anki Rust backend integration; retained the original MIT grant and documented the provenance and remaining compliance gates.
 
 ### Known limitations
-- Does not yet import a release into persistent collections, schedule cards, open Anki packages or synchronize with AnkiWeb.
-- Anki backend adoption and corresponding licensing requirements remain unverified.
+- Neither selected-source note generation nor Anki grading is exposed in the shipping GUI yet; backup/recovery, full FSRS scheduling fixtures, package import/export, and AnkiWeb interoperability remain incomplete.
+- Pinned Anki engine feasibility is verified, but release-grade corresponding-source notices, packaging, and distribution compliance remain unfinished.
