@@ -885,6 +885,9 @@ fn reject_unsafe_package_members(path: &Path) -> BackendResult<()> {
             || raw.starts_with('\\')
             || raw.contains('\\')
             || raw.contains(':')
+            // Reject literal traversal components before enclosed_name() can
+            // normalize a member such as nested/../outside.txt.
+            || raw.split('/').any(|part| part == "." || part == "..")
             || raw.chars().any(char::is_control)
             || enclosed
                 .components()
