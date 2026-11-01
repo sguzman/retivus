@@ -116,7 +116,9 @@ impl AnkiBackend {
         {
             return Err("export destination must be an absolute .apkg path".into());
         }
-        let name = destination.file_name().ok_or("package filename is required")?;
+        let name = destination
+            .file_name()
+            .ok_or("package filename is required")?;
         let parent = fs::canonicalize(
             destination
                 .parent()
@@ -732,7 +734,9 @@ mod tests {
         producer.close().unwrap();
 
         let mut consumer = AnkiBackend::create_managed_profile(root.path(), "consumer").unwrap();
-        assert!(consumer.import_apkg(&root.path().join("missing.apkg")).is_err());
+        assert!(consumer
+            .import_apkg(&root.path().join("missing.apkg"))
+            .is_err());
         consumer.import_apkg(&package_path).unwrap();
         assert!(consumer
             .list_decks()
@@ -785,8 +789,14 @@ mod tests {
         let root = tempdir().unwrap();
         let path = root.path().join("existing.apkg");
         fs::write(&path, b"keep untouched").unwrap();
-        assert!(AnkiBackend::in_memory().unwrap().import_apkg(&path).is_err());
-        assert!(AnkiBackend::in_memory().unwrap().export_apkg_to(&path).is_err());
+        assert!(AnkiBackend::in_memory()
+            .unwrap()
+            .import_apkg(&path)
+            .is_err());
+        assert!(AnkiBackend::in_memory()
+            .unwrap()
+            .export_apkg_to(&path)
+            .is_err());
         let mut managed = AnkiBackend::create_managed_profile(root.path(), "managed").unwrap();
         assert!(managed.export_apkg_to(&path).is_err());
         assert_eq!(fs::read(&path).unwrap(), b"keep untouched");
@@ -795,7 +805,9 @@ mod tests {
         #[cfg(unix)]
         {
             std::os::unix::fs::symlink(&path, root.path().join("symlink.apkg")).unwrap();
-            assert!(managed.import_apkg(&root.path().join("symlink.apkg")).is_err());
+            assert!(managed
+                .import_apkg(&root.path().join("symlink.apkg"))
+                .is_err());
             fs::create_dir(root.path().join("managed/collection.media")).unwrap();
             let media = root.path().join("managed/collection.media");
             fs::remove_dir(&media).unwrap();
