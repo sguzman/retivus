@@ -820,7 +820,12 @@ mod tests {
             ["生", "live"]
         );
         assert_eq!(
-            app.study.backend.as_ref().unwrap().review_event_count(review_id).unwrap(),
+            app.study
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(review_id)
+                .unwrap(),
             1
         );
 

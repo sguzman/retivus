@@ -1442,7 +1442,10 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
     fn persisted_collection_stats_match_notes_cards_and_review_log() {
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "stats").unwrap();
-        assert_eq!(backend.collection_stats().unwrap(), CollectionStats::default());
+        assert_eq!(
+            backend.collection_stats().unwrap(),
+            CollectionStats::default()
+        );
         backend.add_basic_note(1, "banqueta", "sidewalk").unwrap();
         assert_eq!(
             backend.collection_stats().unwrap(),
