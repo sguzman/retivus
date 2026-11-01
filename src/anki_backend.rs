@@ -35,6 +35,14 @@ pub struct ReviewPreview {
     pub css: String,
 }
 
+/// Persisted collection-wide totals for a managed learner profile.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct CollectionStats {
+    pub notes: usize,
+    pub cards: usize,
+    pub review_events: usize,
+}
+
 pub struct AnkiBackend {
     collection: anki::collection::Collection,
     managed_dir: Option<PathBuf>,
@@ -604,6 +612,26 @@ impl AnkiBackend {
             }
         }
         Ok(rows)
+    }
+
+    /// Read actual stored totals without loading the entire learner collection.
+    pub fn collection_stats(&self) -> BackendResult<CollectionStats> {
+        let db = self.collection.storage.db();
+        let count = |table: &str| -> BackendResult<usize> {
+            let sql = match table {
+                "notes" => "SELECT count(*) FROM notes",
+                "cards" => "SELECT count(*) FROM cards",
+                "revlog" => "SELECT count(*) FROM revlog",
+                _ => return Err("unknown collection statistic".into()),
+            };
+            let value: i64 = db.query_row(sql, [], |row| row.get(0))?;
+            Ok(usize::try_from(value)?)
+        };
+        Ok(CollectionStats {
+            notes: count("notes")?,
+            cards: count("cards")?,
+            review_events: count("revlog")?,
+        })
     }
 
     /// Inspect persisted Anki review history without changing scheduler state.

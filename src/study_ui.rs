@@ -1,12 +1,44 @@
 //! Explicit native learner-workspace operations behind the Anki feature gate.
 //! No profile opens, is created, or is migrated until a user chooses an action.
 use eframe::egui;
-use retivus::anki_backend::{AnkiBackend, NoteRow, ReviewPreview};
+use retivus::anki_backend::{AnkiBackend, CollectionStats, NoteRow, ReviewPreview};
 use retivus::source_adapter::{SourceAdapter, SourceRecord};
 use retivus::source_store::{SourceCardCandidate, SourceCatalog};
 use std::fs;
 use std::io::BufReader;
 use std::path::Path;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+enum BrowseScope {
+    #[default]
+    All,
+    SourceLinked,
+    Plain,
+    Conflicts,
+}
+
+impl BrowseScope {
+    fn label(self) -> &'static str {
+        match self {
+            Self::All => "All notes",
+            Self::SourceLinked => "Source-linked",
+            Self::Plain => "Without source",
+            Self::Conflicts => "Source conflicts",
+        }
+    }
+
+    fn matches(self, note: &NoteRow) -> bool {
+        match self {
+            Self::All => true,
+            Self::SourceLinked => matches!(
+                StudyPanel::source_provenance(&note.tags),
+                Ok(Some(_))
+            ),
+            Self::Plain => matches!(StudyPanel::source_provenance(&note.tags), Ok(None)),
+            Self::Conflicts => StudyPanel::source_provenance(&note.tags).is_err(),
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct StudyPanel {
@@ -22,6 +54,8 @@ pub struct StudyPanel {
     back: String,
     query: String,
     notes: Vec<NoteRow>,
+    browse_scope: BrowseScope,
+    stats: CollectionStats,
     selected_note: Option<i64>,
     review: Option<ReviewPreview>,
     revealed: bool,
@@ -103,14 +137,20 @@ impl StudyPanel {
                 return;
             }
         }
-        match (backend.due_counts(), backend.next_review_preview()) {
-            (Ok(due), Ok(review)) => {
+        match (
+            backend.due_counts(),
+            backend.next_review_preview(),
+            backend.collection_stats(),
+        ) {
+            (Ok(due), Ok(review), Ok(stats)) => {
                 self.due = due;
                 self.review = review;
+                self.stats = stats;
             }
-            (Err(error), _) | (_, Err(error)) => {
+            (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
                 self.review = None;
-                self.status = format!("Could not read Anki queue: {error}");
+                self.stats = CollectionStats::default();
+                self.status = format!("Could not read learner statistics or queue: {error}");
             }
         }
     }
@@ -267,6 +307,8 @@ impl StudyPanel {
         }
         self.decks.clear();
         self.notes.clear();
+        self.browse_scope = BrowseScope::All;
+        self.stats = CollectionStats::default();
         self.deck_id = None;
         self.selected_note = None;
         // Never display editor contents, search terms, or file paths from
@@ -345,8 +387,29 @@ impl StudyPanel {
                     if ui.button("Search / refresh").clicked() { self.refresh(); }
                     ui.weak("Up to 50 matching notes; queries use Anki's own search parser.");
                 });
+                ui.horizontal_wrapped(|ui| {
+                    ui.label("Browse filter");
+                    egui::ComboBox::from_id_salt("retivus-browse-scope")
+                        .selected_text(self.browse_scope.label())
+                        .show_ui(ui, |ui| {
+                            for scope in [
+                                BrowseScope::All,
+                                BrowseScope::SourceLinked,
+                                BrowseScope::Plain,
+                                BrowseScope::Conflicts,
+                            ] {
+                                ui.selectable_value(&mut self.browse_scope, scope, scope.label());
+                            }
+                        });
+                    let matching = self
+                        .notes
+                        .iter()
+                        .filter(|note| self.browse_scope.matches(note))
+                        .count();
+                    ui.weak(format!("{matching} matching of {} loaded (50 maximum)", self.notes.len()));
+                });
                 egui::ScrollArea::vertical().max_height(135.0).show(ui, |ui| {
-                    for note in self.notes.clone() {
+                    for note in self.notes.clone().into_iter().filter(|note| self.browse_scope.matches(note)) {
                         let summary = note.fields.first().map_or("(empty note)", String::as_str);
                         let label = format!("{} · {}", note.id, summary);
                         if ui.selectable_label(self.selected_note == Some(note.id), label).clicked() {
@@ -417,6 +480,11 @@ impl StudyPanel {
                     }
                 }
                 ui.separator();
+                ui.heading("Profile statistics");
+                ui.label(format!(
+                    "{} notes · {} cards · {} recorded reviews (all decks)",
+                    self.stats.notes, self.stats.cards, self.stats.review_events
+                ));
                 ui.heading("Study · Anki scheduler");
                 ui.horizontal_wrapped(|ui| {
                     ui.label(format!(
