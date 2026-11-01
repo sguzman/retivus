@@ -785,6 +785,104 @@ mod tests {
     }
 
     #[test]
+    fn cloze_html_css_and_image_render_parity_survives_package_roundtrip() {
+        use anki::card::CardId;
+
+        fn render_cloze(backend: &mut AnkiBackend) -> Vec<(String, String, String)> {
+            let cards = backend
+                .collection
+                .search_cards("tag:retivus-cloze-fixture", SortMode::NoOrder)
+                .unwrap();
+            assert_eq!(cards.len(), 2);
+            let mut rendered: Vec<_> = cards
+                .into_iter()
+                .map(|id| {
+                    let output = backend
+                        .collection
+                        .render_existing_card(CardId(id.0), false, false)
+                        .unwrap();
+                    (
+                        output.question().into_owned(),
+                        output.answer().into_owned(),
+                        output.css,
+                    )
+                })
+                .collect();
+            rendered.sort();
+            rendered
+        }
+
+        let root = tempdir().unwrap();
+        let mut source = AnkiBackend::create_managed_profile(root.path(), "rich-source").unwrap();
+        let deck = source.create_deck("Cloze Rich Text").unwrap();
+        let mut cloze = (*source
+            .collection
+            .get_notetype_by_name("Cloze")
+            .unwrap()
+            .unwrap())
+        .clone();
+        cloze.config.css.push_str("\n.retivus-cloze { font-weight: 700; }\n");
+        cloze.templates[0].config.q_format =
+            "<section class=\"retivus-cloze\">{{cloze:Text}}</section>".into();
+        cloze.templates[0].config.a_format =
+            "<article class=\"retivus-cloze\">{{cloze:Text}}<p>{{Extra}}</p></article>".into();
+        source.collection.update_notetype(&mut cloze, false).unwrap();
+
+        source
+            .collection
+            .media()
+            .unwrap()
+            .add_file("cloze-image.png", b"independent image fixture")
+            .unwrap();
+        let note_id = source
+            .add_note_with_notetype(
+                deck,
+                "Cloze",
+                &[
+                    "{{c1::gato}} tiene {{c2::bigotes}} <img src=\"cloze-image.png\">",
+                    "<em>animal doméstico</em>",
+                ],
+            )
+            .unwrap();
+        let mut note = source
+            .collection
+            .storage
+            .get_note(NoteId(note_id))
+            .unwrap()
+            .unwrap();
+        note.tags.push("retivus-cloze-fixture".into());
+        source.collection.update_note(&mut note).unwrap();
+
+        let original = render_cloze(&mut source);
+        assert!(original.iter().all(|(question, answer, css)| {
+            question.contains("retivus-cloze")
+                && answer.contains("retivus-cloze")
+                && answer.contains("animal doméstico")
+                && css.contains("font-weight: 700")
+        }));
+        assert!(original.iter().all(|(question, answer, _)| {
+            question.contains("cloze-image.png") && answer.contains("cloze-image.png")
+        }));
+        let package = root.path().join("cloze-roundtrip.apkg");
+        assert_eq!(source.export_apkg_to(&package).unwrap(), 1);
+        source.close().unwrap();
+
+        let mut imported = AnkiBackend::create_managed_profile(root.path(), "rich-target").unwrap();
+        imported.import_apkg(&package).unwrap();
+        assert_eq!(render_cloze(&mut imported), original);
+        assert_eq!(
+            fs::read(root.path().join("rich-target/collection.media/cloze-image.png")).unwrap(),
+            b"independent image fixture"
+        );
+        imported.close().unwrap();
+
+        let mut reopened =
+            AnkiBackend::open_managed_profile(root.path(), "rich-target").unwrap();
+        assert_eq!(render_cloze(&mut reopened), original);
+        reopened.close().unwrap();
+    }
+
+    #[test]
     fn package_path_safety_rejects_unmanaged_and_symlinked_inputs() {
         let root = tempdir().unwrap();
         let path = root.path().join("existing.apkg");
