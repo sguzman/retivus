@@ -1233,7 +1233,7 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         copied.close().unwrap();
         assert_eq!(fs::read(&source).unwrap(), original);
 
-        let reopened = AnkiBackend::open_managed_profile(root.path(), "official").unwrap();
+        let mut reopened = AnkiBackend::open_managed_profile(root.path(), "official").unwrap();
         assert_eq!(reopened.schema_version().unwrap(), 18);
         assert_eq!(
             reopened
