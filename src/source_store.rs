@@ -464,19 +464,30 @@ impl SourceCatalog {
     /// The link is reversible and cannot merge two old senses into one target.
     pub fn record_reconciliation(
         &mut self,
-        provider: &str,
-        from_snapshot: &str,
-        from_entry: &str,
-        from_sense: &str,
-        to_snapshot: &str,
-        to_entry: &str,
-        to_sense: &str,
+        from: &SourceCardCandidate,
+        to: &SourceCardCandidate,
     ) -> Result<(), String> {
-        if from_snapshot == to_snapshot {
+        if from.provenance.provider_id != to.provenance.provider_id {
+            return Err("cross-provider reconciliation is prohibited".into());
+        }
+        if from.snapshot == to.snapshot {
             return Err("a reconciliation must cross source snapshots".into());
         }
-        let old = self.select_sense(provider, from_snapshot, from_entry, from_sense)?;
-        let new = self.select_sense(provider, to_snapshot, to_entry, to_sense)?;
+        let old = self.select_sense(
+            &from.provenance.provider_id,
+            &from.snapshot,
+            &from.entry_id,
+            &from.sense_id,
+        )?;
+        let new = self.select_sense(
+            &to.provenance.provider_id,
+            &to.snapshot,
+            &to.entry_id,
+            &to.sense_id,
+        )?;
+        if old != *from || new != *to {
+            return Err("stale or forged reconciliation selection".into());
+        }
         if old.provenance.lexical_language != new.provenance.lexical_language
             || old.provenance.definition_language != new.provenance.definition_language
         {
@@ -489,13 +500,13 @@ impl SourceCatalog {
                   to_snapshot, to_entry, to_sense)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
-                    provider,
-                    from_snapshot,
-                    from_entry,
-                    from_sense,
-                    to_snapshot,
-                    to_entry,
-                    to_sense
+                    from.provenance.provider_id,
+                    from.snapshot,
+                    from.entry_id,
+                    from.sense_id,
+                    to.snapshot,
+                    to.entry_id,
+                    to.sense_id
                 ],
             )
             .map_err(|e| format!("ambiguous, duplicate, or invalid reconciliation: {e}"))?;
@@ -799,9 +810,7 @@ mod tests {
                 .source_tag(),
             old_cat.source_tag()
         );
-        catalog
-            .record_reconciliation("other-dictionary", "old", "c", "s1", "new", "x", "s1")
-            .unwrap();
+        catalog.record_reconciliation(&old_cat, &new_cat).unwrap();
         assert_eq!(
             catalog
                 .reconciled_sense("other-dictionary", "old", "c", "s1")
@@ -809,11 +818,16 @@ mod tests {
                 .source_tag(),
             new_cat.source_tag()
         );
+        let old_water = catalog
+            .select_sense("other-dictionary", "old", "d", "s1")
+            .unwrap();
+        assert!(catalog.record_reconciliation(&old_water, &new_cat).is_err());
+        let invalid_target = SourceCardCandidate {
+            entry_id: "missing".into(),
+            ..new_cat.clone()
+        };
         assert!(catalog
-            .record_reconciliation("other-dictionary", "old", "d", "s1", "new", "x", "s1")
-            .is_err());
-        assert!(catalog
-            .record_reconciliation("other-dictionary", "old", "a", "s1", "new", "missing", "s1")
+            .record_reconciliation(&old_water, &invalid_target)
             .is_err());
         catalog
             .undo_reconciliation("other-dictionary", "old", "c", "s1")
