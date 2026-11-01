@@ -29,7 +29,7 @@ cargo run
 cargo test --all-targets
 ```
 
-An experimental `anki-backend` Cargo feature links the pinned Anki Rust engine and validates an in-memory collection; it is not yet a released backend. The current GUI can read-only validate Mexilex or generic TSV source files. It is a foundation, **not** yet a working flashcard trainer; no learner cards or review history are written.
+An experimental `anki-backend` Cargo feature links the pinned Anki Rust engine and validates an in-memory collection; it is not yet a released backend. The current GUI can read-only validate Mexilex or generic TSV source files. A separate transactional SQLite source catalog can import verified data without touching personal study history. It is a foundation, **not** yet a working flashcard trainer; no learner cards or review history are written.
 
 ## License
 
