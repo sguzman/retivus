@@ -358,8 +358,12 @@ mod tests {
         );
         assert_eq!(catalog.counts("mexilex", "v0.3.0").unwrap(), (1, 2));
         assert_eq!(catalog.counts("other-dictionary", "v1").unwrap(), (2, 2));
-        let first = catalog.select_sense("mexilex", "v0.3.0", "mx1", "s1").unwrap();
-        let second = catalog.select_sense("mexilex", "v0.3.0", "mx1", "s2").unwrap();
+        let first = catalog
+            .select_sense("mexilex", "v0.3.0", "mx1", "s1")
+            .unwrap();
+        let second = catalog
+            .select_sense("mexilex", "v0.3.0", "mx1", "s2")
+            .unwrap();
         assert_eq!(first.word, second.word);
         assert_eq!(first.definition, "sidewalk");
         assert_eq!(second.definition, "footstool");
