@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added opt-in learner UI action to archive an exact selected generic source sense in a managed SQLite snapshot and explicitly create an Anki note, rejecting forged meanings and refusing raw unverified Mexilex imports; acceptance tests pending.
 - Added managed-only `.apkg` import/export with media, template, tag and card round trips; pinned third-party AnkiDroid and MIT sample packages passed independent checks (Anki Desktop GUI interoperability still pending).
 - Added cloze/HTML/CSS/SVG render parity tests across full `.apkg` export/import and reopen.
 - Added offline `.anki2` copy-only migration with schema-checking, source-byte preservation, active WAL refusal, and official upstream Anki Desktop fixture verification.

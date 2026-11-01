@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Early development. The initial repository establishes the Rust/egui application shell, versioned Mexilex and generic TSV validation adapters, and a weighted [implementation roadmap](ROADMAP.md). **An opt-in, CI-tested Anki Rust backend adapter is available; basic Retivus-owned collection persistence and backend deck/note/template operations have been verified, while full review scheduling, backups, synchronization, and deck interchange remain unfinished.**
+Active development. The [weighted implementation roadmap](ROADMAP.md) records only verified task completions. M0–M3 are verified, including Anki-backed FSRS grading and local recovery. The opt-in native learner workspace supports explicitly selected Retivus-owned profiles, note/deck operations, Anki scheduling, and package import/export, but full independent Anki Desktop/AnkiWeb interoperability, native source workflows, GUI review and release acceptance are still in progress.
 
 ## Architecture
 
@@ -29,8 +29,15 @@ cargo run
 cargo test --all-targets
 ```
 
-An experimental `anki-backend` Cargo feature links the pinned Anki Rust engine and validates an in-memory collection; it is not yet a released backend. The current GUI can read-only validate Mexilex or generic TSV source files. A separate transactional SQLite source catalog can import verified data without touching personal study history. It is a foundation, **not** yet a working flashcard trainer; no learner cards or review history are written.
+The default `cargo run` build remains a **read-only source preview**. Opt into the pinned Anki Rust engine and its experimental managed-profile learner workspace with:
+
+```sh
+cargo run --features anki-backend --bin retivus
+cargo test --features anki-backend --bin retivus
+```
+
+The learner workspace never automatically opens your ordinary Anki profile. Choose an existing profile root and a separate Retivus profile ID, then explicitly create/open it. Review grades and undo use the pinned Anki scheduler. Package import/export accepts explicitly chosen absolute `.apkg` paths and refuses export overwrites. The preview can stage exact senses from a user-described generic TSV source into the profile's SQLite source catalog; raw Mexilex JSONL is **preview-only** until its release archive has been independently checksum/rights-verified and imported into that catalog. Source identities are never guessed from word spellings. Rendered card HTML is currently shown as inert text, not executed as a web page. This is a development feature, **not** a finished release or AnkiWeb sync client.
 
 ## License
 
-**Retivus is licensed under AGPL-3.0-or-later.** It was initially intended to use MIT, but we adopted AGPL to support direct reuse of Anki's AGPL-licensed Rust backend in compliance with its terms. **Anki's backend is not yet incorporated into the main application.** Earlier MIT-licensed revisions retain their original terms; see [licensing history and attribution](docs/licensing.md) and [Anki upstream notice](LICENSES/ANKI-ATTRIBUTION.md). External vocabulary datasets and personal study content have separate ownership and licenses.
+**Retivus is licensed under AGPL-3.0-or-later.** It was initially intended to use MIT, but we adopted AGPL to support direct reuse of Anki's AGPL-licensed Rust backend in compliance with its terms. **Anki's backend is linked only when the experimental `anki-backend` Cargo feature is enabled.** Earlier MIT-licensed revisions retain their original terms; see [licensing history and attribution](docs/licensing.md) and [Anki upstream notice](LICENSES/ANKI-ATTRIBUTION.md). External vocabulary datasets and personal study content have separate ownership and licenses.

@@ -701,14 +701,41 @@ impl AnkiBackend {
         Ok((queued.new_count, queued.learning_count, queued.review_count))
     }
 
-    /// Never grade a different due card than the one the learner revealed.
+    /// Grade exactly the queued card the learner saw. The single queue read
+    /// makes it impossible for a second queue fetch to grade the wrong card.
     pub fn grade_previewed_card(&mut self, expected_card_id: i64, rating: u8) -> BackendResult<()> {
-        if self.next_card_id()? != Some(expected_card_id) {
+        let rating = match rating {
+            1 => Rating::Again,
+            2 => Rating::Hard,
+            3 => Rating::Good,
+            4 => Rating::Easy,
+            _ => return Err("rating must be 1 (Again) through 4 (Easy)".into()),
+        };
+        let queued = self
+            .collection
+            .get_next_card()?
+            .ok_or("review queue no longer contains the displayed card")?;
+        if queued.card.id().0 != expected_card_id {
             return Err("review queue changed; refresh the displayed card before grading".into());
         }
-        if self.grade_next_card(rating)? != Some(expected_card_id) {
-            return Err("upstream Anki queue changed while grading".into());
-        }
+        let states = queued.states;
+        let next = match rating {
+            Rating::Again => states.again,
+            Rating::Hard => states.hard,
+            Rating::Good => states.good,
+            Rating::Easy => states.easy,
+        };
+        let mut answer = CardAnswer {
+            card_id: queued.card.id(),
+            current_state: states.current,
+            new_state: next,
+            rating,
+            answered_at: TimestampMillis::now(),
+            milliseconds_taken: 1_000,
+            custom_data: None,
+            from_queue: true,
+        };
+        self.collection.answer_card(&mut answer)?;
         Ok(())
     }
 

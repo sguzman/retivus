@@ -29,6 +29,15 @@ pub struct StudyPanel {
     status: String,
 }
 
+impl Drop for StudyPanel {
+    fn drop(&mut self) {
+        // Window shutdown must release a live Anki collection explicitly.
+        if let Some(backend) = self.backend.take() {
+            let _ = backend.close();
+        }
+    }
+}
+
 impl StudyPanel {
     fn connect(&mut self, create: bool) {
         if self.backend.is_some() {
@@ -153,7 +162,9 @@ impl StudyPanel {
             .is_none()
         {
             if is_mexilex {
-                return Err("Mexilex source snapshot is not in the verified release catalog".into());
+                return Err(
+                    "Mexilex source snapshot is not in the verified release catalog".into(),
+                );
             }
             let file = fs::symlink_metadata(source_path).map_err(|e| e.to_string())?;
             if !file.is_file() || file.file_type().is_symlink() {
@@ -162,12 +173,8 @@ impl StudyPanel {
             let input = fs::File::open(source_path).map_err(|e| e.to_string())?;
             catalog.import_snapshot(&snapshot, adapter, &mut BufReader::new(input))?;
         }
-        let actual = catalog.select_sense(
-            &origin.provider_id,
-            &snapshot,
-            &record.entry_id,
-            sense_id,
-        )?;
+        let actual =
+            catalog.select_sense(&origin.provider_id, &snapshot, &record.entry_id, sense_id)?;
         if actual != expected {
             return Err("source selection differs from the immutable imported snapshot".into());
         }
@@ -177,7 +184,8 @@ impl StudyPanel {
             .ok_or("learner profile closed during import")?
             .add_source_candidate(deck_id, &actual)
             .map_err(|e| e.to_string())?;
-        self.status = format!("Created note {note_id} from an exact source sense; provenance saved.");
+        self.status =
+            format!("Created note {note_id} from an exact source sense; provenance saved.");
         self.refresh();
         self.refresh_review();
         Ok(note_id)
@@ -474,9 +482,12 @@ mod tests {
         .unwrap();
         let mut preview = Vec::new();
         adapter
-            .visit(&mut BufReader::new(fs::File::open(&source_file).unwrap()), &mut |row| {
-                preview.push(row);
-            })
+            .visit(
+                &mut BufReader::new(fs::File::open(&source_file).unwrap()),
+                &mut |row| {
+                    preview.push(row);
+                },
+            )
             .unwrap();
         let mut panel = StudyPanel {
             root: dir.path().to_string_lossy().into_owned(),
@@ -484,7 +495,12 @@ mod tests {
             ..StudyPanel::default()
         };
         panel.connect(true);
-        let deck = panel.backend.as_mut().unwrap().create_deck("Japanese").unwrap();
+        let deck = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Japanese")
+            .unwrap();
         panel.deck_id = Some(deck);
         let first = panel
             .add_validated_source_choice(&adapter, &source_file, &preview[0], "a")
@@ -504,12 +520,75 @@ mod tests {
         assert_ne!(first, second);
         let first_tags = panel.backend.as_ref().unwrap().note_tags(first).unwrap();
         let second_tags = panel.backend.as_ref().unwrap().note_tags(second).unwrap();
-        assert_ne!(first_tags, second_tags, "homographs retain distinct source identities");
-        assert_eq!(panel.backend.as_ref().unwrap().note_fields(first).unwrap(), ["橋", "bridge"]);
-        assert_eq!(panel.backend.as_ref().unwrap().note_fields(second).unwrap(), ["橋", "connect"]);
+        assert_ne!(
+            first_tags, second_tags,
+            "homographs retain distinct source identities"
+        );
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(first).unwrap(),
+            ["橋", "bridge"]
+        );
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(second).unwrap(),
+            ["橋", "connect"]
+        );
         panel.close();
         panel.connect(false);
-        assert_eq!(panel.backend.as_ref().unwrap().note_fields(second).unwrap(), ["橋", "connect"]);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(second).unwrap(),
+            ["橋", "connect"]
+        );
+        panel.close();
+    }
+
+    #[test]
+    fn quitting_with_open_managed_profile_releases_collection_for_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let note_id;
+        {
+            let mut ui = StudyPanel {
+                root: root.path().to_string_lossy().into_owned(),
+                profile_id: "shutdown".into(),
+                ..StudyPanel::default()
+            };
+            ui.connect(true);
+            assert!(ui.backend.is_some(), "{}", ui.status);
+            note_id = ui.backend.as_mut().unwrap().add_basic_note(1, "vida", "life").unwrap();
+            // No explicit close: dropping the window must shut down Anki cleanly.
+        }
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "shutdown").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["vida", "life"]);
+        reopened.close().unwrap();
+    }
+
+    #[test]
+    fn raw_mexilex_source_cannot_create_cards_without_verified_catalog() {
+        use retivus::source_adapter::{MexilexV1, SourceMeaning, SourceRecord};
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel {
+            root: root.path().to_string_lossy().into_owned(),
+            profile_id: "protected".into(),
+            ..StudyPanel::default()
+        };
+        panel.connect(true);
+        let deck = panel.backend.as_mut().unwrap().create_deck("Vocabulary").unwrap();
+        panel.deck_id = Some(deck);
+        let adapter = MexilexV1::default();
+        let row = SourceRecord {
+            provenance: adapter.descriptor().clone(),
+            entry_id: "unverified-entry".into(),
+            word: "banqueta".into(),
+            part_of_speech: "noun".into(),
+            senses: vec![SourceMeaning {
+                sense_id: "sense".into(),
+                definition: "sidewalk".into(),
+            }],
+        };
+        assert!(panel
+            .add_validated_source_choice(&adapter, &root.path().join("raw.jsonl"), &row, "sense")
+            .is_err());
+        assert!(!root.path().join("protected/source-catalog.sqlite3").exists());
+        assert!(panel.backend.as_mut().unwrap().browse_notes("", 10).unwrap().is_empty());
         panel.close();
     }
 

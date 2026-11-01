@@ -31,7 +31,7 @@ The explicit TSV v1 format is a minimal second provider used to verify the inter
 
 **Security/transaction limit:** adapters validate streaming records and can emit earlier records before a later invalid one is discovered. Callers **must stage and roll back** the entire import on failure. Validation alone is not permission to change cards or review history.
 
-The native GUI supports read-only validation for either format; selecting TSV requires the operator to enter explicit source ID, edition, language pair and license metadata. The validation result **never creates cards**. A profile-backed transactional importer and real external-provider upgrade handling are still pending.
+The default native GUI supports read-only validation for either format; selecting TSV requires explicit source ID, edition, language pair and license metadata. In the **opt-in Anki-backed GUI**, the user may explicitly add one selected source sense to an opened Retivus-owned profile/deck. The add operation compares the candidate against a durable SQLite snapshot under that profile, keeps homographs separate, and creates a note only after explicit confirmation. Mexilex raw JSONL remains preview-only unless the checksum-verified release has first been imported to the source catalog. This UI bridge is under CI acceptance and does not imply a complete source-upgrade/conflict UX.
 
 ## Future providers
 

@@ -171,14 +171,16 @@ impl Retivus {
     fn source_adapter(&self) -> Result<Box<dyn source_adapter::SourceAdapter>, String> {
         match self.source_format {
             SourceFormat::Mexilex => Ok(Box::new(source_adapter::MexilexV1::default())),
-            SourceFormat::GenericTsv => source_adapter::StudyTsvV1::new(source_adapter::SourceInfo {
-                provider_id: self.source_id.clone(),
-                edition: self.source_edition.clone(),
-                lexical_language: self.source_language.clone(),
-                definition_language: self.definition_language.clone(),
-                license_notice: self.license_notice.clone(),
-            })
-            .map(|adapter| Box::new(adapter) as Box<dyn source_adapter::SourceAdapter>),
+            SourceFormat::GenericTsv => {
+                source_adapter::StudyTsvV1::new(source_adapter::SourceInfo {
+                    provider_id: self.source_id.clone(),
+                    edition: self.source_edition.clone(),
+                    lexical_language: self.source_language.clone(),
+                    definition_language: self.definition_language.clone(),
+                    license_notice: self.license_notice.clone(),
+                })
+                .map(|adapter| Box::new(adapter) as Box<dyn source_adapter::SourceAdapter>)
+            }
         }
     }
 
@@ -248,14 +250,17 @@ impl eframe::App for Retivus {
             ui.separator();
             #[cfg(not(feature = "anki-backend"))]
             ui.weak("Preview mode: validated sources only. Study, editing and review controls are not available in this window yet.");
-            #[cfg(feature = "anki-backend")]
-            self.study.ui(ui);
             ui.weak("Keyboard: Tab and Shift+Tab move between controls; Enter or Space activates the focused control.");
             ui.label("First data source: Mexilex · es-MX → en");
             #[cfg(not(feature = "anki-backend"))]
             ui.label("Anki Rust backend: separately feature-gated and under integration; this preview never opens learner collections.");
             ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| {
+                #[cfg(feature = "anki-backend")]
+                {
+                    self.study.ui(ui);
+                    ui.separator();
+                }
                 ui.heading("Validate a local source file");
                 ui.weak("Read-only validation · never creates cards or changes review history");
                 ui.horizontal(|ui| {
@@ -319,7 +324,7 @@ impl eframe::App for Retivus {
                     };
                 }
                 ui.label(&self.import_status);
-                if let Some(chosen) = &self.selected_sense {
+                if let Some(chosen) = self.selected_sense.clone() {
                     ui.group(|ui| {
                         ui.heading("Selected meaning (preview only)");
                         ui.strong(format!("{} → {}", chosen.word, chosen.definition));
