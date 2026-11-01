@@ -28,7 +28,10 @@ struct SelectedSense {
 
 impl SelectedSense {
     fn from_record(record: &source_adapter::SourceRecord, sense_id: &str) -> Option<Self> {
-        let sense = record.senses.iter().find(|item| item.sense_id == sense_id)?;
+        let sense = record
+            .senses
+            .iter()
+            .find(|item| item.sense_id == sense_id)?;
         Some(Self {
             provider_id: record.provenance.provider_id.clone(),
             edition: record.provenance.edition.clone(),
@@ -380,8 +383,8 @@ mod tests {
         })
         .unwrap();
         let input = include_str!("../tests/fixtures/independent-ja-es.tsv");
-        let preview = retivus::preview::validate_preview(&adapter, &mut Cursor::new(input))
-            .unwrap();
+        let preview =
+            retivus::preview::validate_preview(&adapter, &mut Cursor::new(input)).unwrap();
         let life = SelectedSense::from_record(&preview.rows[0], "s1").unwrap();
         let live = SelectedSense::from_record(&preview.rows[1], "s1").unwrap();
         assert_eq!(life.word, live.word);

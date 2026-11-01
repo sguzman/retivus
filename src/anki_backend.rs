@@ -795,8 +795,14 @@ mod tests {
         assert_ne!(life_id, live_id);
         assert_eq!(backend.note_fields(life_id).unwrap(), ["生", "vida"]);
         assert_eq!(backend.note_fields(live_id).unwrap(), ["生", "vivir"]);
-        assert!(backend.note_tags(life_id).unwrap().contains(&life.source_tag()));
-        assert!(backend.note_tags(live_id).unwrap().contains(&live.source_tag()));
+        assert!(backend
+            .note_tags(life_id)
+            .unwrap()
+            .contains(&life.source_tag()));
+        assert!(backend
+            .note_tags(live_id)
+            .unwrap()
+            .contains(&live.source_tag()));
         assert!(backend.due_counts().unwrap().0 >= 2);
         let answered = backend.grade_next_card(3).unwrap().unwrap();
         let count: i64 = backend
@@ -815,8 +821,14 @@ mod tests {
         let reopened = AnkiBackend::open_managed_profile(dir.path(), "independent").unwrap();
         assert_eq!(reopened.note_fields(life_id).unwrap(), ["生", "vida"]);
         assert_eq!(reopened.note_fields(live_id).unwrap(), ["生", "vivir"]);
-        assert!(reopened.note_tags(life_id).unwrap().contains(&life.source_tag()));
-        assert!(reopened.note_tags(live_id).unwrap().contains(&live.source_tag()));
+        assert!(reopened
+            .note_tags(life_id)
+            .unwrap()
+            .contains(&life.source_tag()));
+        assert!(reopened
+            .note_tags(live_id)
+            .unwrap()
+            .contains(&live.source_tag()));
         let saved_count: i64 = reopened
             .collection
             .storage
