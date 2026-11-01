@@ -133,7 +133,12 @@ impl AnkiBackend {
         if deck_id <= 0 || name.trim().is_empty() {
             return Err("deck ID must be positive and name must not be blank".into());
         }
-        if !self.collection.get_all_deck_names(false)?.iter().any(|(id, _)| id.0 == deck_id) {
+        if !self
+            .collection
+            .get_all_deck_names(false)?
+            .iter()
+            .any(|(id, _)| id.0 == deck_id)
+        {
             return Err("requested deck does not exist".into());
         }
         self.collection.rename_deck(DeckId(deck_id), name)?;
@@ -147,7 +152,12 @@ impl AnkiBackend {
         if deck_id <= 1 || !confirmed {
             return Err("deleting a non-default deck and its cards requires confirmation".into());
         }
-        if !self.collection.get_all_deck_names(false)?.iter().any(|(id, _)| id.0 == deck_id) {
+        if !self
+            .collection
+            .get_all_deck_names(false)?
+            .iter()
+            .any(|(id, _)| id.0 == deck_id)
+        {
             return Err("requested deck does not exist".into());
         }
         self.collection

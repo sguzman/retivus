@@ -114,7 +114,6 @@ pub fn install_local_krypton(ctx: &egui::Context) -> bool {
     false
 }
 
-
 #[cfg(test)]
 fn install_with_roots(ctx: &egui::Context, roots: &[PathBuf]) -> bool {
     for path in discover_krypton(roots) {
