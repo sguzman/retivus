@@ -122,9 +122,9 @@ impl eframe::App for Retivus {
             ui.heading("Learn from any source.");
             ui.label("Anki ecosystem compatibility and versioned external data providers.");
             ui.separator();
-            ui.weak("Engineering foundation: collection, import and review features are not implemented yet.");
+            ui.weak("Preview mode: validated sources only. Study, editing and review controls are not available in this window yet.");
             ui.label("First data source: Mexilex · es-MX → en");
-            ui.label("Planned backend: Anki Rust engine feasibility gate (not yet integrated).");
+            ui.label("Anki Rust backend: separately feature-gated and under integration; this preview never opens learner collections.");
             ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| {
                 ui.heading("Validate a local source file");
