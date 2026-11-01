@@ -28,11 +28,16 @@ for i in $(seq 1 120); do
 done
 [[ -n "$window" ]] || { echo "Official Anki window not found"; exit 1; }
 capture desktop-startup
-# Official Anki's first launch asks for a UI language and then requires
-# explicit confirmation. The confirmation defaults to No; select the observed
-# Yes button directly rather than looping back through the language chooser.
-xdotool key --clearmodifiers Return
+# On a new official 26.09.3 profile the language-picker has not yet
+# focused its OK button when the first window becomes visible. Select English
+# (United States) and the OK button by the pinned screenshot-confirmed GUI
+# positions, then explicitly click Yes in the next confirmation dialog.
 sleep 2
+xdotool mousemove --sync 516 396 click 1
+sleep 1
+xdotool mousemove --sync 779 537 click 1
+sleep 3
+capture desktop-language-confirmation
 xdotool mousemove --sync 743 437 click 1
 sleep 5
 capture desktop-after-language-confirmation
