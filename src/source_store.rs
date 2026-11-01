@@ -191,7 +191,15 @@ impl SourceCatalog {
             )
             .optional()
             .map_err(|e| e.to_string())?;
-        let Some((edition, word, part_of_speech, lexical_language, definition_language, license_notice)) = found else {
+        let Some((
+            edition,
+            word,
+            part_of_speech,
+            lexical_language,
+            definition_language,
+            license_notice,
+        )) = found
+        else {
             return Ok(None);
         };
 
@@ -297,9 +305,7 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("other.sqlite3");
         let adapter = tsv();
-        let data = format!(
-            "{HEADER}ja1\t生\tverb\ts1\tto live\nja2\t生\tnoun\ts1\tlife\n"
-        );
+        let data = format!("{HEADER}ja1\t生\tverb\ts1\tto live\nja2\t生\tnoun\ts1\tlife\n");
         let preview = validate_preview(&adapter, &mut Cursor::new(&data)).unwrap();
         assert_eq!(preview.validated_count, 2);
         assert_eq!(preview.rows[0].entry_id, "ja1");
@@ -327,10 +333,22 @@ mod tests {
         assert_eq!(first.senses[0].definition, "to live");
         assert_eq!(second.senses[0].definition, "life");
         assert_eq!(first.provenance.lexical_language, "ja");
-        assert_eq!(first.provenance.license_notice, adapter.descriptor().license_notice);
-        assert!(catalog.lookup_entry("mexilex", "v1", "ja1").unwrap().is_none());
-        assert!(catalog.lookup_entry("other-dictionary", "v2", "ja1").unwrap().is_none());
-        assert!(catalog.lookup_entry("other-dictionary", "v1", "missing").unwrap().is_none());
+        assert_eq!(
+            first.provenance.license_notice,
+            adapter.descriptor().license_notice
+        );
+        assert!(catalog
+            .lookup_entry("mexilex", "v1", "ja1")
+            .unwrap()
+            .is_none());
+        assert!(catalog
+            .lookup_entry("other-dictionary", "v2", "ja1")
+            .unwrap()
+            .is_none());
+        assert!(catalog
+            .lookup_entry("other-dictionary", "v1", "missing")
+            .unwrap()
+            .is_none());
     }
 
     #[test]
