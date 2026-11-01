@@ -1,0 +1,41 @@
+name: Anki Rust backend feasibility
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/anki-backend-spike.yml"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  upstream:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Retrieve exact Anki revision
+        uses: actions/checkout@v4
+        with:
+          repository: ankitects/anki
+          ref: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7
+          path: upstream-anki
+          fetch-depth: 1
+          persist-credentials: false
+      - name: Install pinned upstream Rust
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.99.0"
+      - name: Inspect upstream workspace and license boundaries
+        working-directory: upstream-anki
+        run: |
+          test "$(git rev-parse HEAD)" = 136bd42bfbd356fc756b6d3e28cc77b02da11ea7
+          grep -q 'AGPL' LICENSE
+          grep -q 'name = "anki"' rslib/Cargo.toml
+          grep -q 'publish = false' rslib/Cargo.toml
+          grep -q 'pub struct CollectionBuilder' rslib/src/collection/mod.rs
+          cargo --version
+      - name: Compile Anki Rust library from pinned workspace
+        working-directory: upstream-anki
+        env:
+          CARGO_BUILD_JOBS: "2"
+        run: |
+          cargo check --locked -p anki
