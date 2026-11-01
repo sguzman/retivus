@@ -1438,7 +1438,10 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         let intact = backend.add_basic_note(1, "original", "safe").unwrap();
         for (index, archive_member) in [
             "../outside.txt",
+            "nested/../outside.txt",
             "C:\\windows\\outside.txt",
+            "nested\\outside.txt",
+            "alternate:stream.txt",
             "/absolute.txt",
         ]
         .into_iter()
@@ -1470,6 +1473,12 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         zip.finish().unwrap();
         assert!(reject_unsafe_package_members(&bomb).is_err());
         assert!(backend.import_apkg(&bomb).is_err());
+        assert_eq!(backend.note_fields(intact).unwrap(), ["original", "safe"]);
+
+        let malformed = root.path().join("malformed.apkg");
+        fs::write(&malformed, b"not a ZIP archive").unwrap();
+        assert!(reject_unsafe_package_members(&malformed).is_err());
+        assert!(backend.import_apkg(&malformed).is_err());
         assert_eq!(backend.note_fields(intact).unwrap(), ["original", "safe"]);
 
         let valid_unicode = root.path().join("unicode-media.apkg");
