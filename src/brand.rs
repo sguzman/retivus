@@ -27,7 +27,7 @@ pub fn apply_to_context(ctx: &egui::Context) {
         ctx.style_mut_of(theme, |style| {
             style.visuals.hyperlink_color = accent;
             style.visuals.selection.bg_fill = accent;
-            style.visuals.selection.stroke = Stroke::new(1.0, foreground);
+            style.visuals.selection.stroke = Stroke::new(1.0_f32, foreground);
             style.visuals.widgets.hovered.bg_stroke.color = accent;
             style.visuals.widgets.active.bg_fill = accent;
             style.visuals.widgets.active.fg_stroke.color = foreground;
