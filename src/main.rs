@@ -150,9 +150,6 @@ mod tests {
             self.0.insert(key.into(), value);
         }
 
-        fn remove_string(&mut self, key: &str) {
-            self.0.remove(key);
-        }
 
         fn flush(&mut self) {}
     }
@@ -175,7 +172,7 @@ mod tests {
     fn unknown_or_malformed_preference_follows_system() {
         let mut storage = TestStorage::default();
         for value in ["", "DARK", "broken", "3"] {
-            storage.set_string(THEME_STORAGE_KEY, value.into());
+            eframe::Storage::set_string(&mut storage, THEME_STORAGE_KEY, value.into());
             assert_eq!(Retivus::restore(Some(&storage)).theme, Theme::System);
         }
         assert_eq!(Theme::System.preference(), egui::ThemePreference::System);

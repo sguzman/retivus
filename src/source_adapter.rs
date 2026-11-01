@@ -70,7 +70,8 @@ impl Default for MexilexV1 {
                 edition: "enwiktionary".into(),
                 lexical_language: "es-MX".into(),
                 definition_language: "en".into(),
-                license_notice: "Refer to Mexilex CORPUS-LICENSE.md and release sidecar notices".into(),
+                license_notice: "Refer to Mexilex CORPUS-LICENSE.md and release sidecar notices"
+                    .into(),
             },
         }
     }
@@ -210,13 +211,20 @@ mod tests {
         let m: &dyn SourceAdapter = &MexilexV1::default();
         let t: &dyn SourceAdapter = &StudyTsvV1::new(independent_info()).unwrap();
         let mex_rows = collect(m, mex).unwrap();
-        let tsv_rows = collect(t, "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\nja1\t猫\tnoun\tja1.s1\tgato\n").unwrap();
+        let tsv_rows = collect(
+            t,
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\nja1\t猫\tnoun\tja1.s1\tgato\n",
+        )
+        .unwrap();
         assert_eq!(mex_rows[0].senses[0].definition, "sidewalk");
         assert_eq!(tsv_rows[0].senses[0].definition, "gato");
         assert_eq!(tsv_rows[0].provenance.lexical_language, "ja");
         assert_eq!(tsv_rows[0].provenance.definition_language, "es");
         assert_ne!(m.format_id(), t.format_id());
-        assert_ne!(mex_rows[0].provenance.provider_id, tsv_rows[0].provenance.provider_id);
+        assert_ne!(
+            mex_rows[0].provenance.provider_id,
+            tsv_rows[0].provenance.provider_id
+        );
     }
 
     #[test]
