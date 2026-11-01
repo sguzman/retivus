@@ -56,6 +56,7 @@ pub struct StudyPanel {
     browse_scope: BrowseScope,
     stats: CollectionStats,
     selected_note: Option<i64>,
+    confirm_delete: bool,
     review: Option<ReviewPreview>,
     revealed: bool,
     due: (usize, usize, usize),
@@ -282,6 +283,35 @@ impl StudyPanel {
         self.refresh_review();
     }
 
+    /// Require explicit user confirmation before destructive note removal.
+    /// The Anki backend still owns the transaction and provides undo.
+    fn delete_selected_note(&mut self) {
+        if !self.confirm_delete {
+            self.status = "Confirm deletion before removing the selected note.".into();
+            return;
+        }
+        self.confirm_delete = false;
+        let Some(note_id) = self.selected_note else {
+            self.status = "Select a note before deleting.".into();
+            return;
+        };
+        let Some(backend) = self.backend.as_mut() else {
+            self.status = "Open a learner profile before deleting.".into();
+            return;
+        };
+        match backend.remove_note(note_id) {
+            Ok(()) => {
+                self.status = format!("Deleted note {note_id}; Undo last Anki edit can restore it.");
+                self.selected_note = None;
+                self.front.clear();
+                self.back.clear();
+                self.refresh();
+                self.refresh_review();
+            }
+            Err(error) => self.status = format!("Note not deleted: {error}"),
+        }
+    }
+
     fn undo_last_edit(&mut self) {
         let Some(backend) = self.backend.as_mut() else {
             self.status = "Open a Retivus-managed profile first.".into();
@@ -310,6 +340,7 @@ impl StudyPanel {
         self.stats = CollectionStats::default();
         self.deck_id = None;
         self.selected_note = None;
+        self.confirm_delete = false;
         // Never display editor contents, search terms, or file paths from
         // a previous profile after the learner switches collections.
         self.front.clear();
@@ -414,6 +445,7 @@ impl StudyPanel {
                         let label = format!("{} · {}", note.id, summary);
                         if ui.selectable_label(self.selected_note == Some(note.id), label).clicked() {
                             self.selected_note = Some(note.id);
+                            self.confirm_delete = false;
                             self.front = note.fields.first().cloned().unwrap_or_default();
                             self.back = note.fields.get(1).cloned().unwrap_or_default();
                         }
@@ -422,6 +454,7 @@ impl StudyPanel {
                 ui.horizontal_wrapped(|ui| {
                     if ui.button("New basic note").clicked() {
                         self.selected_note = None;
+                        self.confirm_delete = false;
                         self.front.clear();
                         self.back.clear();
                     }
@@ -460,6 +493,18 @@ impl StudyPanel {
                             );
                         }
                     }
+                }
+                if self.selected_note.is_some() {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.checkbox(&mut self.confirm_delete, "Confirm permanent note deletion");
+                        if ui
+                            .add_enabled(self.confirm_delete, egui::Button::new("Delete selected note"))
+                            .clicked()
+                        {
+                            self.delete_selected_note();
+                        }
+                        ui.weak("Undo is available while this collection remains open.");
+                    });
                 }
                 if let Some(id) = self.selected_note {
                     if ui.button("Save edited note").clicked() {
@@ -733,6 +778,48 @@ mod tests {
         assert_eq!(
             panel.backend.as_ref().unwrap().note_fields(second).unwrap(),
             ["橋", "connect"]
+        );
+        panel.close();
+    }
+
+    #[test]
+    fn native_note_deletion_requires_confirmation_and_allows_undo() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "deletion".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let note_id = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .add_basic_note(1, "árbol", "tree")
+            .unwrap();
+        panel.selected_note = Some(note_id);
+        panel.refresh();
+        panel.delete_selected_note();
+        assert!(panel.status.contains("Confirm deletion"));
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            ["árbol", "tree"]
+        );
+        panel.confirm_delete = true;
+        panel.delete_selected_note();
+        assert!(panel.status.contains("Deleted note"), "{}", panel.status);
+        assert!(!panel.confirm_delete);
+        assert!(panel.selected_note.is_none());
+        assert!(panel.backend.as_ref().unwrap().note_fields(note_id).is_err());
+        panel.undo_last_edit();
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            ["árbol", "tree"]
+        );
+        panel.close();
+        panel.connect(false);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            ["árbol", "tree"]
         );
         panel.close();
     }
