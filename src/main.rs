@@ -59,6 +59,7 @@ struct Retivus {
     source_language: String,
     definition_language: String,
     license_notice: String,
+    preview: Vec<source_adapter::SourceRecord>,
 }
 impl Default for Retivus {
     fn default() -> Self {
@@ -72,6 +73,7 @@ impl Default for Retivus {
             source_language: String::new(),
             definition_language: String::new(),
             license_notice: String::new(),
+            preview: Vec::new(),
         }
     }
 }
@@ -162,6 +164,7 @@ impl eframe::App for Retivus {
                     ui.add(egui::TextEdit::singleline(&mut self.source_path).desired_width(300.0));
                 });
                 if ui.button("Validate source").clicked() {
+                    self.preview.clear();
                     let adapter: Result<Box<dyn source_adapter::SourceAdapter>, String> =
                         match self.source_format {
                             SourceFormat::Mexilex => {
@@ -184,9 +187,10 @@ impl eframe::App for Retivus {
                             Err(error) => format!("Could not open source: {error}"),
                             Ok(file) => {
                                 let mut reader = BufReader::new(file);
-                                match adapter.visit(&mut reader, &mut |_| {}) {
-                                    Ok(count) => {
-                                        format!("Valid records: {count} · no learner data changed")
+                                match retivus::preview::validate_preview(adapter.as_ref(), &mut reader) {
+                                    Ok(result) => {
+                                        self.preview = result.rows;
+                                        format!("Valid records: {} · no learner data changed", result.validated_count)
                                     }
                                     Err(error) => format!("Validation failed: {error}"),
                                 }
@@ -195,6 +199,25 @@ impl eframe::App for Retivus {
                     };
                 }
                 ui.label(&self.import_status);
+                if !self.preview.is_empty() {
+                    ui.separator();
+                    ui.heading("Vocabulary preview");
+                    ui.weak("First 12 validated records · read-only · no cards created");
+                    for record in &self.preview {
+                        ui.group(|ui| {
+                            ui.horizontal(|ui| {
+                                ui.strong(&record.word);
+                                ui.weak(&record.part_of_speech);
+                            });
+                            for sense in record.senses.iter().take(3) {
+                                ui.label(&sense.definition);
+                            }
+                            if record.senses.len() > 3 {
+                                ui.weak(format!("{} additional meanings", record.senses.len() - 3));
+                            }
+                        });
+                    }
+                }
             });
         });
     }

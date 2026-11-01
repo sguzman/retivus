@@ -4,3 +4,5 @@ pub mod provider;
 pub mod brand;
 
 pub mod source_adapter;
+
+pub mod preview;

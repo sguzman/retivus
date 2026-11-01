@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Bounded source-neutral vocabulary preview in the native egui validation UI, with late-error rollback tests.
 - Verified pinned Anki Rust backend external-client deck/note/card/review-queue interoperability in isolated CI.
 - Added read-only egui source format selection for Mexilex and generic provider TSV.
 - Verified persistent UI appearance and light/dark OS-following theme behavior.
