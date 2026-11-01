@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **37%** of 100% (previous verified checkpoint 33%, this continuation **+4 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **41%** of 100% (previous verified checkpoint 37%, this continuation **+4 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -10,7 +10,7 @@
 | --- | ---: | ---: | --- |
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
-| 🗃️ M2 Local collection engine and learner-safe core | 15% | 4% | 🟡 |
+| 🗃️ M2 Local collection engine and learner-safe core | 15% | 8% | 🟡 |
 | 🌍 M3 Generic external-source provider engine | 14% | 11% | 🟡 |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
 | 🎨 M5 Complete native egui study experience | 14% | 2% | 🟡 |
@@ -37,7 +37,7 @@
 ### 🗃️ M2: Local collection engine and learner-safe core (15% of project)
 
 - ✅ **M2.1 🗂️ Manage profiles, decks, notes, templates and multiple cards** — **4%**. Acceptance: Create/edit/delete/restore round-trips via selected backend. Depends on: M1.5. **verified complete.**
-- ⏳ **M2.2 ⏱️ Schedule learning/review with actual FSRS and due queues** — **4%**. Acceptance: Known scheduler fixtures and interrupted review restart pass. Depends on: M2.1. **pending.**
+- ✅ **M2.2 ⏱️ Schedule learning/review with actual FSRS and due queues** — **4%**. Acceptance: Known scheduler fixtures and interrupted review restart pass. Depends on: M2.1. **verified complete.**
 - ⏳ **M2.3 💾 Persist review events/undo/backup/recovery atomically** — **4%**. Acceptance: Crash+rollback tests preserve previous state. Depends on: M2.1. **pending.**
 - ⏳ **M2.4 🔐 Profile isolation, path safety, migrations, export backups** — **3%**. Acceptance: Two-profile and corrupt-file tests pass. Depends on: M2.3. **pending.**
 
@@ -101,6 +101,13 @@
 
 - ✅ **M3.3 📝 (+3 pp):** [Anki feature CI 41309537491](https://github.com/sguzman/retivus/actions/runs/41309537491) passed **27/27** library tests including independently selected Japanese-to-Spanish homographs, multiple distinct Mexilex senses, persistent Anki-owned notes, preserved source identity tags and review history on reopen. [Rust CI 41309537553](https://github.com/sguzman/retivus/actions/runs/41309537553) passed the native read-only explicit-sense preview selection regression. This validates source-to-note candidate selection, **not** completed deck management GUI, automatic snapshot migration, media or package import/export.
 - ✅ **M3.5 🔌 (+1 pp):** The same green [Rust CI 41309537553](https://github.com/sguzman/retivus/actions/runs/41309537553) passed the independent `import-generic` Japanese-to-Spanish TSV CLI import and disk-reopen preview. Feature CI 41309537491 then imported its three records through the unchanged source-neutral catalog, selected its homographs, created Anki notes and persisted an actual graded review without altering Mexilex logic.
-- 🟡 **M2.2 ⏱️ active, 0/4 pp:** FSRS-backed grading and interruption/restart events passed the feature suite, but deterministic rating/transition fixtures and broader scheduler coverage remain before the complete task weight is earned.
+- ✅ **M2.2 ⏱️ verified (+4 pp in next checkpoint):** [Feature CI 41310578538](https://github.com/sguzman/retivus/actions/runs/41310578538) passed all 30 tests including known four-rating scheduler transitions, revlog consistency, review undo and interrupted restart.
 - 🟡 **M3.4 🔄 pending, 0/3 pp:** The newly added reversible source-tag parser is a foundation only; no snapshot diff, conflict mediation, history-preserving migration or undoable reconciliation was claimed complete.
 - ⏳ **Next:** Verify source-tag parser CI, add deterministic scheduler grade/state fixtures to finish M2.2, and build learner-safe backup/recovery for M2.3. Current GUI remains read-only, and complete multi-size visual QA is still pending.
+
+## Verified continuation checkpoint — 2026-11-01 (41%)
+
+**Progress:** **37% → 41% (+4 percentage points)**. M0: 8/8 (100%); M1: 12/12 (100%); M2: 8/15 (53.3%); M3: 11/14 (78.6%); M4: 0/17 (0%); M5: 2/14 (14.3%); M6: 0/12 (0%); M7: 0/8 (0%).
+
+- ✅ **M2.2 ⏱️ (+4 pp):** [Anki feature CI 41310578538](https://github.com/sguzman/retivus/actions/runs/41310578538) passed **30 tests**: all Again/Hard/Good/Easy ratings, persisted upstream FSRS scheduling state and revlog, queue restart, and explicit undo of a review. [Rust foundation 41310578551](https://github.com/sguzman/retivus/actions/runs/41310578551) passed format, clippy, provider and native smoke.
+- 🟡 **M2.3 💾 0/4 pp, implementation in verification:** Non-clobber SQLite snapshot and restore-as-new-profile paths under development; no backup/recovery credit until destructive, corrupt-file and rollback tests actually pass. Media packaging and migration remain separate.
