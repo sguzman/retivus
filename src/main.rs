@@ -326,7 +326,7 @@ impl eframe::App for Retivus {
                 ui.label(&self.import_status);
                 if let Some(chosen) = self.selected_sense.clone() {
                     ui.group(|ui| {
-                        ui.heading("Selected meaning (preview only)");
+                        ui.heading("Selected source meaning");
                         ui.strong(format!("{} → {}", chosen.word, chosen.definition));
                         ui.weak(format!(
                             "Provider {} · edition {} · entry {} · sense {}",
@@ -335,7 +335,7 @@ impl eframe::App for Retivus {
                         #[cfg(not(feature = "anki-backend"))]
                         ui.label("Preview only. Enable the Anki backend to create study notes from validated source senses.");
                         #[cfg(feature = "anki-backend")]
-                        ui.label("No card was created yet. Adding this sense requires an explicitly opened Retivus learner profile and selected deck.");
+                        ui.label("Add this sense only to an explicitly opened Retivus learner profile and selected deck.");
                         #[cfg(feature = "anki-backend")]
                         if ui.button("Add selected meaning to learner deck").clicked() {
                             let match_record = self.preview.iter().find(|record| {
@@ -368,7 +368,7 @@ impl eframe::App for Retivus {
                 if !self.preview.is_empty() {
                     ui.separator();
                     ui.heading("Vocabulary preview");
-                    ui.weak("First 12 validated records · choose one specific sense · no cards created");
+                    ui.weak("First 12 validated records · select one specific sense to review or explicitly add");
                     for record in &self.preview {
                         ui.push_id((&record.provenance.provider_id, &record.entry_id), |ui| {
                             ui.group(|ui| {

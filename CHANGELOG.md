@@ -37,5 +37,5 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - Adopted AGPL-3.0-or-later for the project in anticipation of direct Anki Rust backend integration; retained the original MIT grant and documented the provenance and remaining compliance gates.
 
 ### Known limitations
-- Neither selected-source note generation nor Anki grading is exposed in the shipping GUI yet; database-only backups do not cover media. Anki package import/export, full power-failure testing, and AnkiWeb interoperability remain incomplete.
+- The opt-in native learner workspace is not yet release-validated. Rich Anki card HTML is displayed as inert source text, not rendered. Database-only backups do not cover media; independent Anki Desktop/AnkiWeb interoperability and full power-failure testing remain unfinished.
 - Pinned Anki engine feasibility is verified, but release-grade corresponding-source notices, packaging, and distribution compliance remain unfinished.

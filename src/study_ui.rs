@@ -211,6 +211,21 @@ impl StudyPanel {
         self.refresh_review();
     }
 
+    fn undo_last_edit(&mut self) {
+        let Some(backend) = self.backend.as_mut() else {
+            self.status = "Open a Retivus-managed profile first.".into();
+            return;
+        };
+        match backend.undo_last() {
+            Ok(()) => {
+                self.status = "Last edit undone.".into();
+                self.refresh();
+                self.refresh_review();
+            }
+            Err(error) => self.status = format!("Cannot undo: {error}"),
+        }
+    }
+
     fn close(&mut self) {
         if let Some(backend) = self.backend.take() {
             self.status = match backend.close() {
@@ -222,6 +237,14 @@ impl StudyPanel {
         self.notes.clear();
         self.deck_id = None;
         self.selected_note = None;
+        // Never display editor contents, search terms, or file paths from
+        // a previous profile after the learner switches collections.
+        self.front.clear();
+        self.back.clear();
+        self.query.clear();
+        self.package.clear();
+        self.snapshot_id.clear();
+        self.new_deck.clear();
         self.review = None;
         self.revealed = false;
         self.due = (0, 0, 0);
@@ -304,12 +327,7 @@ impl StudyPanel {
                         self.back.clear();
                     }
                     if ui.button("Undo last Anki edit").clicked() {
-                        if let Some(backend) = self.backend.as_mut() {
-                            match backend.undo_last() {
-                                Ok(()) => { self.status = "Last edit undone.".into(); self.refresh(); self.refresh_review(); }
-                                Err(error) => self.status = format!("Cannot undo: {error}"),
-                            }
-                        }
+                        self.undo_last_edit();
                     }
                 });
                 ui.horizontal_wrapped(|ui| {
@@ -410,11 +428,9 @@ mod tests {
     #[test]
     fn stateful_native_study_flow_requires_reveal_and_preserves_review_after_reopen() {
         let dir = tempfile::tempdir().unwrap();
-        let mut panel = StudyPanel {
-            root: dir.path().to_string_lossy().into_owned(),
-            profile_id: "fixture-learner".into(),
-            ..StudyPanel::default()
-        };
+        let mut panel = StudyPanel::default();
+        panel.root = dir.path().to_string_lossy().into_owned();
+        panel.profile_id = "fixture-learner".into();
         panel.connect(true);
         assert!(panel.backend.is_some(), "{}", panel.status);
         let backend = panel.backend.as_mut().unwrap();
@@ -489,11 +505,9 @@ mod tests {
                 },
             )
             .unwrap();
-        let mut panel = StudyPanel {
-            root: dir.path().to_string_lossy().into_owned(),
-            profile_id: "source-learner".into(),
-            ..StudyPanel::default()
-        };
+        let mut panel = StudyPanel::default();
+        panel.root = dir.path().to_string_lossy().into_owned();
+        panel.profile_id = "source-learner".into();
         panel.connect(true);
         let deck = panel
             .backend
@@ -546,11 +560,9 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let note_id;
         {
-            let mut ui = StudyPanel {
-                root: root.path().to_string_lossy().into_owned(),
-                profile_id: "shutdown".into(),
-                ..StudyPanel::default()
-            };
+            let mut ui = StudyPanel::default();
+            ui.root = root.path().to_string_lossy().into_owned();
+            ui.profile_id = "shutdown".into();
             ui.connect(true);
             assert!(ui.backend.is_some(), "{}", ui.status);
             note_id = ui
@@ -570,11 +582,9 @@ mod tests {
     fn raw_mexilex_source_cannot_create_cards_without_verified_catalog() {
         use retivus::source_adapter::{MexilexV1, SourceMeaning, SourceRecord};
         let root = tempfile::tempdir().unwrap();
-        let mut panel = StudyPanel {
-            root: root.path().to_string_lossy().into_owned(),
-            profile_id: "protected".into(),
-            ..StudyPanel::default()
-        };
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "protected".into();
         panel.connect(true);
         let deck = panel
             .backend
@@ -608,6 +618,143 @@ mod tests {
             .browse_notes("", 10)
             .unwrap()
             .is_empty());
+        panel.close();
+    }
+
+    #[test]
+    fn native_undo_action_reverses_grading_and_persists_after_restart() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "review-undo".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let backend = panel.backend.as_mut().unwrap();
+        backend.enable_fsrs().unwrap();
+        let deck = backend.create_deck("Undo").unwrap();
+        backend.add_basic_note(deck, "today", "hoy").unwrap();
+        panel.refresh_review();
+        let card_id = panel.review.as_ref().unwrap().card_id;
+        panel.revealed = true;
+        panel.grade_revealed(3);
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
+            1
+        );
+
+        panel.undo_last_edit();
+        assert_eq!(panel.status, "Last edit undone.");
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
+            0
+        );
+        panel.close();
+        panel.connect(false);
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
+            0
+        );
+        panel.close();
+    }
+
+    #[test]
+    fn stale_displayed_review_never_grades_a_different_queued_card() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "guarded-review".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let backend = panel.backend.as_mut().unwrap();
+        backend.enable_fsrs().unwrap();
+        let deck = backend.create_deck("Guarded").unwrap();
+        backend.add_basic_note(deck, "first", "one").unwrap();
+        backend.add_basic_note(deck, "second", "two").unwrap();
+        panel.refresh_review();
+        let displayed_id = panel.review.as_ref().unwrap().card_id;
+        assert_eq!(
+            panel.backend.as_mut().unwrap().grade_next_card(4).unwrap(),
+            Some(displayed_id)
+        );
+
+        panel.revealed = true;
+        panel.grade_revealed(4);
+        assert!(panel.status.contains("Review not recorded"), "{}", panel.status);
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(displayed_id)
+                .unwrap(),
+            1
+        );
+        if let Some(next) = panel.review.as_ref() {
+            assert_ne!(next.card_id, displayed_id);
+            assert_eq!(
+                panel
+                    .backend
+                    .as_ref()
+                    .unwrap()
+                    .review_event_count(next.card_id)
+                    .unwrap(),
+                0
+            );
+        }
+        panel.close();
+    }
+
+    #[test]
+    fn closing_profile_clears_editor_state_without_erasing_saved_notes() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "privacy".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let note_id = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .add_basic_note(1, "sensitive front", "sensitive back")
+            .unwrap();
+        panel.selected_note = Some(note_id);
+        panel.front = "sensitive front".into();
+        panel.back = "sensitive back".into();
+        panel.query = "sensitive".into();
+        panel.package = "private.apkg".into();
+        panel.snapshot_id = "private".into();
+        panel.new_deck = "private deck".into();
+        panel.close();
+        assert!(panel.backend.is_none());
+        assert!(panel.selected_note.is_none());
+        assert!(panel.front.is_empty());
+        assert!(panel.back.is_empty());
+        assert!(panel.query.is_empty());
+        assert!(panel.package.is_empty());
+        assert!(panel.snapshot_id.is_empty());
+        assert!(panel.new_deck.is_empty());
+
+        panel.connect(false);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            ["sensitive front", "sensitive back"]
+        );
         panel.close();
     }
 
