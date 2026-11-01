@@ -22,3 +22,34 @@ jobs:
         run: cargo test --all-targets
       - name: Compile release UI
         run: cargo build --release
+      - name: Smoke-launch real egui window under virtual X11
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb xdotool scrot libgl1-mesa-dri
+          xvfb-run -a bash -euo pipefail -c '
+            LIBGL_ALWAYS_SOFTWARE=1 ./target/release/retivus > /tmp/retivus-gui.log 2>&1 &
+            app=$!
+            trap "kill $app 2>/dev/null || true" EXIT
+            for attempt in $(seq 1 60); do
+              if xdotool search --name "Retivus" >/dev/null 2>&1; then
+                scrot /tmp/retivus-ui.png
+                test -s /tmp/retivus-ui.png
+                exit 0
+              fi
+              if ! kill -0 "$app" 2>/dev/null; then
+                cat /tmp/retivus-gui.log
+                exit 1
+              fi
+              sleep 0.5
+            done
+            cat /tmp/retivus-gui.log
+            exit 1
+          '
+      - name: Archive actual GUI smoke screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-xvfb-screenshot
+          path: /tmp/retivus-ui.png
+          if-no-files-found: ignore
+          retention-days: 7
