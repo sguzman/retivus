@@ -14,6 +14,12 @@ The pinned root `Cargo.toml` defines a 12-member Rust workspace, including the `
 
 This is an **inventory**, not proof of a portable API. The workspace has substantial internal dependencies and build-time generated protobuf and internationalization assets.
 
+## Defensive package preflight (pending feature acceptance)
+
+The native Anki-package importer checks that the selected absolute .apkg is a regular, non-symlinked file. Before passing it to pinned Anki, Retivus inspects ZIP central-directory metadata without extracting files. It rejects absolute and traversal paths, Windows path syntax, control characters, archive symlinks, and suspicious declared expansion ratios. It caps archive entries at one million and declared expanded data at 64 GiB. Safe Unicode media paths remain permitted.
+
+Disposable-profile tests construct malicious packages and verify rejection without altering existing note fields or writing outside the selected profile. This check supplements upstream Anki's importer and is not a replacement ZIP extractor or a guarantee against every malicious archive. M6.3 remains pending until feature tests pass. AnkiWeb credentials and sync are not used by this offline import path.
+
 ## Repeatable build experiment
 
 [Anki Rust integration feasibility workflow](../.github/workflows/anki-backend-spike.yml) checks out the exact upstream commit into an isolated temporary directory and attempts `cargo check --locked -p anki` on GitHub's Linux worker. It never writes to the Retivus source tree, modifies Anki, or opens a user's collection. An experiment failure must be documented verbatim, classified (toolchain/dependency/build-script/API/license), and resolved before any claim of successful direct integration.
