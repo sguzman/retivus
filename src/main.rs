@@ -2,13 +2,29 @@ mod provider;
 use eframe::egui;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
-enum Theme { System, Light, Dark }
-impl Theme {
-    fn name(self) -> &'static str { match self { Self::System => "System", Self::Light => "Light", Self::Dark => "Dark" } }
+enum Theme {
+    System,
+    Light,
+    Dark,
 }
-struct Retivus { theme: Theme }
+impl Theme {
+    fn name(self) -> &'static str {
+        match self {
+            Self::System => "System",
+            Self::Light => "Light",
+            Self::Dark => "Dark",
+        }
+    }
+}
+struct Retivus {
+    theme: Theme,
+}
 impl Default for Retivus {
-    fn default() -> Self { Self { theme: Theme::System } }
+    fn default() -> Self {
+        Self {
+            theme: Theme::System,
+        }
+    }
 }
 impl eframe::App for Retivus {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
