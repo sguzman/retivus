@@ -341,6 +341,27 @@ impl StudyPanel {
         self.inspect_selected_source();
     }
 
+    /// Reverse only the catalog's recorded one-to-one source mapping.
+    /// Anki-owned notes and review events are never changed by this operation.
+    fn undo_source_mapping(&mut self) {
+        let result = (|| -> Result<(), String> {
+            let (_, mut catalog, from) = self.selected_source_context()?;
+            catalog.undo_reconciliation(
+                &from.provenance.provider_id,
+                &from.snapshot,
+                &from.entry_id,
+                &from.sense_id,
+            )
+        })();
+        self.mapping_approved = false;
+        self.mapping_preview = None;
+        self.status = match result {
+            Ok(()) => "Source mapping removed; the note and review history are unchanged.".into(),
+            Err(error) => format!("Source mapping not removed: {error}"),
+        };
+        self.inspect_selected_source();
+    }
+
     /// This is a distinct user action after mapping: the Anki backend verifies
     /// unmodified source fields, unique provenance and preserves review history.
     fn apply_recorded_source_mapping(&mut self) {
@@ -816,6 +837,9 @@ impl StudyPanel {
                         }
                         if ui.button("Apply already recorded mapping to selected note").clicked() {
                             self.apply_recorded_source_mapping();
+                        }
+                        if ui.button("Undo recorded mapping (no note changes)").clicked() {
+                            self.undo_source_mapping();
                         }
                         ui.weak("Mapping and applying are separate actions; manual edits or ambiguous identities block migration.");
                     });
@@ -1503,6 +1527,13 @@ mod tests {
         panel.record_source_mapping();
         assert!(panel.status.contains("Recorded explicit mapping"));
         panel.inspect_selected_source();
+        assert!(panel.source_report.contains("Update available"));
+        panel.undo_source_mapping();
+        assert!(panel.status.contains("mapping removed"));
+        assert!(panel.source_report.starts_with("Source verified:"));
+        panel.preview_source_mapping();
+        panel.mapping_approved = true;
+        panel.record_source_mapping();
         assert!(panel.source_report.contains("Update available"));
         assert_eq!(
             panel.backend.as_ref().unwrap().note_fields(id).unwrap(),
