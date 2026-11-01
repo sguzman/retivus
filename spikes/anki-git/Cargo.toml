@@ -1,0 +1,13 @@
+[package]
+name = "retivus-anki-git-spike"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Tests pinned Git consumption of Anki's Rust backend without a manual checkout"
+
+[workspace]
+
+[dependencies]
+anki = { git = "https://github.com/ankitects/anki", rev = "136bd42bfbd356fc756b6d3e28cc77b02da11ea7" }
+tokio = { version = "1.51.6", features = ["io-util"] }

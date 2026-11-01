@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/anki-backend-spike.yml"
       - "spikes/anki-collection/**"
+      - "spikes/anki-git/**"
   workflow_dispatch:
 permissions:
   contents: read
@@ -69,3 +70,10 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           cargo run --manifest-path spikes/anki-collection/Cargo.toml
+      - name: Test clean pinned Cargo Git dependency without local Anki checkout
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          cargo run --manifest-path spikes/anki-git/Cargo.toml
