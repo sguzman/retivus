@@ -705,11 +705,9 @@ impl AnkiBackend {
         let Some(card_id) = self.next_card_id()? else {
             return Ok(None);
         };
-        let rendered = self.collection.render_existing_card(
-            anki::card::CardId(card_id),
-            false,
-            false,
-        )?;
+        let rendered =
+            self.collection
+                .render_existing_card(anki::card::CardId(card_id), false, false)?;
         Ok(Some(ReviewPreview {
             card_id,
             question_html: rendered.question().into_owned(),
@@ -1326,7 +1324,10 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         assert!(first.card_id > 0);
         assert!(first.question_html.contains("perro"));
         assert!(first.answer_html.contains("dog"));
-        assert_eq!(first.card_id, backend.next_review_preview().unwrap().unwrap().card_id);
+        assert_eq!(
+            first.card_id,
+            backend.next_review_preview().unwrap().unwrap().card_id
+        );
         assert_eq!(backend.due_counts().unwrap().0, 1);
         assert!(backend.grade_previewed_card(first.card_id + 1, 4).is_err());
         backend.grade_previewed_card(first.card_id, 4).unwrap();
@@ -1334,7 +1335,11 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             .collection
             .storage
             .db()
-            .query_row("SELECT count(*) FROM revlog WHERE cid=?1", [first.card_id], |row| row.get(0))
+            .query_row(
+                "SELECT count(*) FROM revlog WHERE cid=?1",
+                [first.card_id],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(reviews, 1);
         backend.close().unwrap();
