@@ -5,16 +5,19 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
-- Added opt-in generic TSV snapshot staging, immutable note provenance inspection and a two-step source revision UI (exact target preview/approval followed by separately guarded Anki note migration); feature CI acceptance is pending.
-- Added true persisted collection statistics, bounded source-linked/plain/conflicting-note browser filters, and guarded note deletion with Anki undo. New feature-level regression verification is pending.
-- Added a complete validation → precise source-sense choice → real Anki card → grade → restart regression through the same handlers used by the native GUI, plus immutable active-profile identity for source catalog isolation; feature-level regression verification is pending.
+- Added independently measured full Mexilex preview, catalog import and 1,000 indexed lookup benchmarks on the pinned 124,444-entry release; memory bounds passed [provider CI 41342157443](https://github.com/sguzman/retivus/actions/runs/41342157443).
+- Verified archive preflight blocks ZIP traversal, unsafe names, suspicious compression and symlinks without breaking tested public Anki packages in [Anki CI 41344339776](https://github.com/sguzman/retivus/actions/runs/41344339776).
+- Added explicit scheduling-history import and export toggles, both off by default; opt-in round-trip passed [Anki CI 41347374839](https://github.com/sguzman/retivus/actions/runs/41347374839). Four-way isolation and independent source-SQLite package baselines are pending.
+- Verified opt-in generic TSV staging and explicit one-to-one source mapping preview, approval, application and undo in Anki feature CI; no unattended card migration.
+- Verified persisted profile statistics, source-aware browser filters, provenance conflicts and guarded note removal/undo in Anki feature CI.
+- Verified source validation → exact sense selection → real native Anki card → grading → restart using actual egui pointer actions and keyboard focus, plus immutable active-profile identity for source isolation.
 - Verified native selected-deck scheduling, reveal, guarded grading, undo, due counts and review history across restart in [Anki CI 41329550912](https://github.com/sguzman/retivus/actions/runs/41329550912).
-- Added opt-in learner UI action to archive an exact selected generic source sense in a managed SQLite snapshot and explicitly create an Anki note, rejecting forged meanings and refusing raw unverified Mexilex imports; acceptance tests pending.
+- Verified opt-in managed source-catalog staging and exact selected-sense learner note creation, refusing forged meanings and unverified raw Mexilex imports.
 - Added managed-only `.apkg` import/export with media, template, tag and card round trips; pinned third-party AnkiDroid and MIT sample packages passed independent checks (Anki Desktop GUI interoperability still pending).
 - Added cloze/HTML/CSS/SVG render parity tests across full `.apkg` export/import and reopen.
 - Added offline `.anki2` copy-only migration with schema-checking, source-byte preservation, active WAL refusal, and official upstream Anki Desktop fixture verification.
-- Verified persisted UI scale and density with actual 680×560/1100×760 native X11 screenshots and keyboard-focus smoke; Wayland and full accessibility QA remain separately scoped.
-- Added feature-gated learner profiles, deck/note editing, bounded Anki search, `.apkg` operations, and due-card reveal/grading/undo controls; full native-flow acceptance pending.
+- Verified native System/Light/Dark presentation, keyboard controls, X11 smoke and real Sway Wayland screenshots at 1080×800 and 720×650; broader accessibility QA remains separate.
+- Verified feature-gated learner profiles, deck/note editing, bounded Anki search, `.apkg` operations, due-card reveal/grading/undo and full native import-to-review flow.
 - Verified explicit, bounded source snapshot diffs and opt-in reversible identity migrations, with Anki note updates that preserve existing review history and refuse manual-edit conflicts.
 - Verified Anki FSRS four-rating transitions, due queue restart, review persistence and undo using the pinned upstream scheduler.
 - Added explicit sense-specific source card candidates and Anki note creation with immutable provenance tags; homographs and multiple senses retain distinct identities.
