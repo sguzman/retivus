@@ -1,0 +1,12 @@
+[package]
+name = "retivus-anki-spike"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "AGPL-3.0-or-later"
+description = "Disposable test of Retivus using the pinned upstream Anki Rust backend"
+
+[workspace]
+
+[dependencies]
+anki = { path = "../../upstream-anki/rslib" }

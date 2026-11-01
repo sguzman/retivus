@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Checkout Retivus integration smoke client
+        uses: actions/checkout@v4
       - name: Retrieve exact Anki revision
         uses: actions/checkout@v4
         with:
@@ -59,3 +61,10 @@ jobs:
           PROTOC: /usr/bin/protoc
         run: |
           cargo check --locked -p anki
+      - name: Verify a separate Retivus client against disposable Anki collection
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          cargo run --manifest-path spikes/anki-collection/Cargo.toml
