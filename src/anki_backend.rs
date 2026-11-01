@@ -755,6 +755,82 @@ mod tests {
         reopened.close().unwrap();
     }
 
+    #[test]
+    fn independent_japanese_spanish_source_can_be_reviewed_without_mixing_homographs() {
+        use crate::source_adapter::{SourceInfo, StudyTsvV1};
+        use crate::source_store::SourceCatalog;
+        use std::io::Cursor;
+
+        let input = include_str!("../tests/fixtures/independent-ja-es.tsv");
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "independent-ja-es".into(),
+            edition: "2026-11-01".into(),
+            lexical_language: "ja".into(),
+            definition_language: "es".into(),
+            license_notice: "Original test fixture: CC0-1.0".into(),
+        })
+        .unwrap();
+        let mut catalog = SourceCatalog::in_memory().unwrap();
+        assert_eq!(
+            catalog
+                .import_snapshot("ja-es-v1", &adapter, &mut Cursor::new(input))
+                .unwrap(),
+            3
+        );
+        let life = catalog
+            .select_sense("independent-ja-es", "ja-es-v1", "ja1", "s1")
+            .unwrap();
+        let live = catalog
+            .select_sense("independent-ja-es", "ja-es-v1", "ja2", "s1")
+            .unwrap();
+        assert_eq!(life.word, live.word);
+        assert_ne!(life.definition, live.definition);
+        assert_ne!(life.source_tag(), live.source_tag());
+
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "independent").unwrap();
+        backend.enable_fsrs().unwrap();
+        let life_id = backend.add_source_candidate(1, &life).unwrap();
+        let live_id = backend.add_source_candidate(1, &live).unwrap();
+        assert_ne!(life_id, live_id);
+        assert_eq!(backend.note_fields(life_id).unwrap(), ["生", "vida"]);
+        assert_eq!(backend.note_fields(live_id).unwrap(), ["生", "vivir"]);
+        assert!(backend.note_tags(life_id).unwrap().contains(&life.source_tag()));
+        assert!(backend.note_tags(live_id).unwrap().contains(&live.source_tag()));
+        assert!(backend.due_counts().unwrap().0 >= 2);
+        let answered = backend.grade_next_card(3).unwrap().unwrap();
+        let count: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [answered],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+        backend.close().unwrap();
+
+        let reopened = AnkiBackend::open_managed_profile(dir.path(), "independent").unwrap();
+        assert_eq!(reopened.note_fields(life_id).unwrap(), ["生", "vida"]);
+        assert_eq!(reopened.note_fields(live_id).unwrap(), ["生", "vivir"]);
+        assert!(reopened.note_tags(life_id).unwrap().contains(&life.source_tag()));
+        assert!(reopened.note_tags(live_id).unwrap().contains(&live.source_tag()));
+        let saved_count: i64 = reopened
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [answered],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(saved_count, 1);
+        reopened.close().unwrap();
+    }
+
     #[cfg(unix)]
     #[test]
     fn refuses_profile_or_database_symlink_redirects() {
