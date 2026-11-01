@@ -61,14 +61,14 @@ impl Density {
         }
     }
 
-    fn stored(self) -> &\u0027static str {
+    fn stored(self) -> &'static str {
         match self {
             Self::Compact => "compact",
             Self::Comfortable => "comfortable",
         }
     }
 
-    fn name(self) -> &\u0027static str {
+    fn name(self) -> &'static str {
         match self {
             Self::Compact => "Compact",
             Self::Comfortable => "Comfortable",
