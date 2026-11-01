@@ -385,6 +385,64 @@ impl AnkiBackend {
         Ok(note.id.0)
     }
 
+    /// Apply only a user-approved, exact one-to-one source reconciliation.
+    /// Refuse notes with manual field edits or multiple provenance identities.
+    /// Anki updates the existing note in an undoable transaction, preserving its
+    /// card identity and scheduler/review log instead of generating replacement cards.
+    pub fn apply_approved_source_reconciliation(
+        &mut self,
+        catalog: &crate::source_store::SourceCatalog,
+        note_id: i64,
+        from: &SourceCardCandidate,
+    ) -> BackendResult<()> {
+        let verified = catalog.select_sense(
+            &from.provenance.provider_id,
+            &from.snapshot,
+            &from.entry_id,
+            &from.sense_id,
+        )?;
+        if &verified != from {
+            return Err("original source selection does not match immutable snapshot".into());
+        }
+        let target = catalog.reconciled_sense(
+            &from.provenance.provider_id,
+            &from.snapshot,
+            &from.entry_id,
+            &from.sense_id,
+        )?;
+        let old_tag = from.source_tag();
+        let new_tag = target.source_tag();
+        if old_tag == new_tag {
+            return Err("no explicit new source identity has been approved".into());
+        }
+        let mut note = self
+            .collection
+            .storage
+            .get_note(NoteId(note_id))?
+            .ok_or("note ID does not exist")?;
+        if note.fields().len() != 2
+            || note.fields()[0] != from.word
+            || note.fields()[1] != from.definition
+        {
+            return Err("source note has manual edits; explicit conflict resolution required".into());
+        }
+        if note
+            .tags
+            .iter()
+            .filter(|tag| tag.starts_with("retivus::source::"))
+            .count() != 1
+            || !note.tags.contains(&old_tag)
+        {
+            return Err("source provenance identity does not match this note".into());
+        }
+        note.set_field(0, &target.word)?;
+        note.set_field(1, &target.definition)?;
+        note.tags.retain(|tag| tag != &old_tag);
+        note.tags.push(new_tag);
+        self.collection.update_note(&mut note)?;
+        Ok(())
+    }
+
     pub fn note_tags(&self, note_id: i64) -> BackendResult<Vec<String>> {
         let note = self
             .collection
@@ -852,6 +910,109 @@ mod tests {
             .unwrap()
             .contains(&live.source_tag()));
         reopened.close().unwrap();
+    }
+
+    #[test]
+    fn approved_source_migration_preserves_review_history_and_supports_undo() {
+        use crate::source_adapter::{SourceInfo, StudyTsvV1};
+        use crate::source_store::SourceCatalog;
+        use std::io::Cursor;
+
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "disposable-provider".into(),
+            edition: "2026".into(),
+            lexical_language: "es".into(),
+            definition_language: "en".into(),
+            license_notice: "Synthetic fixture".into(),
+        })
+        .unwrap();
+        let before = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\na\tbanqueta\tnoun\ts1\tsidewalk\n";
+        let after = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\nb\tbanqueta\tnoun\ts1\tpavement\n";
+        let mut sources = SourceCatalog::in_memory().unwrap();
+        sources
+            .import_snapshot("old", &adapter, &mut Cursor::new(before))
+            .unwrap();
+        sources
+            .import_snapshot("new", &adapter, &mut Cursor::new(after))
+            .unwrap();
+        let old = sources
+            .select_sense("disposable-provider", "old", "a", "s1")
+            .unwrap();
+        let new = sources
+            .select_sense("disposable-provider", "new", "b", "s1")
+            .unwrap();
+
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+        backend.enable_fsrs().unwrap();
+        let note_id = backend.add_source_candidate(1, &old).unwrap();
+        let card_id = backend.grade_next_card(4).unwrap().unwrap();
+        assert!(backend
+            .apply_approved_source_reconciliation(&sources, note_id, &old)
+            .is_err());
+        sources.record_reconciliation(&old, &new).unwrap();
+        backend
+            .apply_approved_source_reconciliation(&sources, note_id, &old)
+            .unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["banqueta", "pavement"]);
+        assert!(backend.note_tags(note_id).unwrap().contains(&new.source_tag()));
+        let history: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [card_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(history, 1);
+
+        backend.undo_last().unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["banqueta", "sidewalk"]);
+        assert!(backend.note_tags(note_id).unwrap().contains(&old.source_tag()));
+
+        backend
+            .edit_note_fields(note_id, &["custom text", "custom answer"])
+            .unwrap();
+        assert!(backend
+            .apply_approved_source_reconciliation(&sources, note_id, &old)
+            .is_err());
+        assert_eq!(
+            backend.note_fields(note_id).unwrap(),
+            ["custom text", "custom answer"]
+        );
+        backend.undo_last().unwrap();
+        backend
+            .apply_approved_source_reconciliation(&sources, note_id, &old)
+            .unwrap();
+        backend.close().unwrap();
+
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "learner").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["banqueta", "pavement"]);
+        assert!(reopened.note_tags(note_id).unwrap().contains(&new.source_tag()));
+        let history: i64 = reopened
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [card_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(history, 1);
+        reopened.close().unwrap();
+        sources
+            .undo_reconciliation("disposable-provider", "old", "a", "s1")
+            .unwrap();
+        assert_eq!(
+            sources
+                .reconciled_sense("disposable-provider", "old", "a", "s1")
+                .unwrap()
+                .source_tag(),
+            old.source_tag()
+        );
     }
 
     #[test]
