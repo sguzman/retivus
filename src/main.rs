@@ -211,6 +211,27 @@ impl Retivus {
     }
 
     #[cfg(feature = "anki-backend")]
+    fn stage_validated_source_to_study(&mut self) {
+        let result = (|| {
+            if self.source_format != SourceFormat::GenericTsv {
+                return Err("Mexilex requires checksum-verified release ingestion".into());
+            }
+            if self.preview.is_empty() {
+                return Err("Validate a nonempty source before staging it".into());
+            }
+            let adapter = self.source_adapter()?;
+            self.study
+                .stage_generic_snapshot(adapter.as_ref(), std::path::Path::new(&self.source_path))
+        })();
+        self.import_status = match result {
+            Ok(count) => {
+                format!("Staged {count} source entries; no cards or review data changed.")
+            }
+            Err(error) => format!("Source staging refused: {error}"),
+        };
+    }
+
+    #[cfg(feature = "anki-backend")]
     fn add_selected_sense_to_study(&mut self) {
         let result = (|| {
             let chosen = self
@@ -365,6 +386,17 @@ impl eframe::App for Retivus {
                 });
                 if ui.button("Validate source").clicked() {
                     self.validate_source_file();
+                }
+                #[cfg(feature = "anki-backend")]
+                if self.source_format == SourceFormat::GenericTsv
+                    && ui
+                        .add_enabled(
+                            self.study.is_connected() && !self.preview.is_empty(),
+                            egui::Button::new("Stage complete source snapshot (no cards)"),
+                        )
+                        .clicked()
+                {
+                    self.stage_validated_source_to_study();
                 }
                 ui.label(&self.import_status);
                 if let Some(chosen) = self.selected_sense.clone() {

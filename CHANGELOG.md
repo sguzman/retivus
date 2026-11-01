@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added an explicit generic TSV snapshot staging action and immutable note provenance inspection that highlights manual-edit conflicts and previously recorded source-version mappings; current feature CI acceptance is pending.
 - Added true persisted collection statistics, bounded source-linked/plain/conflicting-note browser filters, and guarded note deletion with Anki undo. New feature-level regression verification is pending.
 - Added a complete validation → precise source-sense choice → real Anki card → grade → restart regression through the same handlers used by the native GUI, plus immutable active-profile identity for source catalog isolation; feature-level regression verification is pending.
 - Verified native selected-deck scheduling, reveal, guarded grading, undo, due counts and review history across restart in [Anki CI 41329550912](https://github.com/sguzman/retivus/actions/runs/41329550912).

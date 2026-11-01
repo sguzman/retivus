@@ -58,6 +58,7 @@ pub struct StudyPanel {
     browse_scope: BrowseScope,
     stats: CollectionStats,
     selected_note: Option<i64>,
+    source_report: String,
     confirm_delete: bool,
     review: Option<ReviewPreview>,
     revealed: bool,
@@ -126,6 +127,7 @@ impl StudyPanel {
                         .map(|(id, _)| *id);
                 }
                 self.notes = notes;
+                self.source_report.clear();
                 if self
                     .selected_note
                     .is_some_and(|id| !self.notes.iter().any(|note| note.id == id))
@@ -137,6 +139,7 @@ impl StudyPanel {
                 }
             }
             (Err(error), _, _) | (_, Err(error), _) | (_, _, Err(error)) => {
+                self.source_report.clear();
                 self.notes.clear();
                 self.selected_note = None;
                 self.confirm_delete = false;
@@ -180,6 +183,112 @@ impl StudyPanel {
         }
     }
 
+    pub fn is_connected(&self) -> bool {
+        self.backend.is_some()
+    }
+
+    /// Catalog I/O must always follow the actual open profile, never editable
+    /// text fields. This also refuses a changed or symlinked profile directory.
+    fn managed_catalog_path(&self) -> Result<PathBuf, String> {
+        if self.backend.is_none() {
+            return Err("open a Retivus-managed profile first".into());
+        }
+        let root = self
+            .active_root
+            .as_ref()
+            .ok_or("learner profile root is not pinned")?;
+        let id = self
+            .active_profile_id
+            .as_deref()
+            .ok_or("learner profile identity is not pinned")?;
+        let dir = root.join(id);
+        let meta = fs::symlink_metadata(&dir).map_err(|e| e.to_string())?;
+        if !meta.file_type().is_dir() || meta.file_type().is_symlink() {
+            return Err("learner profile must be a real Retivus-managed directory".into());
+        }
+        Ok(dir.join("source-catalog.sqlite3"))
+    }
+
+    /// Stage a complete, validated generic source snapshot for future explicit
+    /// sense selection and version comparison. Never creates or grades cards.
+    /// Mexilex release ingestion remains guarded by external checksum checks.
+    pub fn stage_generic_snapshot(
+        &mut self,
+        adapter: &dyn SourceAdapter,
+        source_path: &Path,
+    ) -> Result<usize, String> {
+        if adapter.format_id() != "retivus-study-tsv-v1" {
+            return Err("Only generic study TSV snapshots can be staged in the learner GUI".into());
+        }
+        adapter.descriptor().validate()?;
+        let snapshot = if self.snapshot_id.trim().is_empty() {
+            adapter.descriptor().edition.as_str()
+        } else {
+            self.snapshot_id.trim()
+        };
+        let file_info = fs::symlink_metadata(source_path).map_err(|e| e.to_string())?;
+        if !file_info.file_type().is_file() || file_info.file_type().is_symlink() {
+            return Err("generic source must be a regular file, not a symlink".into());
+        }
+        let input = fs::File::open(source_path).map_err(|e| e.to_string())?;
+        let catalog_file = self.managed_catalog_path()?;
+        let mut catalog = match fs::symlink_metadata(&catalog_file) {
+            Ok(_) => SourceCatalog::open_existing(&catalog_file)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                SourceCatalog::create_new(&catalog_file)?
+            }
+            Err(error) => return Err(error.to_string()),
+        };
+        let count = catalog.import_snapshot(snapshot, adapter, &mut BufReader::new(input))?;
+        self.status =
+            format!("Staged {count} source entries under {snapshot} without creating cards.");
+        Ok(count)
+    }
+
+    /// Compare the selected note with its immutable source payload and any
+    /// explicitly recorded one-to-one migration. This never changes cards.
+    fn inspect_selected_source(&mut self) {
+        let outcome = (|| -> Result<String, String> {
+            let note_id = self.selected_note.ok_or("Select a learner note first")?;
+            let backend = self.backend.as_ref().ok_or("Open a learner profile first")?;
+            let tags = backend.note_tags(note_id).map_err(|e| e.to_string())?;
+            let Some([provider, snapshot, entry, sense]) = Self::source_provenance(&tags)?
+            else {
+                return Ok("This note has no linked external source.".into());
+            };
+            let path = self.managed_catalog_path()?;
+            let catalog = SourceCatalog::open_existing(&path)
+                .map_err(|e| format!("Source catalog unavailable or unsafe: {e}"))?;
+            let original = catalog
+                .select_sense(&provider, &snapshot, &entry, &sense)
+                .map_err(|e| format!("Source identity missing or invalid: {e}"))?;
+            let fields = backend.note_fields(note_id).map_err(|e| e.to_string())?;
+            if fields.len() != 2
+                || fields[0] != original.word
+                || fields[1] != original.definition
+            {
+                return Ok("Conflict: this note was edited independently of its source; automatic reconciliation is prohibited.".into());
+            }
+            let mapped = catalog
+                .reconciled_sense(&provider, &snapshot, &entry, &sense)
+                .map_err(|e| format!("Source reconciliation cannot be read: {e}"))?;
+            if mapped.source_tag() != original.source_tag() {
+                Ok(format!(
+                    "Update available by an explicit source mapping: {} / {} / {}. The note and review history remain unchanged until separately approved.",
+                    mapped.snapshot, mapped.entry_id, mapped.sense_id
+                ))
+            } else {
+                Ok(format!(
+                    "Source verified: exact immutable {provider} / {snapshot} / {entry} / {sense} matches this note."
+                ))
+            }
+        })();
+        self.source_report = match outcome {
+            Ok(report) => report,
+            Err(error) => format!("Conflict: {error}"),
+        };
+    }
+
     /// Use one guarded path for both the grade buttons and automated UI-state tests.
     /// Import a validated source into a durable provider catalog before an
     /// explicit sense can become a learner note. No homograph guessing.
@@ -221,20 +330,7 @@ impl StudyPanel {
             part_of_speech: record.part_of_speech.clone(),
             definition: sense.definition.clone(),
         };
-        let profile_root = self
-            .active_root
-            .as_ref()
-            .ok_or("learner profile root is not pinned")?;
-        let profile_id = self
-            .active_profile_id
-            .as_deref()
-            .ok_or("learner profile identity is not pinned")?;
-        let profile_dir = profile_root.join(profile_id);
-        let directory = fs::symlink_metadata(&profile_dir).map_err(|e| e.to_string())?;
-        if !directory.is_dir() || directory.file_type().is_symlink() {
-            return Err("learner profile must be a real Retivus-managed directory".into());
-        }
-        let catalog_file = profile_dir.join("source-catalog.sqlite3");
+        let catalog_file = self.managed_catalog_path()?;
         let is_mexilex = adapter.format_id() == "mexilex-study-jsonl-v1";
         let mut catalog = match fs::symlink_metadata(&catalog_file) {
             Ok(_) => SourceCatalog::open_existing(&catalog_file)?,
@@ -336,6 +432,7 @@ impl StudyPanel {
                 self.status =
                     format!("Deleted note {note_id}; Undo last Anki edit can restore it.");
                 self.selected_note = None;
+                self.source_report.clear();
                 self.front.clear();
                 self.back.clear();
                 self.refresh();
@@ -375,6 +472,7 @@ impl StudyPanel {
         self.stats = CollectionStats::default();
         self.deck_id = None;
         self.selected_note = None;
+        self.source_report.clear();
         self.confirm_delete = false;
         // Never display editor contents, search terms, or file paths from
         // a previous profile after the learner switches collections.
@@ -486,6 +584,7 @@ impl StudyPanel {
                         let label = format!("{} · {}", note.id, summary);
                         if ui.selectable_label(self.selected_note == Some(note.id), label).clicked() {
                             self.selected_note = Some(note.id);
+                            self.source_report.clear();
                             self.confirm_delete = false;
                             self.front = note.fields.first().cloned().unwrap_or_default();
                             self.back = note.fields.get(1).cloned().unwrap_or_default();
@@ -495,6 +594,7 @@ impl StudyPanel {
                 ui.horizontal_wrapped(|ui| {
                     if ui.button("New basic note").clicked() {
                         self.selected_note = None;
+                        self.source_report.clear();
                         self.confirm_delete = false;
                         self.front.clear();
                         self.back.clear();
@@ -536,6 +636,17 @@ impl StudyPanel {
                     }
                 }
                 if self.selected_note.is_some() {
+                    if ui.button("Verify note against source catalog").clicked() {
+                        self.inspect_selected_source();
+                    }
+                    if !self.source_report.is_empty() {
+                        if self.source_report.starts_with("Conflict:") {
+                            let color = ui.visuals().error_fg_color;
+                            ui.colored_label(color, &self.source_report);
+                        } else {
+                            ui.label(&self.source_report);
+                        }
+                    }
                     ui.horizontal_wrapped(|ui| {
                         ui.checkbox(&mut self.confirm_delete, "Confirm removal of selected note");
                         if ui
@@ -1049,6 +1160,16 @@ mod tests {
         assert!(app.import_status.contains("Valid records: 2"));
         assert_eq!(app.preview.len(), 2);
         assert_eq!(app.preview[0].word, app.preview[1].word);
+        app.stage_validated_source_to_study();
+        assert!(
+            app.import_status.contains("Staged 2 source entries"),
+            "{}",
+            app.import_status
+        );
+        assert_eq!(app.study.stats.notes, 0);
+        app.stage_validated_source_to_study();
+        assert!(app.import_status.contains("Source staging refused"));
+        assert_eq!(app.study.stats.notes, 0);
         app.selected_sense = crate::SelectedSense::from_record(&app.preview[1], "s1");
         app.add_selected_sense_to_study();
         assert!(
@@ -1113,6 +1234,86 @@ mod tests {
         assert!(app.preview.is_empty());
         assert!(app.selected_sense.is_none());
         app.study.close();
+    }
+
+    #[test]
+    fn source_inspection_detects_manual_changes_and_explicit_version_mapping() {
+        use retivus::source_adapter::{SourceInfo, StudyTsvV1};
+        use std::io::Cursor;
+
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("source.tsv");
+        let original = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ta\tsea\n";
+        fs::write(&path, original).unwrap();
+        let v1 = StudyTsvV1::new(SourceInfo {
+            provider_id: "version-fixture".into(),
+            edition: "v1".into(),
+            lexical_language: "es".into(),
+            definition_language: "en".into(),
+            license_notice: "Synthetic fixture".into(),
+        })
+        .unwrap();
+        let mut rows = Vec::new();
+        v1.visit(&mut BufReader::new(Cursor::new(original)), &mut |row| rows.push(row))
+            .unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "versioned".into();
+        panel.connect(true);
+        let deck = panel.backend.as_mut().unwrap().create_deck("Spanish").unwrap();
+        panel.deck_id = Some(deck);
+        let id = panel
+            .add_validated_source_choice(&v1, &path, &rows[0], "a")
+            .unwrap();
+        panel.selected_note = Some(id);
+        panel.inspect_selected_source();
+        assert!(panel.source_report.starts_with("Source verified:"));
+        panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .edit_note_fields(id, &["mar", "ocean"])
+            .unwrap();
+        panel.inspect_selected_source();
+        assert!(panel.source_report.contains("edited independently"));
+        panel.backend.as_mut().unwrap().undo_last().unwrap();
+        panel.inspect_selected_source();
+        assert!(panel.source_report.starts_with("Source verified:"));
+
+        let v2 = StudyTsvV1::new(SourceInfo {
+            provider_id: "version-fixture".into(),
+            edition: "v2".into(),
+            lexical_language: "es".into(),
+            definition_language: "en".into(),
+            license_notice: "Synthetic fixture".into(),
+        })
+        .unwrap();
+        let catalog_file = panel.managed_catalog_path().unwrap();
+        let mut catalog = SourceCatalog::open_existing(&catalog_file).unwrap();
+        catalog
+            .import_snapshot(
+                "v2",
+                &v2,
+                &mut BufReader::new(Cursor::new(
+                    "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ta\tocean\n",
+                )),
+            )
+            .unwrap();
+        let source = catalog
+            .select_sense("version-fixture", "v1", "1", "a")
+            .unwrap();
+        let target = catalog
+            .select_sense("version-fixture", "v2", "1", "a")
+            .unwrap();
+        catalog.record_reconciliation(&source, &target).unwrap();
+        drop(catalog);
+        panel.inspect_selected_source();
+        assert!(panel.source_report.contains("Update available"));
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(id).unwrap(),
+            ["mar", "sea"]
+        );
+        panel.close();
     }
 
     #[test]
