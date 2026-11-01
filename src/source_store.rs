@@ -488,8 +488,13 @@ impl SourceCatalog {
                   to_snapshot, to_entry, to_sense)
                  VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
                 params![
-                    provider, from_snapshot, from_entry, from_sense,
-                    to_snapshot, to_entry, to_sense
+                    provider,
+                    from_snapshot,
+                    from_entry,
+                    from_sense,
+                    to_snapshot,
+                    to_entry,
+                    to_sense
                 ],
             )
             .map_err(|e| format!("ambiguous, duplicate, or invalid reconciliation: {e}"))?;
@@ -504,7 +509,8 @@ impl SourceCatalog {
         entry_id: &str,
         sense_id: &str,
     ) -> Result<(), String> {
-        let deleted = self.connection
+        let deleted = self
+            .connection
             .execute(
                 "DELETE FROM reconciliations
                  WHERE provider=?1 AND from_snapshot=?2 AND from_entry=?3 AND from_sense=?4",
@@ -526,7 +532,8 @@ impl SourceCatalog {
         entry_id: &str,
         sense_id: &str,
     ) -> Result<SourceCardCandidate, String> {
-        let target: Option<(String, String, String)> = self.connection
+        let target: Option<(String, String, String)> = self
+            .connection
             .query_row(
                 "SELECT to_snapshot, to_entry, to_sense FROM reconciliations
                  WHERE provider=?1 AND from_snapshot=?2 AND from_entry=?3 AND from_sense=?4",
@@ -727,32 +734,55 @@ mod tests {
             "{HEADER}a\t橋\tnoun\ts1\tbridge\nb\t橋\tverb\ts1\tlink\nx\t猫\tnoun\ts1\tcat\ny\t水\tnoun\ts1\twater\n"
         );
         let mut catalog = SourceCatalog::in_memory().unwrap();
-        catalog.import_snapshot("old", &tsv(), &mut Cursor::new(old)).unwrap();
-        catalog.import_snapshot("new", &tsv(), &mut Cursor::new(updated)).unwrap();
+        catalog
+            .import_snapshot("old", &tsv(), &mut Cursor::new(old))
+            .unwrap();
+        catalog
+            .import_snapshot("new", &tsv(), &mut Cursor::new(updated))
+            .unwrap();
         let changes = catalog
             .diff_snapshots("other-dictionary", "old", "new", 100, 0)
             .unwrap();
         assert_eq!(changes.len(), 5);
         assert!(changes.iter().any(|c| {
-            c.entry_id == "b" && c.before.as_ref().unwrap().definition == "connect"
+            c.entry_id == "b"
+                && c.before.as_ref().unwrap().definition == "connect"
                 && c.after.as_ref().unwrap().definition == "link"
         }));
-        assert!(changes.iter().any(|c| c.entry_id == "c" && c.after.is_none()));
-        assert!(changes.iter().any(|c| c.entry_id == "d" && c.after.is_none()));
-        assert!(changes.iter().any(|c| c.entry_id == "x" && c.before.is_none()));
-        assert!(changes.iter().any(|c| c.entry_id == "y" && c.before.is_none()));
+        assert!(changes
+            .iter()
+            .any(|c| c.entry_id == "c" && c.after.is_none()));
+        assert!(changes
+            .iter()
+            .any(|c| c.entry_id == "d" && c.after.is_none()));
+        assert!(changes
+            .iter()
+            .any(|c| c.entry_id == "x" && c.before.is_none()));
+        assert!(changes
+            .iter()
+            .any(|c| c.entry_id == "y" && c.before.is_none()));
         assert!(!changes.iter().any(|c| c.entry_id == "a"));
         assert_eq!(
-            catalog.diff_snapshots("other-dictionary", "old", "new", 2, 0).unwrap(),
+            catalog
+                .diff_snapshots("other-dictionary", "old", "new", 2, 0)
+                .unwrap(),
             changes[..2]
         );
         assert_eq!(
-            catalog.diff_snapshots("other-dictionary", "old", "new", 2, 2).unwrap(),
+            catalog
+                .diff_snapshots("other-dictionary", "old", "new", 2, 2)
+                .unwrap(),
             changes[2..4]
         );
-        assert!(catalog.diff_snapshots("other-dictionary", "old", "unknown", 2, 0).is_err());
-        assert!(catalog.diff_snapshots("other-dictionary", "old", "old", 2, 0).is_err());
-        assert!(catalog.diff_snapshots("other-dictionary", "old", "new", 0, 0).is_err());
+        assert!(catalog
+            .diff_snapshots("other-dictionary", "old", "unknown", 2, 0)
+            .is_err());
+        assert!(catalog
+            .diff_snapshots("other-dictionary", "old", "old", 2, 0)
+            .is_err());
+        assert!(catalog
+            .diff_snapshots("other-dictionary", "old", "new", 0, 0)
+            .is_err());
 
         let old_cat = catalog
             .select_sense("other-dictionary", "old", "c", "s1")
