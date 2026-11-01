@@ -33,6 +33,10 @@ jobs:
           grep -q 'publish = false' rslib/Cargo.toml
           grep -q 'pub struct CollectionBuilder' rslib/src/collection/mod.rs
           cargo --version
+      - name: Install upstream native codegen requirements
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq protobuf-compiler
       - name: Compile Anki Rust library from pinned workspace
         working-directory: upstream-anki
         env:
