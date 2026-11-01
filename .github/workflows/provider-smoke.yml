@@ -5,7 +5,13 @@ on:
     paths:
       - ".github/workflows/provider-smoke.yml"
       - "src/provider.rs"
+      - "src/source_adapter.rs"
+      - "src/source_store.rs"
+      - "src/preview.rs"
       - "src/bin/check-source.rs"
+      - "src/bin/import-source.rs"
+      - "src/bin/benchmark-source.rs"
+      - "src/bin/benchmark-catalog.rs"
   workflow_dispatch:
 permissions:
   contents: read
