@@ -18,6 +18,14 @@ use tempfile::{Builder, NamedTempFile};
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;
 
+/// Bounded, read-only note listing for the native learner browser.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NoteRow {
+    pub id: i64,
+    pub fields: Vec<String>,
+    pub tags: Vec<String>,
+}
+
 pub struct AnkiBackend {
     collection: anki::collection::Collection,
     managed_dir: Option<PathBuf>,
@@ -547,6 +555,28 @@ impl AnkiBackend {
         note.tags.push(new_tag);
         self.collection.update_note(&mut note)?;
         Ok(())
+    }
+
+    /// Return up to 100 Anki-search-matched notes without loading an unbounded
+    /// collection into UI memory. Errors from Anki's query parser are visible.
+    pub fn browse_notes(&mut self, query: &str, limit: usize) -> BackendResult<Vec<NoteRow>> {
+        if !(1..=100).contains(&limit) {
+            return Err("browse limit must be between 1 and 100".into());
+        }
+        let ids = self
+            .collection
+            .search_notes(query, anki::search::SortMode::NoOrder)?;
+        let mut rows = Vec::new();
+        for id in ids.into_iter().take(limit) {
+            if let Some(note) = self.collection.storage.get_note(id)? {
+                rows.push(NoteRow {
+                    id: id.0,
+                    fields: note.fields().clone(),
+                    tags: note.tags,
+                });
+            }
+        }
+        Ok(rows)
     }
 
     pub fn note_tags(&self, note_id: i64) -> BackendResult<Vec<String>> {
@@ -1245,6 +1275,24 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         );
         reopened.close().unwrap();
         assert_eq!(fs::read(&source).unwrap(), original);
+    }
+
+    #[test]
+    fn native_note_browser_paginates_and_uses_anki_search_rules() {
+        let mut backend = AnkiBackend::in_memory().unwrap();
+        let needle = backend.add_basic_note(1, "banco", "bank").unwrap();
+        backend.add_basic_note(1, "calle", "street").unwrap();
+        assert_eq!(backend.browse_notes("", 1).unwrap().len(), 1);
+        let matched = backend.browse_notes("front:banco", 10).unwrap();
+        assert_eq!(matched.len(), 1);
+        assert_eq!(matched[0].id, needle);
+        assert_eq!(matched[0].fields, ["banco", "bank"]);
+        assert!(backend.browse_notes("front:banco", 0).is_err());
+        assert!(backend.browse_notes("", 101).is_err());
+        backend.edit_note_fields(needle, &["banca", "bench"]).unwrap();
+        assert_eq!(backend.browse_notes("front:banca", 10).unwrap().len(), 1);
+        backend.undo_last().unwrap();
+        assert_eq!(backend.browse_notes("front:banco", 10).unwrap().len(), 1);
     }
 
     #[test]
