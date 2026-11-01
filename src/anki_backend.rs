@@ -862,7 +862,9 @@ fn reject_unsafe_package_members(path: &Path) -> BackendResult<()> {
             || raw.contains('\\')
             || raw.contains(':')
             || raw.chars().any(char::is_control)
-            || enclosed.components().any(|part| !matches!(part, std::path::Component::Normal(_)))
+            || enclosed
+                .components()
+                .any(|part| !matches!(part, std::path::Component::Normal(_)))
         {
             return Err("package contains an unsafe media path".into());
         }
@@ -879,8 +881,7 @@ fn reject_unsafe_package_members(path: &Path) -> BackendResult<()> {
             return Err("package exceeds maximum expanded archive size".into());
         }
         if file.size() > 1024 * 1024
-            && (file.compressed_size() == 0
-                || file.size() / file.compressed_size() > 100)
+            && (file.compressed_size() == 0 || file.size() / file.compressed_size() > 100)
         {
             return Err("package contains suspiciously compressed media".into());
         }
@@ -1278,10 +1279,7 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             );
             assert!(backend.import_apkg(&package).is_err(), "{archive_member}");
             assert!(!root.path().join("outside.txt").exists());
-            assert_eq!(
-                backend.note_fields(intact).unwrap(),
-                ["original", "safe"]
-            );
+            assert_eq!(backend.note_fields(intact).unwrap(), ["original", "safe"]);
         }
 
         let bomb = root.path().join("compressed-bomb.apkg");
@@ -1299,11 +1297,8 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
 
         let valid_unicode = root.path().join("unicode-media.apkg");
         let mut zip = zip::ZipWriter::new(fs::File::create(&valid_unicode).unwrap());
-        zip.start_file(
-            "écriture/日本語.txt",
-            SimpleFileOptions::default(),
-        )
-        .unwrap();
+        zip.start_file("écriture/日本語.txt", SimpleFileOptions::default())
+            .unwrap();
         zip.write_all(b"safe unicode path").unwrap();
         zip.finish().unwrap();
         assert!(reject_unsafe_package_members(&valid_unicode).is_ok());
