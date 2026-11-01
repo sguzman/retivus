@@ -150,7 +150,6 @@ mod tests {
             self.0.insert(key.into(), value);
         }
 
-
         fn flush(&mut self) {}
     }
 
