@@ -3,7 +3,7 @@
 use eframe::egui;
 use retivus::anki_backend::{AnkiBackend, CollectionStats, NoteRow, ReviewPreview};
 use retivus::source_adapter::{SourceAdapter, SourceRecord};
-use retivus::source_store::{SourceCardCandidate, SourceCatalog};
+use retivus::source_store::{SnapshotSenseChange, SourceCardCandidate, SourceCatalog};
 use std::fs;
 use std::io::BufReader;
 use std::path::{Path, PathBuf};
@@ -64,6 +64,12 @@ pub struct StudyPanel {
     mapping_to_sense: String,
     mapping_preview: Option<SourceCardCandidate>,
     mapping_approved: bool,
+    diff_provider: String,
+    diff_before: String,
+    diff_after: String,
+    diff_offset: usize,
+    diff_rows: Vec<SnapshotSenseChange>,
+    diff_status: String,
     confirm_delete: bool,
     review: Option<ReviewPreview>,
     revealed: bool,
@@ -248,6 +254,35 @@ impl StudyPanel {
         self.status =
             format!("Staged {count} source entries under {snapshot} without creating cards.");
         Ok(count)
+    }
+
+    /// Bounded source-only version diff. No Anki notes, scheduler state or
+    /// learner history are loaded or changed by this comparison.
+    fn load_source_differences(&mut self) {
+        let result = (|| -> Result<Vec<SnapshotSenseChange>, String> {
+            let path = self.managed_catalog_path()?;
+            let catalog = SourceCatalog::open_existing(&path)?;
+            catalog.diff_snapshots(
+                self.diff_provider.trim(),
+                self.diff_before.trim(),
+                self.diff_after.trim(),
+                50,
+                self.diff_offset,
+            )
+        })();
+        match result {
+            Ok(rows) => {
+                self.diff_status = format!(
+                    "Showing {} differences at offset {}. IDs are exact; no automatic merges.",
+                    rows.len(), self.diff_offset
+                );
+                self.diff_rows = rows;
+            }
+            Err(error) => {
+                self.diff_rows.clear();
+                self.diff_status = format!("Source comparison refused: {error}");
+            }
+        }
     }
 
     /// Read exact source identity and immutable record for the selected note.
@@ -618,6 +653,12 @@ impl StudyPanel {
         self.mapping_to_sense.clear();
         self.mapping_preview = None;
         self.mapping_approved = false;
+        self.diff_provider.clear();
+        self.diff_before.clear();
+        self.diff_after.clear();
+        self.diff_rows.clear();
+        self.diff_offset = 0;
+        self.diff_status.clear();
         self.confirm_delete = false;
         // Never display editor contents, search terms, or file paths from
         // a previous profile after the learner switches collections.
@@ -876,6 +917,75 @@ impl StudyPanel {
                     }
                 }
                 ui.separator();
+                ui.collapsing("Compare staged source snapshots", |ui| {
+                    ui.weak("Exact provider and snapshot keys only. Removed/added homographs are never automatically matched.");
+                    let mut changed = false;
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label("Provider");
+                        changed |= ui.text_edit_singleline(&mut self.diff_provider).changed();
+                        ui.label("From");
+                        changed |= ui.text_edit_singleline(&mut self.diff_before).changed();
+                        ui.label("To");
+                        changed |= ui.text_edit_singleline(&mut self.diff_after).changed();
+                    });
+                    if changed {
+                        self.diff_rows.clear();
+                        self.diff_offset = 0;
+                        self.diff_status.clear();
+                    }
+                    ui.horizontal_wrapped(|ui| {
+                        if ui.button("Compare").clicked() {
+                            self.diff_offset = 0;
+                            self.load_source_differences();
+                        }
+                        if ui
+                            .add_enabled(self.diff_offset >= 50, egui::Button::new("Previous 50"))
+                            .clicked()
+                        {
+                            self.diff_offset -= 50;
+                            self.load_source_differences();
+                        }
+                        if ui
+                            .add_enabled(self.diff_rows.len() == 50, egui::Button::new("Next 50"))
+                            .clicked()
+                        {
+                            self.diff_offset = self.diff_offset.saturating_add(50);
+                            self.load_source_differences();
+                        }
+                    });
+                    if !self.diff_status.is_empty() {
+                        ui.label(&self.diff_status);
+                    }
+                    egui::ScrollArea::vertical().max_height(200.0).show(ui, |ui| {
+                        for change in &self.diff_rows {
+                            let kind = match (&change.before, &change.after) {
+                                (None, Some(_)) => "Added",
+                                (Some(_), None) => "Removed",
+                                _ => "Changed",
+                            };
+                            ui.collapsing(
+                                format!(
+                                    "{kind} · entry {} · sense {}",
+                                    change.entry_id, change.sense_id
+                                ),
+                                |ui| {
+                                    if let Some(before) = &change.before {
+                                        ui.label(format!(
+                                            "Before: {} ({}) — {}",
+                                            before.word, before.part_of_speech, before.definition
+                                        ));
+                                    }
+                                    if let Some(after) = &change.after {
+                                        ui.label(format!(
+                                            "After: {} ({}) — {}",
+                                            after.word, after.part_of_speech, after.definition
+                                        ));
+                                    }
+                                },
+                            );
+                        }
+                    });
+                });
                 ui.heading("Profile statistics");
                 ui.label(format!(
                     "{} notes · {} cards · {} recorded reviews (all decks)",
@@ -1504,6 +1614,20 @@ mod tests {
             )
             .unwrap();
         drop(catalog);
+        panel.diff_provider = "version-fixture".into();
+        panel.diff_before = "v1".into();
+        panel.diff_after = "v2".into();
+        panel.load_source_differences();
+        assert_eq!(panel.diff_rows.len(), 1);
+        assert_eq!(panel.diff_rows[0].entry_id, "1");
+        assert_eq!(
+            panel.diff_rows[0].before.as_ref().unwrap().definition,
+            "sea"
+        );
+        assert_eq!(
+            panel.diff_rows[0].after.as_ref().unwrap().definition,
+            "ocean"
+        );
         let review_id = panel.review.as_ref().unwrap().card_id;
         panel.revealed = true;
         panel.grade_revealed(4);
