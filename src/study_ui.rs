@@ -1,7 +1,7 @@
 //! Explicit native learner-workspace operations behind the Anki feature gate.
 //! No profile opens, is created, or is migrated until a user chooses an action.
 use eframe::egui;
-use retivus::anki_backend::{AnkiBackend, NoteRow};
+use retivus::anki_backend::{AnkiBackend, NoteRow, ReviewPreview};
 use std::path::Path;
 
 #[derive(Default)]
@@ -18,6 +18,9 @@ pub struct StudyPanel {
     query: String,
     notes: Vec<NoteRow>,
     selected_note: Option<i64>,
+    review: Option<ReviewPreview>,
+    revealed: bool,
+    due: (usize, usize, usize),
     status: String,
 }
 
@@ -38,6 +41,7 @@ impl StudyPanel {
                 self.backend = Some(backend);
                 self.status = format!("Opened Retivus-managed profile {}.", self.profile_id);
                 self.refresh();
+                self.refresh_review();
             }
             Err(error) => self.status = format!("Profile was not opened: {error}"),
         }
@@ -61,6 +65,25 @@ impl StudyPanel {
         }
     }
 
+    fn refresh_review(&mut self) {
+        let Some(backend) = self.backend.as_mut() else {
+            self.review = None;
+            self.due = (0, 0, 0);
+            return;
+        };
+        self.revealed = false;
+        match (backend.due_counts(), backend.next_review_preview()) {
+            (Ok(due), Ok(review)) => {
+                self.due = due;
+                self.review = review;
+            }
+            (Err(error), _) | (_, Err(error)) => {
+                self.review = None;
+                self.status = format!("Could not read Anki queue: {error}");
+            }
+        }
+    }
+
     fn close(&mut self) {
         if let Some(backend) = self.backend.take() {
             self.status = match backend.close() {
@@ -72,6 +95,9 @@ impl StudyPanel {
         self.notes.clear();
         self.deck_id = None;
         self.selected_note = None;
+        self.review = None;
+        self.revealed = false;
+        self.due = (0, 0, 0);
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
@@ -113,6 +139,7 @@ impl StudyPanel {
                                     self.new_deck.clear();
                                     self.status = "New deck created.".into();
                                     self.refresh();
+                                    self.refresh_review();
                                 }
                                 Err(error) => self.status = format!("Deck not created: {error}"),
                             }
@@ -145,7 +172,7 @@ impl StudyPanel {
                     if ui.button("Undo last Anki edit").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
                             match backend.undo_last() {
-                                Ok(()) => { self.status = "Last edit undone.".into(); self.refresh(); }
+                                Ok(()) => { self.status = "Last edit undone.".into(); self.refresh(); self.refresh_review(); }
                                 Err(error) => self.status = format!("Cannot undo: {error}"),
                             }
                         }
@@ -161,7 +188,7 @@ impl StudyPanel {
                     if ui.button("Save edited note").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
                             match backend.edit_note_fields(id, &[&self.front, &self.back]) {
-                                Ok(()) => { self.status = "Note updated; undo is available.".into(); self.refresh(); }
+                                Ok(()) => { self.status = "Note updated; undo is available.".into(); self.refresh(); self.refresh_review(); }
                                 Err(error) => self.status = format!("Note not edited: {error}"),
                             }
                         }
@@ -169,11 +196,54 @@ impl StudyPanel {
                 } else if ui.button("Add basic note to selected deck").clicked() {
                     match (self.backend.as_mut(), self.deck_id) {
                         (Some(backend), Some(deck_id)) => match backend.add_basic_note(deck_id, &self.front, &self.back) {
-                            Ok(_) => { self.status = "Note added to selected deck.".into(); self.refresh(); }
+                            Ok(_) => { self.status = "Note added to selected deck.".into(); self.refresh(); self.refresh_review(); }
                             Err(error) => self.status = format!("Note not added: {error}"),
                         },
                         _ => self.status = "Select a deck first.".into(),
                     }
+                }
+                ui.separator();
+                ui.heading("Study · Anki scheduler");
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(format!(
+                        "Due: {} new · {} learning · {} review",
+                        self.due.0, self.due.1, self.due.2
+                    ));
+                    if ui.button("Refresh due queue").clicked() { self.refresh_review(); }
+                    if ui.button("Enable FSRS").clicked() {
+                        if let Some(backend) = self.backend.as_mut() {
+                            match backend.enable_fsrs() {
+                                Ok(()) => { self.status = "FSRS scheduling enabled.".into(); self.refresh_review(); }
+                                Err(error) => self.status = format!("Could not enable FSRS: {error}"),
+                            }
+                        }
+                    }
+                });
+                if let Some(card) = self.review.clone() {
+                    ui.label(format!("Card {} · question", card.card_id));
+                    ui.label(egui::RichText::new(&card.question_html).monospace());
+                    if self.revealed {
+                        ui.separator();
+                        ui.label("Answer");
+                        ui.label(egui::RichText::new(&card.answer_html).monospace());
+                        ui.horizontal_wrapped(|ui| {
+                            for (rating, name) in [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")] {
+                                if ui.button(name).clicked() {
+                                    if let Some(backend) = self.backend.as_mut() {
+                                        match backend.grade_previewed_card(card.card_id, rating) {
+                                            Ok(()) => { self.status = format!("Recorded {name} using Anki's scheduler."); self.refresh_review(); }
+                                            Err(error) => { self.status = format!("Review not recorded: {error}"); self.refresh_review(); }
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    } else if ui.button("Show answer").clicked() {
+                        self.revealed = true;
+                    }
+                    ui.weak("Card HTML is shown as inert source text; embedded HTML/scripts are not executed. Full rich-card rendering remains a separate UX requirement.");
+                } else {
+                    ui.weak("No queued cards. Refresh after importing or adding study notes.");
                 }
                 ui.separator();
                 ui.heading("Anki package");
@@ -183,7 +253,7 @@ impl StudyPanel {
                     if ui.button("Import package").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
                             match backend.import_apkg(Path::new(&self.package)) {
-                                Ok(()) => { self.status = "Package imported into this profile.".into(); self.refresh(); }
+                                Ok(()) => { self.status = "Package imported into this profile.".into(); self.refresh(); self.refresh_review(); }
                                 Err(error) => self.status = format!("Import refused: {error}"),
                             }
                         }
@@ -214,5 +284,7 @@ mod tests {
         assert!(state.backend.is_none());
         assert!(state.root.is_empty());
         assert!(state.profile_id.is_empty());
+        assert!(state.review.is_none());
+        assert!(!state.revealed);
     }
 }
