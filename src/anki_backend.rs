@@ -706,6 +706,12 @@ mod tests {
         backend.enable_fsrs().unwrap();
         assert!(backend.fsrs_enabled());
         let note_id = backend.add_basic_note(1, "cielo", "sky").unwrap();
+        assert!(backend.due_counts().unwrap().0 >= 1);
+        // Interrupt before answering: reopening must preserve the due card.
+        backend.close().unwrap();
+        let mut backend = AnkiBackend::open_managed_profile(tmp.path(), "fsrs").unwrap();
+        assert!(backend.fsrs_enabled());
+        assert!(backend.due_counts().unwrap().0 >= 1);
         assert!(backend.grade_next_card(0).is_err());
         let card_id = backend.grade_next_card(3).unwrap().unwrap();
         assert!(card_id > 0);
