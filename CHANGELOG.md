@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Verified independent AnkiDroid/third-party `.apkg` source SQLite note/card counts, rich cloze/HTML/CSS/media package parity, and copy-only offline Anki collection migration. Actual Anki Desktop GUI reexport and AnkiWeb sync are still pending.
 - Added independently measured full Mexilex preview, catalog import and 1,000 indexed lookup benchmarks on the pinned 124,444-entry release; memory bounds passed [provider CI 41342157443](https://github.com/sguzman/retivus/actions/runs/41342157443).
 - Added `.apkg` preflight guards for traversal paths, unsafe filenames, archive symlinks and suspicious compression; malicious-path/compression and public-package regressions passed [Anki CI 41344339776](https://github.com/sguzman/retivus/actions/runs/41344339776).
 - Added explicit scheduling-history import and export toggles, both off by default; opt-in round-trip passed [Anki CI 41347374839](https://github.com/sguzman/retivus/actions/runs/41347374839). Four-way isolation and independent source-SQLite package baselines are pending.

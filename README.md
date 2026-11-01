@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Active development; **66% of the weighted acceptance roadmap is verified** at the latest published checkpoint. M0–M3 and all of M5 are complete, including actual keyboard/pointer source-to-review workflows, guarded source conflicts, persistent Anki FSRS grading, managed profiles, and native X11/Wayland wide/narrow screenshots. The real 124,444-entry Mexilex source passed bounded memory and indexed-search benchmarks (M6.2). Independently validated Anki Desktop round-trip, AnkiWeb sync, remaining security/integration hardening and release acceptance are unfinished. The [weighted implementation roadmap](ROADMAP.md) is authoritative for current completion.
+Active development; **77% of the weighted acceptance roadmap is verified**. M0–M3 and M5 are complete. M4 has verified real third-party/AnkiDroid package counts, cloze/media/CSS round-trips, and safe offline collection-copy migration, but **not** a full Anki Desktop GUI import/reexport or AnkiWeb sync. The native learner has verified keyboard/pointer workflows, FSRS reviews, source-conflict guards and X11/Wayland rendering. The 124,444-entry Mexilex release passed bounded-memory and indexed-search benchmarks. Security hardening, accessibility and release acceptance remain in progress. [ROADMAP.md](ROADMAP.md) is authoritative for verified completion.
 
 ## Architecture
 
