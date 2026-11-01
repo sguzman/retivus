@@ -36,6 +36,41 @@ impl SourceCardCandidate {
         }
         tag
     }
+
+    /// Reverse a Retivus provenance tag without guessing at word spellings.
+    /// Reject malformed, truncated, non-UTF-8 and foreign tag namespaces.
+    pub fn parse_source_tag(tag: &str) -> Result<[String; 4], String> {
+        let payload = tag
+            .strip_prefix("retivus::source::")
+            .ok_or("not a Retivus source-identity tag")?;
+        let mut parts = payload.split("::");
+        fn decode(part: &str) -> Result<String, String> {
+            if part.is_empty()
+                || part.len() % 2 != 0
+                || !part.bytes().all(|b| b.is_ascii_hexdigit())
+            {
+                return Err("invalid source-identity hex component".into());
+            }
+            let mut bytes = Vec::with_capacity(part.len() / 2);
+            for pair in part.as_bytes().chunks_exact(2) {
+                let hex = std::str::from_utf8(pair).map_err(|e| e.to_string())?;
+                bytes.push(u8::from_str_radix(hex, 16).map_err(|e| e.to_string())?);
+            }
+            String::from_utf8(bytes).map_err(|e| e.to_string())
+        }
+        let mut next = || {
+            let part = parts.next().ok_or("truncated source-identity tag")?;
+            decode(part)
+        };
+        let provider = next()?;
+        let snapshot = next()?;
+        let entry = next()?;
+        let sense = next()?;
+        if parts.next().is_some() {
+            return Err("source-identity tag has extra components".into());
+        }
+        Ok([provider, snapshot, entry, sense])
+    }
 }
 
 pub struct SourceCatalog {
@@ -435,6 +470,41 @@ mod tests {
             .select_sense("other-dictionary", "v1", "ja1", "other")
             .is_err());
         assert!(catalog.select_sense("mexilex", "v1", "ja1", "s1").is_err());
+    }
+
+    #[test]
+    fn provenance_tag_round_trips_unicode_and_rejects_ambiguity() {
+        let identity = [
+            "source::日本語".to_owned(),
+            "2026-秋".to_owned(),
+            "niño/猫".to_owned(),
+            "meaning::1".to_owned(),
+        ];
+        let candidate = SourceCardCandidate {
+            provenance: SourceInfo {
+                provider_id: identity[0].clone(),
+                edition: "test".into(),
+                lexical_language: "ja".into(),
+                definition_language: "es".into(),
+                license_notice: "Synthetic fixture".into(),
+            },
+            snapshot: identity[1].clone(),
+            entry_id: identity[2].clone(),
+            sense_id: identity[3].clone(),
+            word: "猫".into(),
+            part_of_speech: "noun".into(),
+            definition: "gato".into(),
+        };
+        let tag = candidate.source_tag();
+        assert_eq!(SourceCardCandidate::parse_source_tag(&tag).unwrap(), identity);
+        assert!(SourceCardCandidate::parse_source_tag("foreign::source::aaaa").is_err());
+        assert!(SourceCardCandidate::parse_source_tag("retivus::source::61").is_err());
+        assert!(SourceCardCandidate::parse_source_tag("retivus::source::6g::61::61::61").is_err());
+        assert!(SourceCardCandidate::parse_source_tag("retivus::source::ff::61::61::61").is_err());
+        assert!(SourceCardCandidate::parse_source_tag(
+            "retivus::source::61::61::61::61::61"
+        )
+        .is_err());
     }
 
     #[test]
