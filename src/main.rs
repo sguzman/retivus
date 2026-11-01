@@ -670,9 +670,19 @@ mod tests {
 
         let mut harness = Harness::new_eframe(|_| Retivus::default());
         for (window, pixels_per_point, theme, density) in [
-            (egui::vec2(680.0, 560.0), 1.0, Theme::Light, Density::Comfortable),
+            (
+                egui::vec2(680.0, 560.0),
+                1.0,
+                Theme::Light,
+                Density::Comfortable,
+            ),
             (egui::vec2(720.0, 650.0), 1.5, Theme::Dark, Density::Compact),
-            (egui::vec2(1100.0, 760.0), 0.8, Theme::System, Density::Comfortable),
+            (
+                egui::vec2(1100.0, 760.0),
+                0.8,
+                Theme::System,
+                Density::Comfortable,
+            ),
         ] {
             harness.set_size(window);
             harness.set_pixels_per_point(pixels_per_point);

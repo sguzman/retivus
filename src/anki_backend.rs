@@ -1011,9 +1011,7 @@ mod tests {
                 })
                 .unwrap()
             };
-            let mut statement = db
-                .prepare("SELECT flds FROM notes ORDER BY id")
-                .unwrap();
+            let mut statement = db.prepare("SELECT flds FROM notes ORDER BY id").unwrap();
             let mut fields = statement
                 .query_map([], |row| row.get::<_, String>(0))
                 .unwrap()
@@ -1035,8 +1033,7 @@ mod tests {
             let path = std::path::PathBuf::from(
                 std::env::var_os(env_key).expect("CI must provide the pinned public package"),
             );
-            let (source_note_count, source_card_count, source_fields) =
-                original_sqlite_data(&path);
+            let (source_note_count, source_card_count, source_fields) = original_sqlite_data(&path);
             let root = tempdir().unwrap();
             let mut original =
                 AnkiBackend::create_managed_profile(root.path(), "independent").unwrap();
@@ -1120,11 +1117,17 @@ mod tests {
 
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "private").unwrap();
-        backend.add_basic_note(1, "public front", "public back").unwrap();
+        backend
+            .add_basic_note(1, "public front", "public back")
+            .unwrap();
         // Simulates a future profile-local authorization token: exporting
         // cards must never bundle unrelated files from the private root.
         let secret = b"retivus-sensitive-credential-canary-7db29eb";
-        fs::write(root.path().join("private").join("auth-private.json"), secret).unwrap();
+        fs::write(
+            root.path().join("private").join("auth-private.json"),
+            secret,
+        )
+        .unwrap();
 
         let package = root.path().join("cards-only.apkg");
         assert_eq!(backend.export_apkg_to(&package).unwrap(), 1);
