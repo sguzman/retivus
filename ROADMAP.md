@@ -80,6 +80,10 @@
 - ⏳ **M7.3 🧯 Upgrade/recovery test matrix and no known critical defects** — **2%**. Acceptance: Backups/migration/release gate CI pass. Depends on: M7.2. **pending.**
 - ⏳ **M7.4 🏁 Publish release, tag and final acceptance ledger** — **1%**. Acceptance: Release assets independently downloaded and verified. Depends on: M7.1,M7.2,M7.3. **pending.**
 
+## 🎨 Brand identity amendment (unweighted)
+
+Retivus now owns a distinct OKLCH project color and shared theme tokens, documented in [docs/branding.md](docs/branding.md) and applied in the native egui shell. This is part of the existing M5.1 theme task, **not** a new scope item or extra points: M5.1 requires preference persistence and system-theme verification before it earns its full 2%.
+
 ## Verified evidence and next gate (2026-11-01)
 
 - ✅ M0.1, M0.2, M0.4: fixed product scope, weighted roadmap, README/docs/changelog/agent separation.

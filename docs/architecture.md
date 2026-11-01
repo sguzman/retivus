@@ -28,6 +28,8 @@ A provider supplies source edition, snapshot identity, language pair, stable ent
 
 Rust with eframe/egui, keyboard-first, System/Light/Dark theme, persistent preferences. Respect font licenses; prefer user-installed Krypton Nerd Font if discovered in a safe platform-specific lookup, otherwise native defaults. Avoid a handcrafted rendering engine before baseline egui works.
 
+The [brand system](branding.md) supplies a single OKLCH hue with contrast-adjusted light and dark accents, applied via egui's separate theme styles without defeating System mode. Color tokens are code-owned, not hardcoded per screen.
+
 ## ADR-004: Storage ownership
 
 A Retivus profile is the boundary for its own cards, note/deck metadata, preferences, source snapshots, credentials and event log. The adapter must avoid mixing provider-owned metadata with private review state. Use upstream collection storage if the backend spike succeeds; do not create a competing overlapping SRS database without reason.

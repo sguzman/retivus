@@ -12,7 +12,7 @@ Authoritative scope: [docs/product.md](docs/product.md). Progress source: [ROADM
 
 ## Boundaries
 - 🦀 Rust + egui; no Python/Qt/npm runtime dependency for Retivus.
-- 🌗 System (default), Light, Dark GUI appearance, keyboard UX, compact typography and Krypton Nerd Font where locally available with safe fallback.
+- 🌗 System (default), Light, Dark GUI appearance, keyboard UX, compact typography and Krypton Nerd Font where locally available with safe fallback. Use the canonical [OKLCH brand palette](docs/branding.md) via `src/brand.rs`, not invented ad hoc accent hues.
 - 🔌 Dual purpose: Anki ecosystem and multiple external data providers; Mexilex is first, not hardwired.
 - 🔒 Separate external source records from private cards/history; never upload histories or silently auto-migrate ambiguities.
 - ⚖️ Anki upstream `rslib` is AGPL; review licensing before linking or distributing; original project license remains as initialized until a documented decision.

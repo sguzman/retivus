@@ -1,5 +1,5 @@
 use eframe::egui;
-use retivus::provider;
+use retivus::{brand, provider};
 use std::fs::File;
 use std::io::BufReader;
 
@@ -42,7 +42,7 @@ impl eframe::App for Retivus {
         });
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
-                ui.heading("Retivus");
+                ui.label(egui::RichText::new("Retivus").heading().color(brand::accent(ctx.theme())));
                 ui.separator();
                 ui.label("Appearance");
                 egui::ComboBox::from_id_salt("appearance")
@@ -87,6 +87,9 @@ fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Retivus",
         eframe::NativeOptions::default(),
-        Box::new(|_cc| Ok(Box::new(Retivus::default()))),
+        Box::new(|cc| {
+            brand::apply_to_context(&cc.egui_ctx);
+            Ok(Box::new(Retivus::default()))
+        }),
     )
 }

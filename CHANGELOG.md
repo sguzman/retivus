@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Retivus OKLCH berry-rose identity, verified light/dark accent tokens and a shared egui color module.
 - Initial Rust/egui desktop shell with explicit System, Light and Dark appearance.
 - First strict, streaming Mexilex JSONL contract validator and regression tests.
 - Product scope, weighted milestone roadmap, Anki Rust backend feasibility gate, generic-provider architecture and contributor protocol.
