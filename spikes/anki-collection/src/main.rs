@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let due = collection.get_queued_cards(10, false)?;
     assert!(due.new_count > 0, "Created card should be due as new");
     assert!(
-        due.cards.iter().any(|card| card.card.id == matches[0]),
+        due.cards.iter().any(|card| card.card.id() == matches[0]),
         "Created card must be reachable in the review queue"
     );
     println!("Verified disposable Anki deck, note, card, and review queue");
