@@ -25,7 +25,8 @@ pub fn read_mexilex<R: BufRead>(reader: R) -> Result<Vec<Record>, String> {
         let row: Value = serde_json::from_str(&line)
             .map_err(|e| format!("line {}: invalid JSON: {e}", number + 1))?;
         let str_field = |name: &str| {
-            row.get(name).and_then(Value::as_str)
+            row.get(name)
+                .and_then(Value::as_str)
                 .filter(|s| !s.trim().is_empty())
                 .ok_or_else(|| format!("line {}: missing {name}", number + 1))
         };
@@ -34,23 +35,32 @@ pub fn read_mexilex<R: BufRead>(reader: R) -> Result<Vec<Record>, String> {
             || str_field("lexical_language")? != "es-MX"
             || str_field("definition_language")? != "en"
         {
-            return Err(format!("line {}: unsupported provider contract", number + 1));
+            return Err(format!(
+                "line {}: unsupported provider contract",
+                number + 1
+            ));
         }
         let entry_id = str_field("entry_id")?.to_owned();
         if !ids.insert(entry_id.clone()) {
             return Err(format!("line {}: duplicate lexical entry ID", number + 1));
         }
-        let senses = row.get("senses").and_then(Value::as_array)
+        let senses = row
+            .get("senses")
+            .and_then(Value::as_array)
             .filter(|a| !a.is_empty())
             .ok_or_else(|| format!("line {}: missing senses", number + 1))?;
         let mut sense_ids = Vec::new();
         let mut definitions_en = Vec::new();
         let mut seen_senses = HashSet::new();
         for sense in senses {
-            let id = sense.get("id").and_then(Value::as_str)
+            let id = sense
+                .get("id")
+                .and_then(Value::as_str)
                 .filter(|s| !s.is_empty())
                 .ok_or_else(|| format!("line {}: missing sense ID", number + 1))?;
-            let definition = sense.get("definition_en").and_then(Value::as_str)
+            let definition = sense
+                .get("definition_en")
+                .and_then(Value::as_str)
                 .filter(|s| !s.trim().is_empty())
                 .ok_or_else(|| format!("line {}: missing English meaning", number + 1))?;
             if !seen_senses.insert(id.to_owned()) {
@@ -87,16 +97,20 @@ mod tests {
     #[test]
     fn keeps_multiple_meanings_without_creating_cards() {
         let result = read_mexilex(Cursor::new(row("a"))).unwrap();
-        assert_eq!(result.len(),1);
+        assert_eq!(result.len(), 1);
         assert_eq!(result[0].definitions_en, ["sidewalk", "footstool"]);
     }
     #[test]
     fn refuses_duplicate_entries_and_duplicate_senses() {
-        let duplicate = format!("{}\n{}\n",row("a"),row("a"));
-        assert!(read_mexilex(Cursor::new(duplicate)).unwrap_err().contains("duplicate lexical"));
+        let duplicate = format!("{}\n{}\n", row("a"), row("a"));
+        assert!(read_mexilex(Cursor::new(duplicate))
+            .unwrap_err()
+            .contains("duplicate lexical"));
         let mut bad: Value = serde_json::from_str(&row("a")).unwrap();
         bad["senses"][1]["id"] = serde_json::json!("s1");
-        assert!(read_mexilex(Cursor::new(bad.to_string())).unwrap_err().contains("duplicate sense"));
+        assert!(read_mexilex(Cursor::new(bad.to_string()))
+            .unwrap_err()
+            .contains("duplicate sense"));
     }
     #[test]
     fn rejects_incompatible_contracts_and_blank_meanings() {
