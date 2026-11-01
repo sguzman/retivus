@@ -1,0 +1,56 @@
+name: Official Anki Desktop GUI interoperability
+on:
+  push:
+    paths:
+      - .github/workflows/anki-desktop-interop.yml
+      - scripts/anki-desktop-gui-qa.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: retivus-desktop-interop-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install QA prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq protobuf-compiler zstd curl xvfb xdotool scrot openbox sqlite3 libgl1 libegl1 libgbm1 libnss3 libxkbcommon-x11-0 libxcb-cursor0 libasound2t64
+      - name: Generate immutable Retivus interchange fixture
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/retivus-desktop/fixture"
+          cargo run --features anki-backend --bin desktop-interop-fixture -- generate "$RUNNER_TEMP/retivus-desktop/fixture"
+          cargo run --features anki-backend --bin desktop-interop-fixture -- verify "$RUNNER_TEMP/retivus-desktop/fixture/retivus-desktop-interop.apkg"
+      - name: Install pinned official Anki Desktop 26.09.3
+        run: |
+          set -euo pipefail
+          curl --fail --location --silent --show-error --retry 3 "https://github.com/ankitects/anki/releases/download/26.09.3/anki-26.09.3-linux-x86_64.tar.zst" -o "$RUNNER_TEMP/anki.tar.zst"
+          echo "d70e01971a7aa190b189927573ee643f2525ff840eafaecc7a8f8cde505650b3  $RUNNER_TEMP/anki.tar.zst" | sha256sum -c -
+          mkdir "$RUNNER_TEMP/anki-unpacked"
+          tar -C "$RUNNER_TEMP/anki-unpacked" --zstd -xf "$RUNNER_TEMP/anki.tar.zst"
+          installer="$(find "$RUNNER_TEMP/anki-unpacked" -type f -name install.sh -print -quit)"
+          test -n "$installer"
+          (cd "$(dirname "$installer")" && sudo ./install.sh)
+          command -v anki
+      - name: Exercise official Desktop import and export GUI
+        run: |
+          set -euo pipefail
+          xvfb-run -a -s "-screen 0 1280x900x24" bash scripts/anki-desktop-gui-qa.sh "$RUNNER_TEMP/retivus-desktop/fixture/retivus-desktop-interop.apkg" "$RUNNER_TEMP/retivus-desktop"
+          cargo run --features anki-backend --bin desktop-interop-fixture -- verify "$RUNNER_TEMP/retivus-desktop/anki-desktop-reexport.apkg"
+      - name: Archive real Desktop screenshots and diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-official-desktop-evidence
+          path: |
+            ${{ runner.temp }}/retivus-desktop/captures/*.png
+            ${{ runner.temp }}/retivus-desktop/anki.log
+            ${{ runner.temp }}/retivus-desktop/openbox.log
+          if-no-files-found: ignore
+          retention-days: 7
