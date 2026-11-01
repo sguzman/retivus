@@ -186,7 +186,7 @@ impl eframe::App for Retivus {
         ctx.set_theme(self.theme.preference());
         ctx.style_mut(|style| style.spacing.item_spacing = self.density.spacing());
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
-            ui.horizontal(|ui| {
+            ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new("Retivus")
                         .heading()
@@ -465,7 +465,10 @@ mod tests {
         eframe::Storage::set_string(&mut storage, SCALE_STORAGE_KEY, "-8".into());
         assert_eq!(Retivus::restore(Some(&storage)).ui_scale, 0.8);
         eframe::Storage::set_string(&mut storage, DENSITY_STORAGE_KEY, "invalid".into());
-        assert_eq!(Retivus::restore(Some(&storage)).density, Density::Comfortable);
+        assert_eq!(
+            Retivus::restore(Some(&storage)).density,
+            Density::Comfortable
+        );
     }
 
     #[test]
