@@ -34,11 +34,12 @@ impl Default for Retivus {
 }
 impl eframe::App for Retivus {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        match self.theme {
-            Theme::System => ctx.set_visuals(egui::Visuals::default()),
-            Theme::Light => ctx.set_visuals(egui::Visuals::light()),
-            Theme::Dark => ctx.set_visuals(egui::Visuals::dark()),
-        }
+        // Switching back to System must restore live operating-system theme tracking.
+        ctx.set_theme(match self.theme {
+            Theme::System => egui::ThemePreference::System,
+            Theme::Light => egui::ThemePreference::Light,
+            Theme::Dark => egui::ThemePreference::Dark,
+        });
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Retivus");
