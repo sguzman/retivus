@@ -1,5 +1,7 @@
 mod provider;
 use eframe::egui;
+use std::fs::File;
+use std::io::BufReader;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Theme {
@@ -18,11 +20,15 @@ impl Theme {
 }
 struct Retivus {
     theme: Theme,
+    source_path: String,
+    import_status: String,
 }
 impl Default for Retivus {
     fn default() -> Self {
         Self {
             theme: Theme::System,
+            source_path: String::new(),
+            import_status: "No source checked".into(),
         }
     }
 }
@@ -54,6 +60,25 @@ impl eframe::App for Retivus {
             ui.weak("Engineering foundation: collection, import and review features are not implemented yet.");
             ui.label("First data source: Mexilex · es-MX → en");
             ui.label("Planned backend: Anki Rust engine feasibility gate (not yet integrated).");
+            ui.separator();
+            ui.heading("Validate a local source file");
+            ui.label("Mexilex v1 study JSONL · read-only preview, no cards created");
+            ui.horizontal(|ui| {
+                ui.label("Path");
+                ui.text_edit_singleline(&mut self.source_path);
+                if ui.button("Validate").clicked() {
+                    self.import_status = match File::open(&self.source_path) {
+                        Ok(file) => match provider::read_mexilex(BufReader::new(file)) {
+                            Ok(records) => {
+                                format!("Valid records: {} · no learner data changed", records.len())
+                            }
+                            Err(error) => format!("Validation failed: {error}"),
+                        },
+                        Err(error) => format!("Could not open source: {error}"),
+                    };
+                }
+            });
+            ui.label(&self.import_status);
         });
     }
 }
