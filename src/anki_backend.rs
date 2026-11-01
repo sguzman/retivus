@@ -133,14 +133,13 @@ impl AnkiBackend {
             .ok_or("package import requires a Retivus-owned on-disk profile")?;
         check_managed_media(managed)?;
         check_apkg_path(path)?;
-        self.collection
-            .import_apkg(
-                path,
-                ImportAnkiPackageOptions {
-                    with_scheduling: include_review_history,
-                    ..Default::default()
-                },
-            )?;
+        self.collection.import_apkg(
+            path,
+            ImportAnkiPackageOptions {
+                with_scheduling: include_review_history,
+                ..Default::default()
+            },
+        )?;
         Ok(())
     }
 
