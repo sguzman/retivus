@@ -447,9 +447,11 @@ mod tests {
     #[test]
     fn scale_and_density_preferences_round_trip_with_invalid_value_fallback() {
         let mut storage = TestStorage::default();
-        let mut state = Retivus::default();
-        state.ui_scale = 1.25;
-        state.density = Density::Compact;
+        let mut state = Retivus {
+            ui_scale: 1.25,
+            density: Density::Compact,
+            ..Retivus::default()
+        };
         eframe::App::save(&mut state, &mut storage);
         let restored = Retivus::restore(Some(&storage));
         assert_eq!(restored.ui_scale, 1.25);
