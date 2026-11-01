@@ -3,11 +3,11 @@
 use crate::source_store::SourceCardCandidate;
 use anki::collection::CollectionBuilder;
 use anki::config::BoolKey;
-use anki::scheduler::answering::{CardAnswer, Rating};
-use anki::timestamp::TimestampMillis;
 use anki::decks::DeckId;
 use anki::notes::NoteId;
 use anki::notetype::{CardTemplate, NotetypeId};
+use anki::scheduler::answering::{CardAnswer, Rating};
+use anki::timestamp::TimestampMillis;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -328,7 +328,8 @@ impl AnkiBackend {
 
     /// Enable upstream FSRS rather than implementing a competing scheduler.
     pub fn enable_fsrs(&mut self) -> BackendResult<()> {
-        self.collection.set_config_bool(BoolKey::Fsrs, true, false)?;
+        self.collection
+            .set_config_bool(BoolKey::Fsrs, true, false)?;
         Ok(())
     }
 
@@ -712,7 +713,11 @@ mod tests {
             .collection
             .storage
             .db()
-            .query_row("select count(*) from revlog where cid=?1", [card_id], |row| row.get(0))
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [card_id],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(events, 1);
         backend.close().unwrap();
@@ -724,7 +729,11 @@ mod tests {
             .collection
             .storage
             .db()
-            .query_row("select count(*) from revlog where cid=?1", [card_id], |row| row.get(0))
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [card_id],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(persisted, 1);
         reopened.close().unwrap();
