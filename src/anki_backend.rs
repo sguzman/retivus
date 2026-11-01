@@ -4,9 +4,11 @@ use crate::source_store::SourceCardCandidate;
 use anki::collection::CollectionBuilder;
 use anki::config::BoolKey;
 use anki::decks::DeckId;
+use anki::import_export::package::{ExportAnkiPackageOptions, ImportAnkiPackageOptions};
 use anki::notes::NoteId;
 use anki::notetype::{CardTemplate, NotetypeId};
 use anki::scheduler::answering::{CardAnswer, Rating};
+use anki::search::SearchNode;
 use anki::timestamp::TimestampMillis;
 use rusqlite::OpenFlags;
 use std::error::Error;
@@ -44,7 +46,9 @@ impl AnkiBackend {
         let profile_dir = canonical_root.join(profile_id);
         fs::create_dir(&profile_dir)?;
         let collection_path = profile_dir.join("collection.anki2");
-        let collection = CollectionBuilder::new(&collection_path).build()?;
+        let mut builder = CollectionBuilder::new(&collection_path);
+        configure_managed_media(&mut builder, &profile_dir)?;
+        let collection = builder.build()?;
         Ok(Self {
             collection,
             managed_dir: Some(profile_dir),
@@ -71,6 +75,7 @@ impl AnkiBackend {
         }
         let mut builder = CollectionBuilder::new(&collection_path);
         builder.set_check_integrity(true);
+        configure_managed_media(&mut builder, &dir)?;
         let collection = builder.build()?;
         Ok(Self {
             collection,
@@ -82,6 +87,63 @@ impl AnkiBackend {
     pub fn close(self) -> BackendResult<()> {
         self.collection.close(None)?;
         Ok(())
+    }
+
+    /// Import a package through the pinned upstream Anki engine into a
+    /// Retivus-managed collection only. Do not open an arbitrary Anki profile.
+    pub fn import_apkg(&mut self, path: &Path) -> BackendResult<()> {
+        let managed = self
+            .managed_dir
+            .as_ref()
+            .ok_or("package import requires a Retivus-owned on-disk profile")?;
+        check_managed_media(managed)?;
+        check_apkg_path(path)?;
+        self.collection
+            .import_apkg(path, ImportAnkiPackageOptions::default())?;
+        Ok(())
+    }
+
+    /// Export all notes/decks/templates and media to a new .apkg. Never overwrite
+    /// an existing user file, even if Anki's internal exporter permits it.
+    pub fn export_apkg_to(&mut self, destination: &Path) -> BackendResult<usize> {
+        let managed = self
+            .managed_dir
+            .as_ref()
+            .ok_or("package export requires a Retivus-owned on-disk profile")?;
+        check_managed_media(managed)?;
+        if !destination.is_absolute()
+            || destination.extension().and_then(|value| value.to_str()) != Some("apkg")
+        {
+            return Err("export destination must be an absolute .apkg path".into());
+        }
+        let name = destination.file_name().ok_or("package filename is required")?;
+        let parent = fs::canonicalize(
+            destination
+                .parent()
+                .ok_or("export parent directory is required")?,
+        )?;
+        check_regular(&parent, true)?;
+        let final_path = parent.join(name);
+        if fs::symlink_metadata(&final_path).is_ok() {
+            return Err("existing packages cannot be overwritten".into());
+        }
+        let stage = NamedTempFile::new_in(&parent)?;
+        let exported = self.collection.export_apkg(
+            stage.path(),
+            ExportAnkiPackageOptions {
+                with_scheduling: true,
+                with_deck_configs: true,
+                with_media: true,
+                legacy: false,
+            },
+            SearchNode::WholeCollection,
+            None,
+        )?;
+        stage.as_file().sync_all()?;
+        let finished = stage.persist_noclobber(&final_path)?;
+        finished.sync_all()?;
+        fs::File::open(&parent)?.sync_all()?;
+        Ok(exported)
     }
 
     /// Create a complete SQLite snapshot of a Retivus-owned collection using
@@ -556,6 +618,35 @@ impl AnkiBackend {
     }
 }
 
+/// Configure only a Retivus-owned media folder and its database. Existing
+/// symlink paths are rejected before Anki's media manager can create files.
+fn check_managed_media(dir: &Path) -> BackendResult<(PathBuf, PathBuf)> {
+    check_regular(dir, true)?;
+    let media = dir.join("collection.media");
+    let database = dir.join("collection.mdb");
+    if fs::symlink_metadata(&media).is_ok() {
+        check_regular(&media, true)?;
+    }
+    if fs::symlink_metadata(&database).is_ok() {
+        check_regular(&database, false)?;
+    }
+    Ok((media, database))
+}
+
+fn configure_managed_media(builder: &mut CollectionBuilder, dir: &Path) -> BackendResult<()> {
+    let (media, database) = check_managed_media(dir)?;
+    builder.set_media_paths(media, database);
+    Ok(())
+}
+
+fn check_apkg_path(path: &Path) -> BackendResult<()> {
+    if !path.is_absolute() || path.extension().and_then(|value| value.to_str()) != Some("apkg") {
+        return Err("an absolute .apkg file path is required".into());
+    }
+    check_regular(path, false)?;
+    Ok(())
+}
+
 /// Refuse symlinks and special files before reading or publishing a snapshot.
 fn check_regular(path: &Path, directory: bool) -> BackendResult<()> {
     let meta = fs::symlink_metadata(path)?;
@@ -604,6 +695,115 @@ mod tests {
     use anki::search::SortMode;
     use anki::storage::SchemaVersion;
     use tempfile::tempdir;
+
+    #[test]
+    fn package_round_trip_preserves_media_notes_decks_templates_and_tags() {
+        let root = tempdir().unwrap();
+        let mut producer = AnkiBackend::create_managed_profile(root.path(), "producer").unwrap();
+        let deck_id = producer.create_deck("Package Fixture").unwrap();
+        let kind = "Package Bidirectional";
+        producer.create_bidirectional_notetype(kind).unwrap();
+        let attachment = producer
+            .collection
+            .media()
+            .unwrap()
+            .add_file("fixture.png", b"Retivus PNG fixture")
+            .unwrap();
+        assert_eq!(attachment.as_ref(), "fixture.png");
+        let note = producer
+            .add_note_with_notetype(
+                deck_id,
+                kind,
+                &["<img src=\"fixture.png\"> palabra", "word"],
+            )
+            .unwrap();
+        let mut note_data = producer
+            .collection
+            .storage
+            .get_note(NoteId(note))
+            .unwrap()
+            .unwrap();
+        note_data.tags.push("retivus-package-test".into());
+        producer.collection.update_note(&mut note_data).unwrap();
+        let package_path = root.path().join("fixture.apkg");
+        assert_eq!(producer.export_apkg_to(&package_path).unwrap(), 1);
+        assert!(package_path.exists());
+        assert!(producer.export_apkg_to(&package_path).is_err());
+        producer.close().unwrap();
+
+        let mut consumer = AnkiBackend::create_managed_profile(root.path(), "consumer").unwrap();
+        assert!(consumer.import_apkg(&root.path().join("missing.apkg")).is_err());
+        consumer.import_apkg(&package_path).unwrap();
+        assert!(consumer
+            .list_decks()
+            .unwrap()
+            .iter()
+            .any(|(_, name)| name == "Package Fixture"));
+        assert!(consumer
+            .list_notetypes()
+            .unwrap()
+            .iter()
+            .any(|(name, templates)| name == kind && *templates == 2));
+        let imported_notes = consumer
+            .collection
+            .search_notes("tag:retivus-package-test", SortMode::NoOrder)
+            .unwrap();
+        assert_eq!(imported_notes.len(), 1);
+        let imported_id = imported_notes[0].0;
+        assert_eq!(
+            consumer.note_fields(imported_id).unwrap(),
+            ["<img src=\"fixture.png\"> palabra", "word"]
+        );
+        assert!(consumer
+            .note_tags(imported_id)
+            .unwrap()
+            .contains(&"retivus-package-test".to_owned()));
+        assert_eq!(
+            consumer
+                .collection
+                .search_cards("tag:retivus-package-test", SortMode::NoOrder)
+                .unwrap()
+                .len(),
+            2
+        );
+        assert_eq!(
+            fs::read(root.path().join("consumer/collection.media/fixture.png")).unwrap(),
+            b"Retivus PNG fixture"
+        );
+        consumer.close().unwrap();
+
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "consumer").unwrap();
+        assert_eq!(
+            reopened.note_fields(imported_id).unwrap(),
+            ["<img src=\"fixture.png\"> palabra", "word"]
+        );
+        reopened.close().unwrap();
+    }
+
+    #[test]
+    fn package_path_safety_rejects_unmanaged_and_symlinked_inputs() {
+        let root = tempdir().unwrap();
+        let path = root.path().join("existing.apkg");
+        fs::write(&path, b"keep untouched").unwrap();
+        assert!(AnkiBackend::in_memory().unwrap().import_apkg(&path).is_err());
+        assert!(AnkiBackend::in_memory().unwrap().export_apkg_to(&path).is_err());
+        let mut managed = AnkiBackend::create_managed_profile(root.path(), "managed").unwrap();
+        assert!(managed.export_apkg_to(&path).is_err());
+        assert_eq!(fs::read(&path).unwrap(), b"keep untouched");
+        assert!(managed.import_apkg(Path::new("relative.apkg")).is_err());
+        assert!(managed.export_apkg_to(Path::new("relative.apkg")).is_err());
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(&path, root.path().join("symlink.apkg")).unwrap();
+            assert!(managed.import_apkg(&root.path().join("symlink.apkg")).is_err());
+            fs::create_dir(root.path().join("managed/collection.media")).unwrap();
+            let media = root.path().join("managed/collection.media");
+            fs::remove_dir(&media).unwrap();
+            std::os::unix::fs::symlink(root.path(), &media).unwrap();
+            assert!(managed.import_apkg(&path).is_err());
+        }
+        managed.close().unwrap();
+    }
 
     #[test]
     fn creates_real_anki_deck_note_and_due_card_without_disk_profile() {
