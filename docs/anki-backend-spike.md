@@ -10,6 +10,8 @@
 - Entry API: public `anki::collection::CollectionBuilder` in `rslib/src/collection/mod.rs`; builder can target disposable `:memory:` collection.
 - Backend public Rust modules: `collection`, `card`, `notes`, `decks`, `scheduler`, `import_export`, `sync`, `media`, `notetype` and `storage`.
 
+The pinned root `Cargo.toml` defines a 12-member Rust workspace, including the `rslib`, `rslib/i18n`, `rslib/io`, `rslib/proto`, `rslib/sync`, `rslib/process`, `rslib/linkchecker`, `pylib/rsbridge`, and build-support packages. `rslib` depends on workspace path crates `anki_i18n`, `anki_io`, `anki_proto`, and `anki_proto_gen`. Upstream dependencies include `fsrs = 6.6.2`, a pinned `unicase = 2.6.0`, and pinned Git revisions of `ankitects/rust-url` and `ankitects/linkcheck` in the workspace. The protobuf crate invokes `prost-build` and needs a system `protoc`; the CI spike installs `protobuf-compiler` and sets `PROTOC=/usr/bin/protoc` explicitly. The normal Retivus UI and provider validator are independent of this experimental backend.
+
 This is an **inventory**, not proof of a portable API. The workspace has substantial internal dependencies and build-time generated protobuf and internationalization assets.
 
 ## Repeatable build experiment
