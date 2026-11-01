@@ -1,5 +1,6 @@
 //! Feature-gated direct integration with the pinned, AGPL-licensed Anki Rust engine.
 //! No user profile is opened by this module's initial construction or tests.
+use crate::source_store::SourceCardCandidate;
 use anki::collection::CollectionBuilder;
 use anki::decks::DeckId;
 use anki::notes::NoteId;
@@ -249,6 +250,37 @@ impl AnkiBackend {
         }
         self.collection.add_note(&mut note, DeckId(deck_id))?;
         Ok(note.id.0)
+    }
+
+    /// Materialize only a user-selected source sense. The separate source
+    /// catalog remains read-only; Anki owns the new note, cards and review state.
+    pub fn add_source_candidate(
+        &mut self,
+        deck_id: i64,
+        candidate: &SourceCardCandidate,
+    ) -> BackendResult<i64> {
+        if candidate.word.trim().is_empty() || candidate.definition.trim().is_empty() {
+            return Err("selected source word and definition must be nonempty".into());
+        }
+        let notetype = self
+            .collection
+            .get_notetype_by_name("Basic")?
+            .ok_or("Anki collection does not contain Basic note type")?;
+        let mut note = notetype.new_note();
+        note.set_field(0, &candidate.word)?;
+        note.set_field(1, &candidate.definition)?;
+        note.tags.push(candidate.source_tag());
+        self.collection.add_note(&mut note, DeckId(deck_id))?;
+        Ok(note.id.0)
+    }
+
+    pub fn note_tags(&self, note_id: i64) -> BackendResult<Vec<String>> {
+        let note = self
+            .collection
+            .storage
+            .get_note(NoteId(note_id))?
+            .ok_or("note ID does not exist")?;
+        Ok(note.tags)
     }
 
     pub fn note_fields(&self, note_id: i64) -> BackendResult<Vec<String>> {
@@ -557,9 +589,56 @@ mod tests {
         reopened.close().unwrap();
     }
 
-    #[cfg(unix)]
     #[test]
-    fn refuses_profile_or_database_symlink_redirects() {
+    fn explicit_source_senses_make_separate_persistent_tagged_notes() {
+        use crate::source_adapter::{SourceInfo, StudyTsvV1};
+        use crate::source_store::SourceCatalog;
+        use std::io::Cursor;
+
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "independent".into(),
+            edition: "v1".into(),
+            lexical_language: "ja".into(),
+            definition_language: "en".into(),
+            license_notice: "Synthetic test fixture".into(),
+        })
+        .unwrap();
+        let data = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n\
+                    a\t生\tnoun\tone\tlife\n\
+                    b\t生\tverb\ttwo\tto live\n";
+        let mut source = SourceCatalog::in_memory().unwrap();
+        source
+            .import_snapshot("edition-1", &adapter, &mut Cursor::new(data))
+            .unwrap();
+        let life = source
+            .select_sense("independent", "edition-1", "a", "one")
+            .unwrap();
+        let live = source
+            .select_sense("independent", "edition-1", "b", "two")
+            .unwrap();
+
+        let tmp = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "source").unwrap();
+        let deck_id = backend.create_deck("Selected senses").unwrap();
+        let first = backend.add_source_candidate(deck_id, &life).unwrap();
+        let second = backend.add_source_candidate(deck_id, &live).unwrap();
+        assert_ne!(first, second);
+        assert_eq!(backend.note_fields(first).unwrap(), ["生", "life"]);
+        assert_eq!(backend.note_fields(second).unwrap(), ["生", "to live"]);
+        assert!(backend.note_tags(first).unwrap().contains(&life.source_tag()));
+        assert!(backend.note_tags(second).unwrap().contains(&live.source_tag()));
+        assert_ne!(life.source_tag(), live.source_tag());
+        backend.close().unwrap();
+
+        let reopened = AnkiBackend::open_managed_profile(tmp.path(), "source").unwrap();
+        assert_eq!(reopened.note_fields(first).unwrap(), ["生", "life"]);
+        assert_eq!(reopened.note_fields(second).unwrap(), ["生", "to live"]);
+        assert!(reopened.note_tags(first).unwrap().contains(&life.source_tag()));
+        assert!(reopened.note_tags(second).unwrap().contains(&live.source_tag()));
+        reopened.close().unwrap();
+    }
+
+ {
         use std::os::unix::fs::symlink;
 
         let tmp = tempdir().unwrap();
