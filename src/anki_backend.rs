@@ -1036,7 +1036,9 @@ mod tests {
     fn shareable_package_redacts_review_history_unless_explicitly_included() {
         let root = tempdir().unwrap();
         let mut original = AnkiBackend::create_managed_profile(root.path(), "private").unwrap();
-        original.add_basic_note(1, "sensitive", "private review").unwrap();
+        original
+            .add_basic_note(1, "sensitive", "private review")
+            .unwrap();
         let card = original.next_review_preview().unwrap().unwrap();
         original.grade_previewed_card(card.card_id, 4).unwrap();
         assert_eq!(original.collection_stats().unwrap().review_events, 1);
