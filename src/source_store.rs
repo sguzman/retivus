@@ -496,15 +496,17 @@ mod tests {
             definition: "gato".into(),
         };
         let tag = candidate.source_tag();
-        assert_eq!(SourceCardCandidate::parse_source_tag(&tag).unwrap(), identity);
+        assert_eq!(
+            SourceCardCandidate::parse_source_tag(&tag).unwrap(),
+            identity
+        );
         assert!(SourceCardCandidate::parse_source_tag("foreign::source::aaaa").is_err());
         assert!(SourceCardCandidate::parse_source_tag("retivus::source::61").is_err());
         assert!(SourceCardCandidate::parse_source_tag("retivus::source::6g::61::61::61").is_err());
         assert!(SourceCardCandidate::parse_source_tag("retivus::source::ff::61::61::61").is_err());
-        assert!(SourceCardCandidate::parse_source_tag(
-            "retivus::source::61::61::61::61::61"
-        )
-        .is_err());
+        assert!(
+            SourceCardCandidate::parse_source_tag("retivus::source::61::61::61::61::61").is_err()
+        );
     }
 
     #[test]

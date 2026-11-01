@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **33%** of 100% (previous session 23%, current session **+10 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **37%** of 100% (previous verified checkpoint 33%, this continuation **+4 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -11,7 +11,7 @@
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 4% | 🟡 |
-| 🌍 M3 Generic external-source provider engine | 14% | 7% | 🟡 |
+| 🌍 M3 Generic external-source provider engine | 14% | 11% | 🟡 |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
 | 🎨 M5 Complete native egui study experience | 14% | 2% | 🟡 |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 0% | ⏳ |
@@ -45,9 +45,9 @@
 
 - ✅ **M3.1 🧱 Source-neutral versioned provider interface and errors** — **3%**. Acceptance: Two adapters use same interface and reject unsupported contracts. Depends on: M0.3. **verified complete.**
 - ✅ **M3.2 📦 Stream Mexilex v0.3.0 source package with integrity/rights gates** — **4%**. Acceptance: Public archive, checksum and 124444-entry import smoke pass. Depends on: M3.1. **verified complete.**
-- ⏳ **M3.3 📝 Create note/card candidates with sense-disambiguating previews** — **3%**. Acceptance: Multiple homographs and senses never merge; selection tested. Depends on: M2.1,M3.2. **pending.**
+- ✅ **M3.3 📝 Create note/card candidates with sense-disambiguating previews** — **3%**. Acceptance: Multiple homographs and senses never merge; selection tested. Depends on: M2.1,M3.2. **verified complete.**
 - ⏳ **M3.4 🔄 Snapshot diff, identity reconciliation and preserving history** — **3%**. Acceptance: Updated/missing/colliding input tests + undoable migration. Depends on: M2.3,M3.3. **pending.**
-- ⏳ **M3.5 🔌 Verify independent second provider, not Mexilex-specific** — **1%**. Acceptance: Distinct format imported and reviewed without modifying engine. Depends on: M3.1. **pending.**
+- ✅ **M3.5 🔌 Verify independent second provider, not Mexilex-specific** — **1%**. Acceptance: Distinct format imported and reviewed without modifying engine. Depends on: M3.1. **verified complete.**
 
 ### 🃏 M4: Anki ecosystem round-trip compatibility (17% of project)
 
@@ -80,7 +80,7 @@
 - ⏳ **M7.3 🧯 Upgrade/recovery test matrix and no known critical defects** — **2%**. Acceptance: Backups/migration/release gate CI pass. Depends on: M7.2. **pending.**
 - ⏳ **M7.4 🏁 Publish release, tag and final acceptance ledger** — **1%**. Acceptance: Release assets independently downloaded and verified. Depends on: M7.1,M7.2,M7.3. **pending.**
 
-## Verified checkpoint — 2026-11-01
+## Prior verified checkpoint — 2026-11-01 (33%)
 
 - ✅ **M2.1 🗂️ (+4 pp):** [Anki feature CI 41268857882](https://github.com/sguzman/retivus/actions/runs/41268857882) passed **20** feature-enabled tests, including an actual two-template Anki note yielding two cards, deck and note-type enumeration, note field modification, deletion, undo restoration, and a clean close/reopen preserving data. The alternate formatting-only build is still running but the tested source behavior is identical. This confirms the backend-level collection CRUD, not the still-pending egui editor or backup/recovery.
 
@@ -94,3 +94,13 @@
 - ⏳ **Next:** M2.2 ⏱️ implement and verify actual Anki FSRS review/queue behavior across restart. M2.3 💾 adds undo/review-history crash safety and backups. M3.3 📝 builds lexical sense-to-card candidate previews now that M2.1 is verified. No new workstreams are introduced outside the fixed roadmap.
 
 **Accounting rule:** only completed numbered tasks earn their fixed project weights. The provider import is a **source catalog**; this is not the later study-card generation, snapshot reconciliation or Anki package importer. Do not count GUI demo or documentation as any additional percentage.
+
+## Verified continuation checkpoint — 2026-11-01 (37%)
+
+**Progress:** **33% → 37% (+4 percentage points)**. M0: 8/8 (100%); M1: 12/12 (100%); M2: 4/15 (26.7%); M3: 11/14 (78.6%); M4: 0/17 (0%); M5: 2/14 (14.3%); M6: 0/12 (0%); M7: 0/8 (0%).
+
+- ✅ **M3.3 📝 (+3 pp):** [Anki feature CI 41309537491](https://github.com/sguzman/retivus/actions/runs/41309537491) passed **27/27** library tests including independently selected Japanese-to-Spanish homographs, multiple distinct Mexilex senses, persistent Anki-owned notes, preserved source identity tags and review history on reopen. [Rust CI 41309537553](https://github.com/sguzman/retivus/actions/runs/41309537553) passed the native read-only explicit-sense preview selection regression. This validates source-to-note candidate selection, **not** completed deck management GUI, automatic snapshot migration, media or package import/export.
+- ✅ **M3.5 🔌 (+1 pp):** The same green [Rust CI 41309537553](https://github.com/sguzman/retivus/actions/runs/41309537553) passed the independent `import-generic` Japanese-to-Spanish TSV CLI import and disk-reopen preview. Feature CI 41309537491 then imported its three records through the unchanged source-neutral catalog, selected its homographs, created Anki notes and persisted an actual graded review without altering Mexilex logic.
+- 🟡 **M2.2 ⏱️ active, 0/4 pp:** FSRS-backed grading and interruption/restart events passed the feature suite, but deterministic rating/transition fixtures and broader scheduler coverage remain before the complete task weight is earned.
+- 🟡 **M3.4 🔄 pending, 0/3 pp:** The newly added reversible source-tag parser is a foundation only; no snapshot diff, conflict mediation, history-preserving migration or undoable reconciliation was claimed complete.
+- ⏳ **Next:** Verify source-tag parser CI, add deterministic scheduler grade/state fixtures to finish M2.2, and build learner-safe backup/recovery for M2.3. Current GUI remains read-only, and complete multi-size visual QA is still pending.
