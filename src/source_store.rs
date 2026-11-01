@@ -845,6 +845,56 @@ mod tests {
     }
 
     #[test]
+    fn explicit_reconciliation_is_durable_and_undo_survives_catalog_reopen() {
+        let dir = tempdir().unwrap();
+        let database = dir.path().join("snapshots.sqlite3");
+        let mut source = SourceCatalog::create_new(&database).unwrap();
+        let before = format!("{HEADER}same\t犬\tnoun\ts1\tdog\n");
+        let after = format!("{HEADER}renamed\t犬\tnoun\ts1\tdomestic dog\n");
+        source
+            .import_snapshot("v1", &tsv(), &mut Cursor::new(before))
+            .unwrap();
+        source
+            .import_snapshot("v2", &tsv(), &mut Cursor::new(after))
+            .unwrap();
+        let old = source
+            .select_sense("other-dictionary", "v1", "same", "s1")
+            .unwrap();
+        let updated = source
+            .select_sense("other-dictionary", "v2", "renamed", "s1")
+            .unwrap();
+        let mut forged = old.clone();
+        forged.definition = "unauthorized edit".into();
+        assert!(source.record_reconciliation(&forged, &updated).is_err());
+        source.record_reconciliation(&old, &updated).unwrap();
+        drop(source);
+
+        let mut reopened = SourceCatalog::open_existing(&database).unwrap();
+        assert_eq!(
+            reopened
+                .reconciled_sense("other-dictionary", "v1", "same", "s1")
+                .unwrap()
+                .source_tag(),
+            updated.source_tag()
+        );
+        assert!(reopened.record_reconciliation(&old, &updated).is_err());
+        reopened
+            .undo_reconciliation("other-dictionary", "v1", "same", "s1")
+            .unwrap();
+        drop(reopened);
+
+        let restored = SourceCatalog::open_existing(&database).unwrap();
+        assert_eq!(
+            restored
+                .reconciled_sense("other-dictionary", "v1", "same", "s1")
+                .unwrap()
+                .source_tag(),
+            old.source_tag()
+        );
+        assert_eq!(restored.counts("other-dictionary", "v2").unwrap(), (1, 1));
+    }
+
+    #[test]
     fn late_invalid_input_rolls_back_entire_new_snapshot() {
         let mut catalog = SourceCatalog::in_memory().unwrap();
         let valid = format!("{HEADER}a\t橋\tnoun\ts1\tbridge\n");
