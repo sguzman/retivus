@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **48%** of 100% (previous verified checkpoint 45%, this continuation **+3 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **51%** of 100% (previous verified checkpoint 48%, this continuation **+3 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -11,7 +11,7 @@
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 15% | ✅ |
-| 🌍 M3 Generic external-source provider engine | 14% | 11% | 🟡 |
+| 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
 | 🎨 M5 Complete native egui study experience | 14% | 2% | 🟡 |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 0% | ⏳ |
@@ -46,7 +46,7 @@
 - ✅ **M3.1 🧱 Source-neutral versioned provider interface and errors** — **3%**. Acceptance: Two adapters use same interface and reject unsupported contracts. Depends on: M0.3. **verified complete.**
 - ✅ **M3.2 📦 Stream Mexilex v0.3.0 source package with integrity/rights gates** — **4%**. Acceptance: Public archive, checksum and 124444-entry import smoke pass. Depends on: M3.1. **verified complete.**
 - ✅ **M3.3 📝 Create note/card candidates with sense-disambiguating previews** — **3%**. Acceptance: Multiple homographs and senses never merge; selection tested. Depends on: M2.1,M3.2. **verified complete.**
-- ⏳ **M3.4 🔄 Snapshot diff, identity reconciliation and preserving history** — **3%**. Acceptance: Updated/missing/colliding input tests + undoable migration. Depends on: M2.3,M3.3. **pending.**
+- ✅ **M3.4 🔄 Snapshot diff, identity reconciliation and preserving history** — **3%**. Acceptance: Updated/missing/colliding input tests + undoable migration. Depends on: M2.3,M3.3. **verified complete.**
 - ✅ **M3.5 🔌 Verify independent second provider, not Mexilex-specific** — **1%**. Acceptance: Distinct format imported and reviewed without modifying engine. Depends on: M3.1. **verified complete.**
 
 ### 🃏 M4: Anki ecosystem round-trip compatibility (17% of project)
@@ -127,3 +127,10 @@
 - ✅ **M2.4 🔐 (+3 pp):** [Anki feature CI 41313034807](https://github.com/sguzman/retivus/actions/runs/41313034807) passed **33/33** tests: isolated profiles, path/symlink rejection, supported schema-11 migration preserving notes, unknown future-version refusal, corrupt original-database refusal without replacing its contents, and the new backup/recovery smoke. All **15/15 M2** points now verified.
 - 🟡 **M3.4 🔄 0/3 pp:** Bounded source snapshot differences and explicit one-to-one reconciliations are implemented but feature/Anki note migration tests remain unverified. Neither provider words nor source metadata may silently overwrite learner field edits or review history.
 - ⏳ **Next:** Verify M3.4 end-to-end and handle conflicts before credit; then pursue scoped Anki package round trips and native editor/review controls.
+
+## Verified continuation checkpoint — 2026-11-01 (51%)
+
+**Progress:** **48% → 51% (+3 percentage points)**. M0: 8/8 (100%); M1: 12/12 (100%); M2: 15/15 (100%); M3: 14/14 (100%); M4: 0/17 (0%); M5: 2/14 (14.3%); M6: 0/12 (0%); M7: 0/8 (0%).
+
+- ✅ **M3.4 🔄 (+3 pp):** [Rust foundation CI 41313849974](https://github.com/sguzman/retivus/actions/runs/41313849974) passed **20 library tests** and independent provider/native smoke, including bounded diff of changed/removed/new senses, explicit homograph collision behavior, one-to-one conflict rejection, immutable original identities, persisted source mappings and reversible undo after SQLite reopen. [Anki feature CI 41313808023](https://github.com/sguzman/retivus/actions/runs/41313808023) passed **35/35** including application of a catalog-approved source migration to the same Anki note while retaining the same card review log, rejecting manually edited fields, undo, and persistent reopen. Thus **M3 is 14/14**. The engine does **not** auto-reconcile ambiguous sources or expose finished GUI conflict resolution (M5.5).
+- ⏳ **Next:** M4.1/M4.2 Anki `.apkg` imports and exports with real media/card/template round trips, followed by native deck/notes/review UI M5 and independent release hardening M6/M7. Do not equate pinned upstream feature gate with AnkiWeb sync compatibility.

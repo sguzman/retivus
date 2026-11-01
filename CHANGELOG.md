@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Verified explicit, bounded source snapshot diffs and opt-in reversible identity migrations, with Anki note updates that preserve existing review history and refuse manual-edit conflicts.
 - Verified Anki FSRS four-rating transitions, due queue restart, review persistence and undo using the pinned upstream scheduler.
 - Added explicit sense-specific source card candidates and Anki note creation with immutable provenance tags; homographs and multiple senses retain distinct identities.
 - Added non-clobber managed-profile SQLite snapshots and restore-as-new recovery, verified through pinned Anki integrity checks and isolated feature-CI regression tests.
