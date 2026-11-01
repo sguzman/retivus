@@ -124,6 +124,32 @@ impl AnkiBackend {
         Ok(decks)
     }
 
+    /// Rename an existing deck using Anki's undoable transaction.
+    pub fn rename_deck(&mut self, deck_id: i64, name: &str) -> BackendResult<()> {
+        if deck_id <= 0 || name.trim().is_empty() {
+            return Err("deck ID must be positive and name must not be blank".into());
+        }
+        if self.collection.storage.get_deck(DeckId(deck_id))?.is_none() {
+            return Err("requested deck does not exist".into());
+        }
+        self.collection.rename_deck(DeckId(deck_id), name)?;
+        Ok(())
+    }
+
+    /// Deliberately destructive: Anki removes cards in the deck and orphaned notes.
+    /// The caller must explicitly confirm that loss before invoking this method.
+    /// Default deck deletion is never exposed through this adapter.
+    pub fn delete_deck_and_cards(&mut self, deck_id: i64, confirmed: bool) -> BackendResult<()> {
+        if deck_id <= 1 || !confirmed {
+            return Err("deleting a non-default deck and its cards requires confirmation".into());
+        }
+        if self.collection.storage.get_deck(DeckId(deck_id))?.is_none() {
+            return Err("requested deck does not exist".into());
+        }
+        self.collection.remove_decks_and_child_decks(&[DeckId(deck_id)])?;
+        Ok(())
+    }
+
     /// Name and number of card templates, without exposing upstream internal types.
     pub fn list_notetypes(&mut self) -> BackendResult<Vec<(String, usize)>> {
         Ok(self
@@ -152,6 +178,52 @@ impl AnkiBackend {
             .push(CardTemplate::new("Reverse", "{{Back}}", "{{Front}}"));
         self.collection.add_notetype(&mut notetype, false)?;
         Ok(notetype.id.0)
+    }
+
+    /// Rename a custom note type through Anki's own migration and undo logic.
+    pub fn rename_notetype(&mut self, old_name: &str, new_name: &str) -> BackendResult<()> {
+        if new_name.trim().is_empty() || self.collection.get_notetype_by_name(new_name)?.is_some() {
+            return Err("replacement note type name must be nonempty and unique".into());
+        }
+        let mut notetype = self
+            .collection
+            .get_notetype_by_name(old_name)?
+            .ok_or("requested note type does not exist")?
+            .as_ref()
+            .clone();
+        notetype.name = new_name.to_owned();
+        self.collection.update_notetype(&mut notetype, false)?;
+        Ok(())
+    }
+
+    /// Edit one card template using upstream validation and a reversible transaction.
+    /// Reject blank template content instead of silently generating empty cards.
+    pub fn update_card_template(
+        &mut self,
+        notetype_name: &str,
+        template_index: usize,
+        template_name: &str,
+        question: &str,
+        answer: &str,
+    ) -> BackendResult<()> {
+        if template_name.trim().is_empty() || question.trim().is_empty() || answer.trim().is_empty() {
+            return Err("template name, question and answer must not be blank".into());
+        }
+        let mut notetype = self
+            .collection
+            .get_notetype_by_name(notetype_name)?
+            .ok_or("requested note type does not exist")?
+            .as_ref()
+            .clone();
+        let template = notetype
+            .templates
+            .get_mut(template_index)
+            .ok_or("card template index does not exist")?;
+        template.name = template_name.to_owned();
+        template.config.q_format = question.to_owned();
+        template.config.a_format = answer.to_owned();
+        self.collection.update_notetype(&mut notetype, false)?;
+        Ok(())
     }
 
     pub fn add_note_with_notetype(
@@ -414,6 +486,74 @@ mod tests {
             .unwrap()
             .iter()
             .any(|item| item.0 == kind && item.1 == 2));
+        reopened.close().unwrap();
+    }
+
+    #[test]
+    fn deck_and_template_changes_delete_undo_and_reopen_safely() {
+        let tmp = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "changes").unwrap();
+        let deck_id = backend.create_deck("Original Deck").unwrap();
+        let kind = "Temporary Reverse";
+        backend.create_bidirectional_notetype(kind).unwrap();
+        let note_id = backend
+            .add_note_with_notetype(deck_id, kind, &["casa", "house"])
+            .unwrap();
+
+        assert!(backend.rename_deck(deck_id, " ").is_err());
+        backend.rename_deck(deck_id, "Renamed Deck").unwrap();
+        assert!(backend
+            .list_decks()
+            .unwrap()
+            .iter()
+            .any(|(id, name)| *id == deck_id && name == "Renamed Deck"));
+
+        assert!(backend.rename_notetype(kind, "Basic").is_err());
+        backend
+            .rename_notetype(kind, "Renamed Reverse")
+            .unwrap();
+        assert!(backend
+            .update_card_template("Renamed Reverse", 5, "Missing", "{{Back}}", "{{Front}}")
+            .is_err());
+        backend
+            .update_card_template(
+                "Renamed Reverse",
+                1,
+                "Reverse verified",
+                "{{Back}}",
+                "{{Front}}",
+            )
+            .unwrap();
+        let template = backend
+            .collection
+            .get_notetype_by_name("Renamed Reverse")
+            .unwrap()
+            .unwrap();
+        assert_eq!(template.templates[1].name, "Reverse verified");
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["casa", "house"]);
+
+        assert!(backend.delete_deck_and_cards(1, true).is_err());
+        assert!(backend.delete_deck_and_cards(deck_id, false).is_err());
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["casa", "house"]);
+
+        backend.delete_deck_and_cards(deck_id, true).unwrap();
+        assert!(backend.note_fields(note_id).is_err());
+        backend.undo_last().unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["casa", "house"]);
+        assert!(backend
+            .list_decks()
+            .unwrap()
+            .iter()
+            .any(|(id, name)| *id == deck_id && name == "Renamed Deck"));
+        backend.close().unwrap();
+
+        let mut reopened = AnkiBackend::open_managed_profile(tmp.path(), "changes").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["casa", "house"]);
+        assert!(reopened
+            .list_notetypes()
+            .unwrap()
+            .iter()
+            .any(|(name, count)| name == "Renamed Reverse" && *count == 2));
         reopened.close().unwrap();
     }
 
