@@ -110,7 +110,10 @@ mod tests {
         let output = generate(root.path()).unwrap();
         assert!(output.is_file());
         verify(&output).unwrap();
-        assert!(generate(root.path()).is_err(), "existing fixture cannot be overwritten");
+        assert!(
+            generate(root.path()).is_err(),
+            "existing fixture cannot be overwritten"
+        );
         verify(&output).unwrap();
         assert!(verify(&root.path().join("missing.apkg")).is_err());
     }
