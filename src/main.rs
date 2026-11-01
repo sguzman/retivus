@@ -168,6 +168,36 @@ mod tests {
     }
 
     #[test]
+    fn theme_modes_render_and_system_tracks_operating_system_input() {
+        let ctx = egui::Context::default();
+        brand::apply_to_context(&ctx);
+        for choice in [Theme::System, Theme::Light, Theme::Dark] {
+            ctx.set_theme(choice.preference());
+            for system_theme in [egui::Theme::Light, egui::Theme::Dark] {
+                let output = ctx.run(
+                    egui::RawInput {
+                        system_theme: Some(system_theme),
+                        ..egui::RawInput::default()
+                    },
+                    |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            ui.heading("Retivus");
+                            ui.label("Review");
+                        });
+                    },
+                );
+                assert!(!output.shapes.is_empty());
+                let expected = match choice {
+                    Theme::System => system_theme,
+                    Theme::Light => egui::Theme::Light,
+                    Theme::Dark => egui::Theme::Dark,
+                };
+                assert_eq!(ctx.theme(), expected);
+            }
+        }
+    }
+
+    #[test]
     fn unknown_or_malformed_preference_follows_system() {
         let mut storage = TestStorage::default();
         for value in ["", "DARK", "broken", "3"] {
