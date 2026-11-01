@@ -90,6 +90,15 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           cargo test --features anki-backend --lib
+      - name: Verify official Anki Desktop collection copy
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          set -euo pipefail
+          test "$(git hash-object upstream-anki/rslib/tests/support/mediacheck.anki2)" = "5580db4ef5419c21e76d9f0d31cfe1bb87f88656"
+          RETIVUS_UPSTREAM_ANKI2="$PWD/upstream-anki/rslib/tests/support/mediacheck.anki2" cargo test --features anki-backend --lib official_upstream_anki_collection_fixture -- --ignored
       - name: Verify independent public Anki packages
         env:
           CARGO_BUILD_JOBS: "2"

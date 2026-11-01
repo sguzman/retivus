@@ -705,7 +705,9 @@ fn ensure_no_sqlite_sidecars(source: &Path) -> BackendResult<()> {
         let mut filename = source.as_os_str().to_os_string();
         filename.push(suffix);
         if fs::symlink_metadata(PathBuf::from(filename)).is_ok() {
-            return Err("source has SQLite journal/WAL sidecars; close Anki and export a safe copy".into());
+            return Err(
+                "source has SQLite journal/WAL sidecars; close Anki and export a safe copy".into(),
+            );
         }
     }
     Ok(())
@@ -1159,31 +1161,24 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
 
         let wal = root.path().join("upstream/collection.anki2-wal");
         fs::write(&wal, b"simulated uncheckpointed write").unwrap();
-        assert!(AnkiBackend::import_offline_anki_collection_copy(
-            root.path(),
-            "blocked",
-            &source
-        )
-        .is_err());
+        assert!(
+            AnkiBackend::import_offline_anki_collection_copy(root.path(), "blocked", &source)
+                .is_err()
+        );
         assert!(!root.path().join("blocked").exists());
         fs::remove_file(&wal).unwrap();
 
-        let copied = AnkiBackend::import_offline_anki_collection_copy(
-            root.path(),
-            "imported",
-            &source,
-        )
-        .unwrap();
+        let copied =
+            AnkiBackend::import_offline_anki_collection_copy(root.path(), "imported", &source)
+                .unwrap();
         assert_eq!(copied.schema_version().unwrap(), 18);
         assert_eq!(copied.note_fields(note_id).unwrap(), ["archivo", "archive"]);
         copied.close().unwrap();
         assert_eq!(fs::read(&source).unwrap(), pristine);
-        assert!(AnkiBackend::import_offline_anki_collection_copy(
-            root.path(),
-            "imported",
-            &source
-        )
-        .is_err());
+        assert!(
+            AnkiBackend::import_offline_anki_collection_copy(root.path(), "imported", &source)
+                .is_err()
+        );
         assert_eq!(fs::read(&source).unwrap(), pristine);
 
         #[cfg(unix)]
@@ -1208,6 +1203,48 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         .is_err());
         assert!(!root.path().join("malformed").exists());
         assert_eq!(fs::read(&damaged).unwrap(), b"not sqlite");
+    }
+
+    /// Official Anki Desktop collection fixture downloaded via the pinned upstream checkout.
+    #[test]
+    #[ignore = "requires pinned Anki Desktop fixture from CI"]
+    fn official_upstream_anki_collection_fixture_imports_only_as_a_copy() {
+        let source = std::path::PathBuf::from(
+            std::env::var_os("RETIVUS_UPSTREAM_ANKI2")
+                .expect("CI must supply pinned official .anki2 fixture"),
+        );
+        let original = fs::read(&source).unwrap();
+        let root = tempdir().unwrap();
+        let mut copied =
+            AnkiBackend::import_offline_anki_collection_copy(root.path(), "official", &source)
+                .unwrap();
+        assert_eq!(copied.schema_version().unwrap(), 18);
+        let notes = copied
+            .collection
+            .search_notes("", SortMode::NoOrder)
+            .unwrap()
+            .len();
+        let cards = copied
+            .collection
+            .search_cards("", SortMode::NoOrder)
+            .unwrap()
+            .len();
+        assert!(cards >= notes);
+        copied.close().unwrap();
+        assert_eq!(fs::read(&source).unwrap(), original);
+
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "official").unwrap();
+        assert_eq!(reopened.schema_version().unwrap(), 18);
+        assert_eq!(
+            reopened
+                .collection
+                .search_notes("", SortMode::NoOrder)
+                .unwrap()
+                .len(),
+            notes
+        );
+        reopened.close().unwrap();
+        assert_eq!(fs::read(&source).unwrap(), original);
     }
 
     #[test]
