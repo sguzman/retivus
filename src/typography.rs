@@ -33,13 +33,17 @@ fn discover_krypton(roots: &[PathBuf]) -> Vec<PathBuf> {
         if depth > 6 || seen >= MAX_DIRECTORY_ENTRIES {
             break;
         }
-        let Ok(entries) = fs::read_dir(&dir) else { continue };
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
         for entry in entries.flatten() {
             seen += 1;
             if seen >= MAX_DIRECTORY_ENTRIES {
                 break;
             }
-            let Ok(kind) = entry.file_type() else { continue };
+            let Ok(kind) = entry.file_type() else {
+                continue;
+            };
             if kind.is_symlink() {
                 continue;
             }
@@ -60,7 +64,11 @@ fn discover_krypton(roots: &[PathBuf]) -> Vec<PathBuf> {
         }
     }
     found.sort_by_key(|path| {
-        let name = path.file_name().unwrap_or_default().to_string_lossy().to_ascii_lowercase();
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_ascii_lowercase();
         (!name.contains("regular"), name)
     });
     found
@@ -84,7 +92,9 @@ fn font_bytes(path: &Path) -> Option<Vec<u8>> {
 /// Returns true only when a valid font was loaded.
 pub fn install_local_krypton(ctx: &egui::Context) -> bool {
     for path in discover_krypton(&font_roots()) {
-        let Some(bytes) = font_bytes(&path) else { continue };
+        let Some(bytes) = font_bytes(&path) else {
+            continue;
+        };
         let font_name = "retivus-local-krypton".to_owned();
         let mut fonts = egui::FontDefinitions::default();
         fonts.font_data.insert(
@@ -92,7 +102,11 @@ pub fn install_local_krypton(ctx: &egui::Context) -> bool {
             Arc::new(egui::FontData::from_owned(bytes)),
         );
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-            fonts.families.entry(family).or_default().insert(0, font_name.clone());
+            fonts
+                .families
+                .entry(family)
+                .or_default()
+                .insert(0, font_name.clone());
         }
         ctx.set_fonts(fonts);
         return true;
@@ -108,8 +122,16 @@ mod tests {
     #[test]
     fn local_font_discovery_prefers_regular_and_ignores_symlinks() {
         let root = tempdir().unwrap();
-        fs::write(root.path().join("Krypton_Nerd_Font-Bold.ttf"), b"not a font").unwrap();
-        fs::write(root.path().join("Krypton_Nerd_Font-Regular.ttf"), b"not a font").unwrap();
+        fs::write(
+            root.path().join("Krypton_Nerd_Font-Bold.ttf"),
+            b"not a font",
+        )
+        .unwrap();
+        fs::write(
+            root.path().join("Krypton_Nerd_Font-Regular.ttf"),
+            b"not a font",
+        )
+        .unwrap();
         let paths = discover_krypton(&[root.path().to_path_buf()]);
         assert_eq!(paths.len(), 2);
         assert!(paths[0].ends_with("Krypton_Nerd_Font-Regular.ttf"));
@@ -121,7 +143,10 @@ mod tests {
         let root = tempdir().unwrap();
         let nonexistent = root.path().join("does-not-exist");
         assert!(discover_krypton(&[nonexistent]).is_empty());
-        assert!(!install_with_roots(&egui::Context::default(), &[root.path().to_path_buf()]));
+        assert!(!install_with_roots(
+            &egui::Context::default(),
+            &[root.path().to_path_buf()]
+        ));
     }
 }
 
