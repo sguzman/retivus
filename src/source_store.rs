@@ -6,6 +6,38 @@ use std::fs;
 use std::io::BufRead;
 use std::path::Path;
 
+/// A single explicitly selected source sense, not a learner note or review event.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SourceCardCandidate {
+    pub provenance: SourceInfo,
+    pub snapshot: String,
+    pub entry_id: String,
+    pub sense_id: String,
+    pub word: String,
+    pub part_of_speech: String,
+    pub definition: String,
+}
+
+impl SourceCardCandidate {
+    /// Reversible source identity in an Anki-safe hierarchical tag. No private
+    /// review state is encoded, and UTF-8 components cannot collide on delimiters.
+    pub fn source_tag(&self) -> String {
+        let mut tag = String::from("retivus::source");
+        for component in [
+            &self.provenance.provider_id,
+            &self.snapshot,
+            &self.entry_id,
+            &self.sense_id,
+        ] {
+            tag.push_str("::");
+            for byte in component.as_bytes() {
+                tag.push_str(&format!("{byte:02x}"));
+            }
+        }
+        tag
+    }
+}
+
 pub struct SourceCatalog {
     connection: Connection,
 }
@@ -236,6 +268,36 @@ impl SourceCatalog {
         }))
     }
 
+    /// Resolve one explicit sense before a learner chooses to create a card.
+    /// Never fall back to a similarly spelled entry or a different source edition.
+    pub fn select_sense(
+        &self,
+        provider: &str,
+        snapshot: &str,
+        entry_id: &str,
+        sense_id: &str,
+    ) -> Result<SourceCardCandidate, String> {
+        let record = self
+            .lookup_entry(provider, snapshot, entry_id)?
+            .ok_or("source entry does not exist in requested snapshot")?;
+        let definition = record
+            .senses
+            .iter()
+            .find(|sense| sense.sense_id == sense_id)
+            .ok_or("source sense does not exist for requested entry")?
+            .definition
+            .clone();
+        Ok(SourceCardCandidate {
+            provenance: record.provenance,
+            snapshot: snapshot.to_owned(),
+            entry_id: record.entry_id,
+            sense_id: sense_id.to_owned(),
+            word: record.word,
+            part_of_speech: record.part_of_speech,
+            definition,
+        })
+    }
+
     pub fn counts(&self, provider: &str, snapshot: &str) -> Result<(i64, i64), String> {
         let entries = self
             .connection
@@ -349,6 +411,22 @@ mod tests {
             .lookup_entry("other-dictionary", "v1", "missing")
             .unwrap()
             .is_none());
+        let a = catalog
+            .select_sense("other-dictionary", "v1", "ja1", "s1")
+            .unwrap();
+        let b = catalog
+            .select_sense("other-dictionary", "v1", "ja2", "s1")
+            .unwrap();
+        assert_eq!(a.word, b.word);
+        assert_ne!(a.definition, b.definition);
+        assert_ne!(a.source_tag(), b.source_tag());
+        assert!(a.source_tag().starts_with("retivus::source::"));
+        assert!(catalog
+            .select_sense("other-dictionary", "v1", "ja1", "other")
+            .is_err());
+        assert!(catalog
+            .select_sense("mexilex", "v1", "ja1", "s1")
+            .is_err());
     }
 
     #[test]
