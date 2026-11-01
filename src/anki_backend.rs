@@ -146,7 +146,8 @@ impl AnkiBackend {
         if self.collection.storage.get_deck(DeckId(deck_id))?.is_none() {
             return Err("requested deck does not exist".into());
         }
-        self.collection.remove_decks_and_child_decks(&[DeckId(deck_id)])?;
+        self.collection
+            .remove_decks_and_child_decks(&[DeckId(deck_id)])?;
         Ok(())
     }
 
@@ -206,7 +207,8 @@ impl AnkiBackend {
         question: &str,
         answer: &str,
     ) -> BackendResult<()> {
-        if template_name.trim().is_empty() || question.trim().is_empty() || answer.trim().is_empty() {
+        if template_name.trim().is_empty() || question.trim().is_empty() || answer.trim().is_empty()
+        {
             return Err("template name, question and answer must not be blank".into());
         }
         let mut notetype = self
@@ -509,9 +511,7 @@ mod tests {
             .any(|(id, name)| *id == deck_id && name == "Renamed Deck"));
 
         assert!(backend.rename_notetype(kind, "Basic").is_err());
-        backend
-            .rename_notetype(kind, "Renamed Reverse")
-            .unwrap();
+        backend.rename_notetype(kind, "Renamed Reverse").unwrap();
         assert!(backend
             .update_card_template("Renamed Reverse", 5, "Missing", "{{Back}}", "{{Front}}")
             .is_err());
