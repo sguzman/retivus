@@ -1075,6 +1075,18 @@ mod tests {
         assert_eq!((stats.notes, stats.cards, stats.review_events), (1, 1, 0));
         public.close().unwrap();
 
+        let mut no_export = AnkiBackend::create_managed_profile(root.path(), "no-export").unwrap();
+        no_export
+            .import_apkg_with_scheduling(&public_package, true)
+            .unwrap();
+        assert_eq!(no_export.collection_stats().unwrap().review_events, 0);
+        no_export.close().unwrap();
+
+        let mut no_import = AnkiBackend::create_managed_profile(root.path(), "no-import").unwrap();
+        no_import.import_apkg(&opt_in_package).unwrap();
+        assert_eq!(no_import.collection_stats().unwrap().review_events, 0);
+        no_import.close().unwrap();
+
         let mut private = AnkiBackend::create_managed_profile(root.path(), "opted-in").unwrap();
         private
             .import_apkg_with_scheduling(&opt_in_package, true)
