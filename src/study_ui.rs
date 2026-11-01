@@ -694,7 +694,11 @@ mod tests {
 
         panel.revealed = true;
         panel.grade_revealed(4);
-        assert!(panel.status.contains("Review not recorded"), "{}", panel.status);
+        assert!(
+            panel.status.contains("Review not recorded"),
+            "{}",
+            panel.status
+        );
         assert_eq!(
             panel
                 .backend
@@ -752,7 +756,12 @@ mod tests {
 
         panel.connect(false);
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
             ["sensitive front", "sensitive back"]
         );
         panel.close();
