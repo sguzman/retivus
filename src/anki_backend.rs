@@ -8,10 +8,10 @@ use anki::notes::NoteId;
 use anki::notetype::{CardTemplate, NotetypeId};
 use anki::scheduler::answering::{CardAnswer, Rating};
 use anki::timestamp::TimestampMillis;
+use rusqlite::OpenFlags;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
-use rusqlite::OpenFlags;
 use tempfile::{Builder, NamedTempFile};
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;
@@ -89,24 +89,32 @@ impl AnkiBackend {
     /// The requested absolute destination must not exist and its parent must exist.
     /// Returns only after integrity validation, atomic no-clobber publish and sync.
     pub fn backup_to(&mut self, destination: &Path) -> BackendResult<()> {
-        let managed = self.managed_dir.as_ref().ok_or(
-            "only Retivus-managed disk profiles may produce persistent backups",
-        )?;
+        let managed = self
+            .managed_dir
+            .as_ref()
+            .ok_or("only Retivus-managed disk profiles may produce persistent backups")?;
         check_regular(managed, true)?;
         check_regular(&managed.join("collection.anki2"), false)?;
         if !destination.is_absolute() {
             return Err("backup destination must be an absolute file path".into());
         }
-        let name = destination.file_name().ok_or("backup filename is required")?;
+        let name = destination
+            .file_name()
+            .ok_or("backup filename is required")?;
         let parent = fs::canonicalize(
-            destination.parent().ok_or("backup parent directory is required")?,
+            destination
+                .parent()
+                .ok_or("backup parent directory is required")?,
         )?;
         check_regular(&parent, true)?;
         let final_path = parent.join(name);
         if fs::symlink_metadata(&final_path).is_ok() {
             return Err("backup destination already exists; never overwrite backups".into());
         }
-        let staged = NamedTempFile::new_in(&parent)?;
+        let staging = Builder::new()
+            .prefix(".retivus-backup-")
+            .tempdir_in(&parent)?;
+        let staged = NamedTempFile::new_in(staging.path())?;
         let staged_name = staged
             .path()
             .to_str()
@@ -115,7 +123,7 @@ impl AnkiBackend {
             .storage
             .db()
             .execute("VACUUM INTO ?1", [staged_name])?;
-        check_sqlite_integrity(staged.path())?;
+        verify_anki_staged_copy(staged.path())?;
         staged.as_file().sync_all()?;
         let finished = staged.persist_noclobber(&final_path)?;
         finished.sync_all()?;
@@ -135,30 +143,26 @@ impl AnkiBackend {
         let root = fs::canonicalize(root)?;
         check_regular(&root, true)?;
         check_regular(backup_path, false)?;
-        check_sqlite_integrity(backup_path)?;
+        check_sqlite_identity(backup_path)?;
         let target = root.join(profile_id);
         if fs::symlink_metadata(&target).is_ok() {
             return Err("restored profile already exists; never replace profiles".into());
         }
 
-        let staged = Builder::new()
+        let staging = Builder::new()
             .prefix(".retivus-restore-")
-            .suffix(".anki2")
-            .tempfile_in(&root)?;
-        fs::copy(backup_path, staged.path())?;
-        check_sqlite_integrity(staged.path())?;
-        let mut builder = CollectionBuilder::new(staged.path());
-        builder.set_check_integrity(true);
-        let checked = builder.build()?;
-        checked.close(None)?;
-        staged.as_file().sync_all()?;
+            .tempdir_in(&root)?;
+        let staged_path = staging.path().join("collection.anki2");
+        fs::copy(backup_path, &staged_path)?;
+        verify_anki_staged_copy(&staged_path)?;
+        fs::File::open(&staged_path)?.sync_all()?;
 
         // Publishing the complete file via a hard link (same root filesystem)
         // cannot overwrite another collection. The new directory is created
         // with exclusive create_dir after all validation has succeeded.
         fs::create_dir(&target)?;
         let final_database = target.join("collection.anki2");
-        if let Err(err) = fs::hard_link(staged.path(), &final_database) {
+        if let Err(err) = fs::hard_link(&staged_path, &final_database) {
             // Remove only the directory just created, and only if still empty.
             let _ = fs::remove_dir(&target);
             return Err(err.into());
@@ -503,14 +507,21 @@ fn check_regular(path: &Path, directory: bool) -> BackendResult<()> {
     Ok(())
 }
 
-fn check_sqlite_integrity(path: &Path) -> BackendResult<()> {
+/// Read the version safely without evaluating Anki's custom-collated indexes.
+/// Full integrity validation is performed on an isolated copy with Anki's engine.
+fn check_sqlite_identity(path: &Path) -> BackendResult<()> {
     check_regular(path, false)?;
     let db = rusqlite::Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-    let check: String = db.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
-    if check != "ok" {
-        return Err("SQLite backup integrity check failed".into());
-    }
     let _: i32 = db.query_row("SELECT ver FROM col", [], |row| row.get(0))?;
+    Ok(())
+}
+
+fn verify_anki_staged_copy(path: &Path) -> BackendResult<()> {
+    check_sqlite_identity(path)?;
+    let mut builder = CollectionBuilder::new(path);
+    builder.set_check_integrity(true);
+    let checked = builder.build()?;
+    checked.close(None)?;
     Ok(())
 }
 
@@ -885,20 +896,24 @@ mod tests {
         // A second backup cannot overwrite even if the source has changed.
         let late_note = original.add_basic_note(1, "después", "after").unwrap();
         assert!(original.backup_to(&backup_file).is_err());
-        assert!(AnkiBackend::restore_backup_as_new_profile(
-            root.path(),
-            "original",
-            &backup_file
-        )
-        .is_err());
-        assert_eq!(original.note_fields(late_note).unwrap(), ["después", "after"]);
+        assert!(
+            AnkiBackend::restore_backup_as_new_profile(root.path(), "original", &backup_file)
+                .is_err()
+        );
+        assert_eq!(
+            original.note_fields(late_note).unwrap(),
+            ["después", "after"]
+        );
         original.close().unwrap();
 
         let recovered =
             AnkiBackend::restore_backup_as_new_profile(root.path(), "recovered", &backup_file)
                 .unwrap();
         assert!(recovered.fsrs_enabled());
-        assert_eq!(recovered.note_fields(saved_note).unwrap(), ["banqueta", "sidewalk"]);
+        assert_eq!(
+            recovered.note_fields(saved_note).unwrap(),
+            ["banqueta", "sidewalk"]
+        );
         assert!(recovered.note_fields(late_note).is_err());
         let (count, ease): (i64, i64) = recovered
             .collection
@@ -912,11 +927,26 @@ mod tests {
             .unwrap();
         assert_eq!((count, ease), (1, 4));
         recovered.close().unwrap();
+        assert_eq!(
+            fs::read_dir(root.path())
+                .unwrap()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_name().to_string_lossy().starts_with(".retivus-"))
+                .count(),
+            0,
+            "staging files and auxiliary Anki files must be cleaned after success"
+        );
 
         let reopened = AnkiBackend::open_managed_profile(root.path(), "original").unwrap();
-        assert_eq!(reopened.note_fields(late_note).unwrap(), ["después", "after"]);
+        assert_eq!(
+            reopened.note_fields(late_note).unwrap(),
+            ["después", "after"]
+        );
         reopened.close().unwrap();
-        assert!(AnkiBackend::in_memory().unwrap().backup_to(&backup_file).is_err());
+        assert!(AnkiBackend::in_memory()
+            .unwrap()
+            .backup_to(&backup_file)
+            .is_err());
     }
 
     #[test]
@@ -924,12 +954,9 @@ mod tests {
         let root = tempdir().unwrap();
         let invalid = root.path().join("not-sqlite.db");
         fs::write(&invalid, b"not a collection").unwrap();
-        assert!(AnkiBackend::restore_backup_as_new_profile(
-            root.path(),
-            "invalid",
-            &invalid
-        )
-        .is_err());
+        assert!(
+            AnkiBackend::restore_backup_as_new_profile(root.path(), "invalid", &invalid).is_err()
+        );
         assert!(!root.path().join("invalid").exists());
 
         let intact = root.path().join("already-exists.db");
