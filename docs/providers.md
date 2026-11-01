@@ -36,3 +36,11 @@ The native GUI supports read-only validation for either format; selecting TSV re
 ## Future providers
 
 A provider adapter must describe its format/version and licensing, parse and validate into source-neutral records, expose provenance and snapshot identity, and present a reversible mapping to note/card generation. An unknown format is rejected with a useful error, not guessed from filenames. Contract tests with a second genuinely different format are mandatory.
+
+## Atomic source catalog import
+
+The source-neutral `SourceCatalog` stores externally provided records, sense IDs, snapshot metadata and license notices in a separate SQLite database. Its single transaction per snapshot guarantees that a late JSONL error, a duplicate source key, or a failed SQL constraint **rolls back the entire new snapshot**, leaving existing snapshots intact. The catalog enforces unique provider/snapshot/entry identities and sense identities. Multiple providers and historical snapshots coexist without mixing user-owned cards or reviews.
+
+`retivus import-source` is exposed as `cargo run --bin import-source -- <verified-study.jsonl> <new-catalog.sqlite3> <snapshot>`. The target catalog is create-only, refusing existing files. The source JSONL **must already have passed release archive checksum and license validation**, which the CI study-package workflow performs before invoking the binary. An immutable snapshot key must be supplied explicitly and should correspond to the verified release. The catalog does not independently authenticate the supplied label, and no user learning history is modified.
+
+This is an import/staging foundation, not a complete provider lifecycle: manifest signature verification, user-initiated snapshot upgrades, review-history reconciliation, and note/card generation are still separate tasks.

@@ -9,3 +9,5 @@ pub mod preview;
 
 #[cfg(feature = "anki-backend")]
 pub mod anki_backend;
+
+pub mod source_store;

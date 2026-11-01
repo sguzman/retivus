@@ -42,8 +42,14 @@ jobs:
         run: |
           cargo run --bin check-source -- data/study/study.jsonl | tee data/validation-result.txt
           grep -q 'Validated 124444 Mexilex entries' data/validation-result.txt
+      - name: Import entire verified snapshot atomically into separate SQLite source catalog
+        run: |
+          cargo run --bin import-source -- data/study/study.jsonl data/catalog.sqlite3 lex-v0.3.0 | tee data/import-result.txt
+          grep -q 'Imported 124444 Mexilex entries' data/import-result.txt
+          test -s data/catalog.sqlite3
       - name: Report independent consumer evidence
         run: |
           echo '## Mexilex published source integration' >> "$GITHUB_STEP_SUMMARY"
           cat data/validation-result.txt >> "$GITHUB_STEP_SUMMARY"
+          cat data/import-result.txt >> "$GITHUB_STEP_SUMMARY"
           echo 'Verified upstream release SHA256SUMS, license notice, source identity, and language pair. No user decks or review history accessed.' >> "$GITHUB_STEP_SUMMARY"

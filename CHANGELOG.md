@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added transactional SQLite source-snapshot catalog with rollback, duplicate and persistent-reopen tests, plus full real Mexilex study-import CI.
 - Introduced restricted Retivus-owned Anki profile create/reopen APIs and disposable schema migration, isolation, symlink and unsupported-future-version regression tests.
 - Added an opt-in, pinned Anki Git backend module for in-memory deck/note/queue operations and isolated library tests.
 - Bounded source-neutral vocabulary preview in the native egui validation UI, with late-error rollback tests.
