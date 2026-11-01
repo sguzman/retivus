@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **56%** of 100% (previous verified checkpoint 53%, this continuation **+3 percentage points**). Feature-enabled native review, undo, selected-deck queue and reopen tests passed; real X11 launch is green. Complete keyboard/mouse import-to-review UX and Wayland QA remain separately scheduled. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **58%** of 100% (previous verified checkpoint 56%, this continuation **+2 percentage points**). Native profile statistics, browse filters, exact source provenance, manual-edit conflicts, mapping approval/undo and guarded migration passed feature-enabled tests. Full keyboard/mouse workflow and Wayland visual acceptance remain separately scheduled. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -13,7 +13,7 @@
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 15% | ✅ |
 | 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
-| 🎨 M5 Complete native egui study experience | 14% | 7% | 🟡 |
+| 🎨 M5 Complete native egui study experience | 14% | 9% | 🟡 |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 0% | ⏳ |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
@@ -63,7 +63,7 @@
 - ✅ **M5.2 🔠 Typography, accessible density, sizing and keyboard controls** — **2%**. Acceptance: Krypton if installed, reliable fallback, layout and keyboard QA. Depends on: M5.1. **verified complete.**
 - ⏳ **M5.3 🗂️ Deck browser, note editor, browse/search and import preview** — **3%**. Acceptance: Full keyboard-and-mouse workflow from import to cards. Depends on: M2.1,M3.3. **pending.**
 - ✅ **M5.4 🎯 Review UI, grading, undo, due counts and session transitions** — **3%**. Acceptance: Actual due queue and review state persisted across restart. Depends on: M2.2,M2.3. **verified complete.**
-- ⏳ **M5.5 📊 Statistics, browse filters, source provenance and visible conflict UX** — **2%**. Acceptance: Metrics match backend and all provenance/conflict states visible. Depends on: M5.4. **pending.**
+- ✅ **M5.5 📊 Statistics, browse filters, source provenance and visible conflict UX** — **2%**. Acceptance: Metrics match backend and all provenance/conflict states visible. Depends on: M5.4. **verified complete.**
 - ⏳ **M5.6 🖥️ Real GUI visual QA on Linux Wayland and window sizes** — **2%**. Acceptance: Screenshots/video evidence on actual app, not just compilation. Depends on: M5.1,M5.3,M5.4. **pending.**
 
 ### 🧪 M6: Integration hardening, performance and correctness (12% of project)
@@ -159,3 +159,11 @@
 - ✅ **M5.4 🎯 (+3 pp):** [Anki feature CI 41329550912](https://github.com/sguzman/retivus/actions/runs/41329550912) passed **42 Anki library tests, 13 native application tests, real feature-enabled X11 launch and independent collection/package fixture checks**. Native tests verify reveal-before-grade, correct-card guarded grading, safe stale-card rejection, due counts, undo and review-event persistence across close/reopen, and profile-scoped editor clearing. The selected deck now updates Anki's actual persisted review queue, not only egui's selector. [Rust foundation CI 41329550983](https://github.com/sguzman/retivus/actions/runs/41329550983) passed formatting, Clippy, native build, provider checks and X11 launch.
 - ⏳ **M5.3 remains 0/3:** Source validation and explicit note creation are covered in state-level tests, but full on-screen keyboard-and-mouse import-to-study acceptance is not yet demonstrated.
 - ⏳ **M5.6/M6.4 remain open:** Real Wayland layout/accessibility QA has not been claimed based on X11 smoke alone. M4 Anki Desktop package round-trip acceptance and AnkiWeb sync remain independently open.
+
+## Verified continuation checkpoint — 2026-11-01 (58%)
+
+**Progress: 56% → 58% (+2 percentage points).** M0: 8/8; M1: 12/12; M2: 15/15; M3: 14/14; M4: 0/17; **M5: 9/14**; M6: 0/12; M7: 0/8.
+
+- ✅ **M5.5 📊 (+2 pp):** [Anki feature CI 41334645600](https://github.com/sguzman/retivus/actions/runs/41334645600) passed **44 backend library tests, 20 native application tests**, native X11 window and official collection/public-package fixture checks. The native profile statistics are read from Anki's stored notes, cards and review log; browse filters classify linked/plain/conflicting source tags; selected-note inspection distinguishes exact stored provenance, missing/invalid catalogs, manual field edits and an explicitly recorded source revision. The guarded source-mapping UI previews a precise target, requires an approval step, allows separate application and undo, preserves review history, and surfaces paged source diffs rather than guessing homograph matches. [Rust foundation CI 41334645685](https://github.com/sguzman/retivus/actions/runs/41334645685) passed formatting, strict Clippy, provider tests and real X11 smoke.
+- ⏳ **M5.3 remains open:** The full real pointer-and-keyboard GUI import-to-review interaction is not yet verified. Native state tests and X11 launch alone do not satisfy that acceptance.
+- ⏳ **M5.6 remains open:** No verified native Wayland GUI screenshots and responsive actual-window inspection yet. M4/M6/M7 remain independently pending.
