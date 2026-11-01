@@ -5,6 +5,9 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Verified pinned Anki Rust backend external-client deck/note/card/review-queue interoperability in isolated CI.
+- Added read-only egui source format selection for Mexilex and generic provider TSV.
+- Verified persistent UI appearance and light/dark OS-following theme behavior.
 - Source-neutral adapter interface and a genuinely distinct versioned TSV provider, with independent language/licensing metadata and contract tests.
 - Persistent System/Light/Dark theme preferences, restored automatically at app launch.\n- Retivus OKLCH berry-rose identity, verified light/dark accent tokens and a shared egui color module.
 - Initial Rust/egui desktop shell with explicit System, Light and Dark appearance.

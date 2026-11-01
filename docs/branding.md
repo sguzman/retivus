@@ -25,4 +25,4 @@
 
 ## Branding acceptance
 
-Color tokens are committed and tested in code. The application now saves the theme value in eframe native persistence storage and restores it on startup; tests cover every preference, unknown-value fallback, and System-mode selection. Final M5.1 verification still includes explicit light/dark rendering and operating-system appearance switching QA.
+Color tokens are committed and tested in code. The application now saves the theme value in eframe native persistence storage and restores it on startup; tests cover every preference, unknown-value fallback, and System-mode selection. The M5.1 completion criteria are now verified by cross-instance preference tests, rendering paths for all three modes, simulated OS theme input transitions in System mode, and the native GUI smoke CI. Full desktop-size visual QA remains M5.6.

@@ -1,6 +1,6 @@
 # External data providers
 
-Retivus is not a Mexilex GUI. The first importer validates the existing **Mexilex study JSONL format v1**, and a source-neutral `SourceAdapter` interface supports other versioned formats.
+Retivus is not a Mexilex GUI. The first importer validates the existing **Mexilex study JSONL format v1**. A source-neutral `SourceAdapter` interface supports multiple versioned formats, and the egui validation screen exposes both Mexilex and generic TSV sources.
 
 ## Mexilex v0.3.0
 
@@ -30,6 +30,8 @@ Other evidence (ACTIV-ES film dialogue frequency, CIEMPIESS radio frequencies, W
 The explicit TSV v1 format is a minimal second provider used to verify the interface without coupling it to Mexilex. It requires a UTF-8 header `entry_id<TAB>word<TAB>part_of_speech<TAB>sense_id<TAB>definition` and one complete entry/sense per line. Repeated spellings with distinct IDs are accepted; duplicate IDs and missing fields are refused. The source descriptor is provided externally, not guessed from filename. A sample source might use Japanese words with Spanish meanings, distinct from Mexilex's es-MX/en pair. Do not treat this format as the final importer, and do not interpret a field as a license for republishing content.
 
 **Security/transaction limit:** adapters validate streaming records and can emit earlier records before a later invalid one is discovered. Callers **must stage and roll back** the entire import on failure. Validation alone is not permission to change cards or review history.
+
+The native GUI supports read-only validation for either format; selecting TSV requires the operator to enter explicit source ID, edition, language pair and license metadata. The validation result **never creates cards**. A profile-backed transactional importer and real external-provider upgrade handling are still pending.
 
 ## Future providers
 

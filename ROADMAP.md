@@ -2,18 +2,18 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **13%** of 100% (initial baseline 0%; +13 percentage points this first round; previously verified 10%, now +3). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **21%** of 100% (previous verified 13%, latest development session +8 percentage points). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
 | Milestone | Weight | Verified | Status |
 | --- | ---: | ---: | --- |
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
-| 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 5% | 🟡 |
+| 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 8% | 🟡 |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 0% | ⏳ |
-| 🌍 M3 Generic external-source provider engine | 14% | 0% | ⏳ |
+| 🌍 M3 Generic external-source provider engine | 14% | 3% | 🟡 |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
-| 🎨 M5 Complete native egui study experience | 14% | 0% | ⏳ |
+| 🎨 M5 Complete native egui study experience | 14% | 2% | 🟡 |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 0% | ⏳ |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
@@ -30,8 +30,8 @@
 
 - ✅ **M1.1 🔎 Pin upstream Anki release/commit and dependency/toolchain inventory** — **2%**. Acceptance: Commit, transitive workspace deps and toolchain recorded. Depends on: M0.3. **verified complete.**
 - ✅ **M1.2 ⚙️ Build actual pinned Anki Rust workspace in isolated CI** — **3%**. Acceptance: Repeatable Linux CI build passes. Depends on: M1.1. **verified complete.**
-- 🟡 **M1.3 🧩 Compile external client opening disposable Anki collection** — **3%**. Acceptance: Real read/write deck/note/card queue smoke without user collections. Depends on: M1.2. **active.**
-- ⏳ **M1.4 ⚖️ Review AGPL licensing, notices, distribution and choose adapter** — **2%**. Acceptance: Document and implement legal compatible dependency boundary. Depends on: M1.3. **pending.**
+- ✅ **M1.3 🧩 Compile external client opening disposable Anki collection** — **3%**. Acceptance: Real read/write deck/note/card queue smoke without user collections. Depends on: M1.2. **verified complete.**
+- 🟡 **M1.4 ⚖️ Review AGPL licensing, notices, distribution and choose adapter** — **2%**. Acceptance: Document and implement legal compatible dependency boundary. Depends on: M1.3. **active.**
 - ⏳ **M1.5 🧪 Confirm incremental upgrades/fallback and adapter tests** — **2%**. Acceptance: Pinned backend integration proven or justified alternative verified. Depends on: M1.4. **pending.**
 
 ### 🗃️ M2: Local collection engine and learner-safe core (15% of project)
@@ -43,7 +43,7 @@
 
 ### 🌍 M3: Generic external-source provider engine (14% of project)
 
-- ⏳ **M3.1 🧱 Source-neutral versioned provider interface and errors** — **3%**. Acceptance: Two adapters use same interface and reject unsupported contracts. Depends on: M0.3. **pending.**
+- ✅ **M3.1 🧱 Source-neutral versioned provider interface and errors** — **3%**. Acceptance: Two adapters use same interface and reject unsupported contracts. Depends on: M0.3. **verified complete.**
 - ⏳ **M3.2 📦 Stream Mexilex v0.3.0 source package with integrity/rights gates** — **4%**. Acceptance: Public archive, checksum and 124444-entry import smoke pass. Depends on: M3.1. **pending.**
 - ⏳ **M3.3 📝 Create note/card candidates with sense-disambiguating previews** — **3%**. Acceptance: Multiple homographs and senses never merge; selection tested. Depends on: M2.1,M3.2. **pending.**
 - ⏳ **M3.4 🔄 Snapshot diff, identity reconciliation and preserving history** — **3%**. Acceptance: Updated/missing/colliding input tests + undoable migration. Depends on: M2.3,M3.3. **pending.**
@@ -59,7 +59,7 @@
 
 ### 🎨 M5: Complete native egui study experience (14% of project)
 
-- ⏳ **M5.1 🌗 System/light/dark visual themes and persistence** — **2%**. Acceptance: All modes render, OS follow, preference restart tests. Depends on: M0.3. **pending.**
+- ✅ **M5.1 🌗 System/light/dark visual themes and persistence** — **2%**. Acceptance: All modes render, OS follow, preference restart tests. Depends on: M0.3. **verified complete.**
 - ⏳ **M5.2 🔠 Typography, accessible density, sizing and keyboard controls** — **2%**. Acceptance: Krypton if installed, reliable fallback, layout and keyboard QA. Depends on: M5.1. **pending.**
 - ⏳ **M5.3 🗂️ Deck browser, note editor, browse/search and import preview** — **3%**. Acceptance: Full keyboard-and-mouse workflow from import to cards. Depends on: M2.1,M3.3. **pending.**
 - ⏳ **M5.4 🎯 Review UI, grading, undo, due counts and session transitions** — **3%**. Acceptance: Actual due queue and review state persisted across restart. Depends on: M2.2,M2.3. **pending.**
@@ -80,9 +80,16 @@
 - ⏳ **M7.3 🧯 Upgrade/recovery test matrix and no known critical defects** — **2%**. Acceptance: Backups/migration/release gate CI pass. Depends on: M7.2. **pending.**
 - ⏳ **M7.4 🏁 Publish release, tag and final acceptance ledger** — **1%**. Acceptance: Release assets independently downloaded and verified. Depends on: M7.1,M7.2,M7.3. **pending.**
 
-## 🌍 Provider adapter groundwork (unweighted until verified)
+## ✅ Verified integration checkpoint — 2026-11-01
 
-Added a source-neutral trait and a distinct TSV v1 adapter with explicit languages and licensing metadata; M3.1 earns its 3% only after CI confirms both adapter contract tests. This is not the full Mexilex transactional import, note creation, or provider upgrade story.
+- **M1.3 🧩 (3 points):** [Anki CI run 41266034216](https://github.com/sguzman/retivus/actions/runs/41266034216) compiled and executed the independent Retivus client using pinned `rslib` Rust APIs. It created an isolated in-memory Anki collection, deck, Basic note, card and review queue; no existing profile was accessed. Direct Git dependency packaging is being tested separately; this success is for the isolated path-based adapter.
+- **M3.1 🧱 (3 points):** [Rust CI run 41266324012](https://github.com/sguzman/retivus/actions/runs/41266324012) passed the object-safe `SourceAdapter` contract for Mexilex JSONL and distinct generic TSV, explicit language/licensing metadata, duplicate/malformed rejection and streaming record visits.
+- **M5.1 🌗 (2 points):** the same successful CI passed preference save/restart tests, all three egui theme-rendering paths, and OS light/dark input changes in System mode, in addition to the earlier virtual X11 application launch smoke. Full desktop visual styling and window-size QA remain M5.6.
+- **M1.4 ⚖️ (active, uncredited):** the project adopted AGPL-3.0-or-later and preserved its original MIT notice, but notice provenance and the actual distributed Anki engine adapter still need integration before this task earns points.
+- **M3.2 📦 (pending, uncredited):** public Mexilex release checksums and a 124,444-entry streaming validation passed in [run 41262927205](https://github.com/sguzman/retivus/actions/runs/41262927205). A durable transactional installation with rollback has not been built, so it is **not** counted as a completed import.
+- **Current next gate:** test pinned Cargo Git dependency to avoid a manually maintained Anki checkout; then choose and implement the legally compliant shipping adapter and safe profile persistence.
+
+**Session progress:** 13% → **21%** (**+8 percentage points**). M1 = 8/12 (66.7%); M3 = 3/14 (21.4%); M5 = 2/14 (14.3%). Only completed acceptance items earn weight. Do not count partial UI wiring or backend research as extra tasks.
 
 ## ⚖️ License decision (unweighted)
 
@@ -90,7 +97,7 @@ The project adopted **AGPL-3.0-or-later**, in anticipation of combining Retivus 
 
 ## 🎨 Brand identity amendment (unweighted)
 
-Retivus now owns a distinct OKLCH project color and shared theme tokens, documented in [docs/branding.md](docs/branding.md) and applied in the native egui shell. This is part of the existing M5.1 theme task, **not** a new scope item or extra points: M5.1 requires preference persistence and system-theme verification before it earns its full 2%.
+Retivus now owns a distinct OKLCH project color and shared theme tokens, documented in [docs/branding.md](docs/branding.md) and applied in the native egui shell. This is part of the existing M5.1 theme task, **not** a new scope item or extra points: M5.1 is verified through persistence, rendering, and system-theme unit tests; final multi-window visual QA remains M5.6.
 
 ## Verified evidence and next gate (2026-11-01)
 

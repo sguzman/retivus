@@ -34,3 +34,9 @@ The first independent pinned build failed because `protoc` was not available; af
 ## Verified backend compilation (2026-11-01)
 
 [Workflow 41262898809](https://github.com/sguzman/retivus/actions/runs/41262898809) **succeeded** using the exact pinned Anki source revision. The CI checkout included upstream FTL submodules, `protobuf-compiler`, and a separately displayed, isolated `tokio/io-util` feature adjustment in the temporary Anki manifest. This proves the underlying backend can compile on the Linux runner with that explicit integration workaround; it is not yet proof an external app can use the API. The next [separate smoke crate](../spikes/anki-collection/README.md) tests a throwaway in-memory collection and review queue, without importing user data or distributing upstream code.
+
+## Independent external-client feasibility verified
+
+[Anki integration run 41266034216](https://github.com/sguzman/retivus/actions/runs/41266034216) succeeded for the standalone external Rust client: `CollectionBuilder` opened disposable in-memory storage, a deck and Basic note were added, a card was found, and that card appeared in Anki's scheduled queue. Upstream Card's identifier is accessed through its **public `id()` method**, not its private field. This verifies source-level integration without Python/Qt; it does not demonstrate direct integration into the shipping UI, AnkiWeb sync or app packaging.
+
+A second experiment in `spikes/anki-git/` tests direct pinned Cargo Git consumption, using Cargo feature unification for Tokio `io-util`. It is not a completed result until CI proves it.
