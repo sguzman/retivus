@@ -1,0 +1,75 @@
+name: Linux release candidate acceptance
+on:
+  push:
+    paths:
+      - .github/workflows/linux-candidate.yml
+      - scripts/package-linux.sh
+      - scripts/install-linux-candidate.sh
+      - scripts/uninstall-linux-candidate.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: retivus-candidate-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install build and headless display prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq protobuf-compiler zstd xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0
+      - name: Resolve dependency lock and compile feature-enabled release
+        env:
+          CARGO_BUILD_JOBS: '2'
+          PROTOC: /usr/bin/protoc
+        run: |
+          cargo generate-lockfile
+          cargo build --locked --release --features anki-backend --bin retivus
+      - name: Package source-accompanied candidate
+        run: |
+          bash scripts/package-linux.sh dist
+          (cd dist && sha256sum -c *.sha256)
+      - name: Verify clean-home install, GUI launch, update and uninstall
+        run: |
+          set -euo pipefail
+          sandbox="$(mktemp -d)"
+          archive="$(find dist -maxdepth 1 -type f -name '*.tar.zst' -print -quit)"
+          tar --zstd -xf "$archive" -C "$sandbox"
+          root="$(find "$sandbox" -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          prefix="$sandbox/clean-home/.local"
+          "$root/install.sh" "$prefix"
+          test -x "$prefix/bin/retivus"
+          test -f "$prefix/share/applications/retivus.desktop"
+          "$root/install.sh" "$prefix"
+          xvfb-run -a bash -c '
+            set -euo pipefail
+            openbox > /tmp/retivus-release-wm.log 2>&1 & wm=$!
+            LIBGL_ALWAYS_SOFTWARE=1 "$1" > /tmp/retivus-release-app.log 2>&1 & app=$!
+            trap "kill $app $wm 2>/dev/null || true" EXIT
+            for i in $(seq 1 90); do
+              if xdotool search --onlyvisible --name Retivus >/dev/null 2>&1; then exit 0; fi
+              kill -0 "$app" || { cat /tmp/retivus-release-app.log; exit 1; }
+              sleep 1
+            done
+            cat /tmp/retivus-release-app.log
+            exit 1
+          ' bash "$prefix/bin/retivus"
+          "$root/uninstall.sh" "$prefix"
+          test ! -e "$prefix/bin/retivus"
+          test ! -e "$prefix/share/applications/retivus.desktop"
+      - name: Retain candidate and dependency lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-linux-candidate-evidence
+          path: |
+            dist/*.tar.zst
+            dist/*.sha256
+            Cargo.lock
+          if-no-files-found: ignore
+          retention-days: 7
