@@ -33,4 +33,4 @@ The first GUI is a foundation, **not** a working flashcard trainer.
 
 ## License
 
-This repository presently retains its original MIT license. Upstream Anki `rslib` uses **AGPL-3.0-or-later**; adopting that code requires a reviewed project licensing decision and compatible redistribution before it is linked or vendored. The two codebases have **not** been combined. Lexical data has its own upstream license and is not covered by this repository's MIT license.
+**Retivus is licensed under AGPL-3.0-or-later.** It was initially intended to use MIT, but we adopted AGPL to support direct reuse of Anki's AGPL-licensed Rust backend in compliance with its terms. **Anki's backend is not yet incorporated into the main application.** Earlier MIT-licensed revisions retain their original terms; see [licensing history and attribution](docs/licensing.md). External vocabulary datasets and personal study content have separate ownership and licenses.

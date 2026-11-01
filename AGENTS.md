@@ -15,6 +15,6 @@ Authoritative scope: [docs/product.md](docs/product.md). Progress source: [ROADM
 - 🌗 System (default), Light, Dark GUI appearance, keyboard UX, compact typography and Krypton Nerd Font where locally available with safe fallback. Use the canonical [OKLCH brand palette](docs/branding.md) via `src/brand.rs`, not invented ad hoc accent hues.
 - 🔌 Dual purpose: Anki ecosystem and multiple external data providers; Mexilex is first, not hardwired.
 - 🔒 Separate external source records from private cards/history; never upload histories or silently auto-migrate ambiguities.
-- ⚖️ Anki upstream `rslib` is AGPL; review licensing before linking or distributing; original project license remains as initialized until a documented decision.
+- ⚖️ Retivus is **AGPL-3.0-or-later**; retain [original MIT notice](LICENSES/MIT-original.txt) and [licensing provenance](docs/licensing.md). Actual Anki `rslib` incorporation still requires verified upstream notices, source/build obligations, and adapter review. Never describe the current repo as MIT-only.
 - 🧭 No arbitrary new workstreams after scope locked, no unrelated features, no names ending in the prohibited suffix. Never erase an existing profile or user's collection.
 - ▶️ “continue” means continue only if legitimate roadmap work remains. Stop at verified completion.

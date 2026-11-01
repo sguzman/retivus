@@ -80,6 +80,10 @@
 - ⏳ **M7.3 🧯 Upgrade/recovery test matrix and no known critical defects** — **2%**. Acceptance: Backups/migration/release gate CI pass. Depends on: M7.2. **pending.**
 - ⏳ **M7.4 🏁 Publish release, tag and final acceptance ledger** — **1%**. Acceptance: Release assets independently downloaded and verified. Depends on: M7.1,M7.2,M7.3. **pending.**
 
+## ⚖️ License decision (unweighted)
+
+The project adopted **AGPL-3.0-or-later**, in anticipation of combining Retivus with Anki's upstream AGPL Rust backend. The original MIT grant is preserved in `LICENSES/MIT-original.txt` and [licensing history](docs/licensing.md). **M1.4 remains pending** until the backend integration is verified and its actual redistribution/notice obligations are implemented; the license declaration alone earns no points.
+
 ## 🎨 Brand identity amendment (unweighted)
 
 Retivus now owns a distinct OKLCH project color and shared theme tokens, documented in [docs/branding.md](docs/branding.md) and applied in the native egui shell. This is part of the existing M5.1 theme task, **not** a new scope item or extra points: M5.1 requires preference persistence and system-theme verification before it earns its full 2%.

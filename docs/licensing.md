@@ -1,26 +1,45 @@
-# Anki backend licensing decision gate
+# Retivus licensing, history and upstream compliance
 
-Retivus begins with original MIT-licensed Rust and egui code. Its initial source validator and GUI do **not** link against Anki. The standalone [integration spike](../spikes/anki-collection/README.md) explicitly marks its own license **AGPL-3.0-or-later** and is not distributed with the main product.
+## Current license
 
-## What adopting upstream Anki's `rslib` means
+**GNU Affero General Public License, version 3 or later (AGPL-3.0-or-later).** The repository's root [LICENSE](../LICENSE) contains the full AGPLv3 text, and the Rust package manifest identifies the `AGPL-3.0-or-later` SPDX license expression.
 
-Anki's upstream source and Rust backend carry the **GNU Affero GPL, version 3 or later**. If Retivus incorporates and distributes a combined work using Anki's AGPL backend, the **combined application must satisfy the AGPL**. That typically entails:
+### Why the license changed
 
-- Declaring an AGPL-compatible license for the combined program, keeping copyright/attribution information and giving recipients the license terms.
-- Making corresponding source available to recipients, including build and installation scripts and source required to modify and rebuild the covered combination.
-- Honoring AGPL section 13 if a modified version supports remote network interaction: affected network users must have an opportunity to obtain the corresponding source.
-- Preserving the MIT notices for originally MIT-licensed components rather than pretending those authors' existing license or copyright vanished.
+> Retivus was originally intended to use the permissive MIT License. To integrate Anki's AGPL-licensed Rust backend while honoring the upstream license requirements, Retivus adopted AGPL-3.0-or-later.
 
-The **source code license is not the vocabulary data license**. User-owned decks, personal progress, review histories and independent external dataset licenses do not automatically become AGPL merely because the application is. Do not confuse AGPL source availability with posting private user files or credentials.
+This choice was made because **directly incorporating Anki's Rust backend into the distributed application** entails AGPL obligations for the resulting combined program, not because original code was inherently required to use AGPL. Retivus made that compliance decision *before* linking the Anki backend into its main application. The independent `spikes/anki-collection/` experiment already uses AGPL but is not a distributed product.
 
-## Decision boundary
+This is a deliberate architectural and compliance choice, not an allegation against Anki or a claim that the MIT license is defective. Anki's licensing is published openly and was considered when planning backend reuse.
 
-**Status: pending M1.4 after successful standalone API feasibility verification.**
+## What remains MIT-licensed
 
-Preferred option: when direct upstream integration is technically and legally viable, distribute Retivus's combined Anki-backed application under **AGPL-3.0-or-later**, with upstream notices and source obligations satisfied. This is not merely changing the root `LICENSE` file; actual source provenance, Cargo package metadata, SPDX headers, README documentation, build instructions, bundled notices and release assets must agree.
+Retivus's **original revisions** were published under MIT, with copyright attributed to Salvador Guzman in 2026. The [verbatim original MIT notice](../LICENSES/MIT-original.txt) is retained for historical provenance and compliance. **Changing the license for later versions does not revoke MIT rights that recipients already received for earlier versions.**
 
-If we cannot responsibly satisfy those obligations or the API is unsuitable, document the precise issue and evaluate interoperable alternatives before choosing a second architecture. Do not claim a standalone process is automatically a licensing escape hatch; combined-work analysis depends on actual architecture and circumstances.
+The repository's current license is AGPL-3.0-or-later, **not a promise that all future versions will also be available under MIT**. Original independently authored Retivus code remains owned by its copyright holders; copyright ownership and permissions are separate from the license terms for distribution.
 
-References: [Anki LICENSE](https://github.com/ankitects/anki/blob/main/LICENSE), [GNU AGPLv3 text](https://www.gnu.org/licenses/agpl-3.0.en.html), [GNU GPL FAQ](https://www.gnu.org/licenses/gpl-faq.en.html).
+## Requirements when Anki is integrated
 
-This is engineering compliance guidance, not a substitute for formal legal advice.
+Anki's [upstream source](https://github.com/ankitects/anki) uses **AGPL-3.0-or-later**, with some separately licensed components. Before distributing a linked or otherwise combined Anki-backed Retivus application, confirm:
+
+- Include required license terms and preserve upstream copyright notices, author information and relevant third-party notices.
+- Supply recipients of the covered program with the corresponding source code, including required build and installation scripts, under the applicable AGPL terms.
+- Comply with AGPL section 13 if a modified AGPL program offers remote network interaction.
+- Include actual upstream source/commit provenance and relevant modification notices, not just an AGPL string in `Cargo.toml`.
+- Verify the real distribution and dependency structure before claiming compliance. Do not assume a separate executable or IPC arrangement categorically changes combined-work analysis.
+
+**Status:** The main application license was proactively changed; Anki `rslib` is **not currently linked into the shipping Retivus application**. The M1.4 roadmap task also requires a working, legally reviewed adapter, notices and packaging; this license commit alone does **not** complete M1.4.
+
+## Separate data and user content
+
+An application's AGPL license does **not** automatically require disclosure of a user's private decks, card histories, personal notes, collection databases or credentials. Data sourced from Mexilex and future providers has its own provenance and licensing. Do not treat the MIT/AGPL code licensing decision as a permission to redistribute dictionary data or private user records.
+
+## References
+
+- [Current Retivus LICENSE](../LICENSE)
+- [Historical MIT notice](../LICENSES/MIT-original.txt)
+- [Anki source license](https://github.com/ankitects/anki/blob/main/LICENSE)
+- [GNU AGPLv3](https://www.gnu.org/licenses/agpl-3.0.html)
+- [GNU GPL FAQ](https://www.gnu.org/licenses/gpl-faq.html)
+
+This document describes project practice, not formal legal advice.

@@ -6,7 +6,7 @@
 - Commit: `136bd42bfbd356fc756b6d3e28cc77b02da11ea7`
 - Requested upstream toolchain: Rust **1.99.0**, per `rust-toolchain.toml` at the research target.
 - Crate: `rslib/Cargo.toml`, package `anki`; `publish = false`, `workspace = ".."`.
-- License: upstream **AGPL-3.0-or-later**, which is not automatically compatible with distributing Retivus as solely MIT if linked.
+- License: upstream **AGPL-3.0-or-later**. Retivus has since proactively adopted AGPL-3.0-or-later too, although no linked main-app Anki integration has been released. See [licensing history](licensing.md).
 - Entry API: public `anki::collection::CollectionBuilder` in `rslib/src/collection/mod.rs`; builder can target disposable `:memory:` collection.
 - Backend public Rust modules: `collection`, `card`, `notes`, `decks`, `scheduler`, `import_export`, `sync`, `media`, `notetype` and `storage`.
 

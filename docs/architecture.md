@@ -14,7 +14,7 @@ The upstream [ankitects/anki](https://github.com/ankitects/anki) repository has 
 4. If practical, adopt a pinned backend adapter and formally review project licensing first. If blocked, record exact failures and evaluate Anki's protobuf backend service or a narrow clean-room compatible adapter. A fallback must not imply full Anki ecosystem compatibility.
 5. Keep egui concerns out of the engine adapter; the application depends on stable internal traits. Maintain Anki-compatible identifiers and review actions only after verification of upstream semantics.
 
-**Licensing gate:** The repo initially has MIT-licensed original code. Direct incorporation of Anki's AGPL-3.0-or-later code requires compatible overall licensing, source availability and notices. Do **not** import or link `rslib` into distributed Retivus code while claiming the overall binary is solely MIT. Confirm obligations before integration.
+**Licensing gate:** Retivus was initially MIT-licensed, but has adopted **AGPL-3.0-or-later** in anticipation of direct use of Anki's AGPL-licensed `rslib`. The original MIT notice is retained for historical revisions. This proactive project-license change is **not sufficient proof of integration compliance**: pinned upstream provenance, actual dependency boundaries, required notices, corresponding-source and packaging obligations still must be verified before a combined release. See [licensing history](licensing.md).
 
 ## ADR-002: Source-provider boundary
 
