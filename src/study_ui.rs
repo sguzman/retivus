@@ -208,6 +208,19 @@ impl StudyPanel {
         Ok(note_id)
     }
 
+    /// Accept exactly one valid Retivus source identity. Multiple source
+    /// identities are a conflict, never a basis for automatic reconciliation.
+    fn source_provenance(tags: &[String]) -> Result<Option<[String; 4]>, String> {
+        let mut source_tags = tags.iter().filter(|tag| tag.starts_with("retivus::source::"));
+        let Some(tag) = source_tags.next() else {
+            return Ok(None);
+        };
+        if source_tags.next().is_some() {
+            return Err("multiple source identities require explicit resolution".into());
+        }
+        SourceCardCandidate::parse_source_tag(tag).map(Some)
+    }
+
     fn grade_revealed(&mut self, rating: u8) {
         if !self.revealed {
             self.status = "Reveal the answer before choosing a rating.".into();
@@ -357,6 +370,32 @@ impl StudyPanel {
                     ui.label("Back");
                     ui.add(egui::TextEdit::singleline(&mut self.back).desired_width(220.0));
                 });
+                if let Some(note) = self
+                    .notes
+                    .iter()
+                    .find(|note| Some(note.id) == self.selected_note)
+                {
+                    match Self::source_provenance(&note.tags) {
+                        Ok(Some([provider, snapshot, entry, sense])) => {
+                            ui.collapsing("External source provenance", |ui| {
+                                ui.label(format!("Provider: {provider}"));
+                                ui.label(format!("Snapshot: {snapshot}"));
+                                ui.label(format!("Entry: {entry} · sense: {sense}"));
+                                ui.weak(
+                                    "Source records and learner review history are separate. Updates require explicit reconciliation.",
+                                );
+                            });
+                        }
+                        Ok(None) => {}
+                        Err(error) => {
+                            let color = ui.visuals().error_fg_color;
+                            ui.colored_label(
+                                color,
+                                format!("Source identity conflict: {error}"),
+                            );
+                        }
+                    }
+                }
                 if let Some(id) = self.selected_note {
                     if ui.button("Save edited note").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
@@ -555,6 +594,19 @@ mod tests {
             .unwrap();
         assert_ne!(first, second);
         let first_tags = panel.backend.as_ref().unwrap().note_tags(first).unwrap();
+        assert_eq!(
+            StudyPanel::source_provenance(&first_tags).unwrap(),
+            Some([
+                "independent-japanese".into(),
+                "2026-edition".into(),
+                "1".into(),
+                "a".into()
+            ])
+        );
+        let duplicate = vec![first_tags[0].clone(), first_tags[0].clone()];
+        assert!(StudyPanel::source_provenance(&duplicate).is_err());
+        let malformed = vec![String::from("retivus::source::not-hex")];
+        assert!(StudyPanel::source_provenance(&malformed).is_err());
         let second_tags = panel.backend.as_ref().unwrap().note_tags(second).unwrap();
         assert_ne!(
             first_tags, second_tags,

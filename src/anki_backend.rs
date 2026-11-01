@@ -1373,6 +1373,43 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
     }
 
     #[test]
+    fn review_deck_selection_scopes_queue_and_survives_profile_reopen() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "deck-selection").unwrap();
+        let first_deck = backend.create_deck("First").unwrap();
+        let second_deck = backend.create_deck("Second").unwrap();
+        backend.add_basic_note(first_deck, "uno", "one").unwrap();
+        backend.add_basic_note(second_deck, "dos", "two").unwrap();
+
+        assert_eq!(backend.current_review_deck().unwrap(), 1);
+        assert!(backend.next_review_preview().unwrap().is_none());
+        backend.select_review_deck(first_deck).unwrap();
+        assert_eq!(backend.current_review_deck().unwrap(), first_deck);
+        let first = backend.next_review_preview().unwrap().unwrap();
+        assert!(first.question_html.contains("uno"));
+        assert_eq!(backend.due_counts().unwrap().0, 1);
+
+        backend.select_review_deck(second_deck).unwrap();
+        let second = backend.next_review_preview().unwrap().unwrap();
+        assert!(second.question_html.contains("dos"));
+        assert_ne!(first.card_id, second.card_id);
+        assert_eq!(backend.due_counts().unwrap().0, 1);
+        assert!(backend.select_review_deck(i64::MAX).is_err());
+        assert!(backend.select_review_deck(0).is_err());
+        assert_eq!(backend.current_review_deck().unwrap(), second_deck);
+        backend.close().unwrap();
+
+        let mut reopened =
+            AnkiBackend::open_managed_profile(root.path(), "deck-selection").unwrap();
+        assert_eq!(reopened.current_review_deck().unwrap(), second_deck);
+        assert_eq!(
+            reopened.next_review_preview().unwrap().unwrap().card_id,
+            second.card_id
+        );
+        reopened.close().unwrap();
+    }
+
+    #[test]
     fn rendered_due_card_preview_reuses_anki_scheduler_without_grading() {
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "review").unwrap();

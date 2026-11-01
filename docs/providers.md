@@ -57,7 +57,7 @@ The `import-generic` executable accepts a versioned TSV and **explicit** provide
 
 The source catalog's `lookup_entry(provider, snapshot, entry_id)` restores a precise published entry with its individually identified senses and attribution. `select_sense(provider, snapshot, entry_id, sense_id)` returns a selected `SourceCardCandidate` without creating a learner record. The candidate's reversible `retivus::source` tag encodes provider/snapshot/entry/sense separately as hex UTF-8, so identical spellings do not collide. The feature-gated Anki adapter can then explicitly create a Basic note using that choice, retaining both the user's new Anki note identity and source provenance on a separate plane. Test fixtures cover Japanese homographs with distinct source entries and two Mexilex meanings under the same entry.
 
-This is a **backend-only experimental bridge** awaiting feature-enabled CI and GUI integration. It does not automatically import the entire catalog, reconcile updates, deduplicate intentionally repeated choices, or alter any existing personal flashcards or review history.
+The opt-in feature-enabled learner GUI now exposes exact sense selection and explicit note creation in a managed profile, with immutable source identities checked against its SQLite catalog. When a note is selected in the learner browser, its reversible provider/snapshot/entry/sense identity is displayed; malformed or multiply assigned Retivus provenance tags are flagged rather than silently reconciled. This integration is under acceptance testing and does not automatically import the entire catalog, reconcile updates, deduplicate repeated choices, or change any existing review history.
 
 ## Verified explicit-sense and second-provider acceptance — 2026-11-01
 
