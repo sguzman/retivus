@@ -5,6 +5,9 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added true persisted collection statistics, bounded source-linked/plain/conflicting-note browser filters, and guarded note deletion with Anki undo. New feature-level regression verification is pending.
+- Added a complete validation → precise source-sense choice → real Anki card → grade → restart regression through the same handlers used by the native GUI, plus immutable active-profile identity for source catalog isolation; feature-level regression verification is pending.
+- Verified native selected-deck scheduling, reveal, guarded grading, undo, due counts and review history across restart in [Anki CI 41329550912](https://github.com/sguzman/retivus/actions/runs/41329550912).
 - Added opt-in learner UI action to archive an exact selected generic source sense in a managed SQLite snapshot and explicitly create an Anki note, rejecting forged meanings and refusing raw unverified Mexilex imports; acceptance tests pending.
 - Added managed-only `.apkg` import/export with media, template, tag and card round trips; pinned third-party AnkiDroid and MIT sample packages passed independent checks (Anki Desktop GUI interoperability still pending).
 - Added cloze/HTML/CSS/SVG render parity tests across full `.apkg` export/import and reopen.

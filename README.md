@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Active development. The [weighted implementation roadmap](ROADMAP.md) records only verified task completions. M0–M3 are verified, including Anki-backed FSRS grading and local recovery. The opt-in native learner workspace supports explicitly selected Retivus-owned profiles, note/deck operations, Anki scheduling, and package import/export, but full independent Anki Desktop/AnkiWeb interoperability, native source workflows, GUI review and release acceptance are still in progress.
+Active development. The [weighted implementation roadmap](ROADMAP.md) records only verified task completions. M0–M3 are verified, including Anki-backed FSRS grading and local recovery. The opt-in native learner workspace has verified real Anki due-queue review, grading, undo and persistence on X11, with managed-profile notes, source selection, and package import/export. Complete keyboard-and-mouse import-to-review UX, source-conflict management, native Wayland QA, independent Anki Desktop/AnkiWeb interoperability and release acceptance remain in progress.
 
 ## Architecture
 
