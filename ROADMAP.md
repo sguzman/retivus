@@ -8,7 +8,7 @@
 
 | Milestone | Weight | Verified | Status |
 | --- | ---: | ---: | --- |
-| 🧭 M0 Specification, project governance, initial foundation | 8% | 0% | ⏳ |
+| 🧭 M0 Specification, project governance, initial foundation | 8% | 6% | 🟡 |
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 0% | ⏳ |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 0% | ⏳ |
 | 🌍 M3 Generic external-source provider engine | 14% | 0% | ⏳ |
