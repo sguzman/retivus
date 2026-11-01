@@ -1,4 +1,4 @@
-mod provider;
+use retivus::provider;
 use eframe::egui;
 use std::fs::File;
 use std::io::BufReader;
@@ -69,9 +69,9 @@ impl eframe::App for Retivus {
                 ui.text_edit_singleline(&mut self.source_path);
                 if ui.button("Validate").clicked() {
                     self.import_status = match File::open(&self.source_path) {
-                        Ok(file) => match provider::read_mexilex(BufReader::new(file)) {
-                            Ok(records) => {
-                                format!("Valid records: {} · no learner data changed", records.len())
+                        Ok(file) => match provider::visit_mexilex(BufReader::new(file), |_| {}) {
+                            Ok(count) => {
+                                format!("Valid records: {count} · no learner data changed")
                             }
                             Err(error) => format!("Validation failed: {error}"),
                         },

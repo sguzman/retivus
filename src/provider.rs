@@ -14,9 +14,13 @@ pub struct Record {
     pub definitions_en: Vec<String>,
 }
 
-pub fn read_mexilex<R: BufRead>(reader: R) -> Result<Vec<Record>, String> {
+/// Validate entries incrementally and deliver one owned record at a time.
+pub fn visit_mexilex<R: BufRead, F: FnMut(Record)>(
+    reader: R,
+    mut visitor: F,
+) -> Result<usize, String> {
     let mut ids = HashSet::new();
-    let mut result = Vec::new();
+    let mut count = 0;
     for (number, line) in reader.lines().enumerate() {
         let line = line.map_err(|e| format!("line {}: {e}", number + 1))?;
         if line.trim().is_empty() {
@@ -69,7 +73,7 @@ pub fn read_mexilex<R: BufRead>(reader: R) -> Result<Vec<Record>, String> {
             sense_ids.push(id.to_owned());
             definitions_en.push(definition.to_owned());
         }
-        result.push(Record {
+        visitor(Record {
             source: "mexilex".into(),
             edition: str_field("source_edition")?.to_owned(),
             entry_id,
@@ -78,7 +82,15 @@ pub fn read_mexilex<R: BufRead>(reader: R) -> Result<Vec<Record>, String> {
             sense_ids,
             definitions_en,
         });
+        count += 1;
     }
+    Ok(count)
+}
+
+/// Convenience collector for callers that actually need all records in memory.
+pub fn read_mexilex<R: BufRead>(reader: R) -> Result<Vec<Record>, String> {
+    let mut result = Vec::new();
+    visit_mexilex(reader, |record| result.push(record))?;
     Ok(result)
 }
 
@@ -99,6 +111,14 @@ mod tests {
         let result = read_mexilex(Cursor::new(row("a"))).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].definitions_en, ["sidewalk", "footstool"]);
+    }
+    #[test]
+    fn streams_records_without_collecting_entire_dataset() {
+        let data = format!("{}\n{}\n", row("a"), row("b"));
+        let mut words = Vec::new();
+        let count = visit_mexilex(Cursor::new(data), |record| words.push(record.word)).unwrap();
+        assert_eq!(count, 2);
+        assert_eq!(words, ["banqueta", "banqueta"]);
     }
     #[test]
     fn refuses_duplicate_entries_and_duplicate_senses() {
