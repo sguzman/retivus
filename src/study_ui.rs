@@ -46,6 +46,7 @@ pub struct StudyPanel {
     active_root: Option<PathBuf>,
     active_profile_id: Option<String>,
     package: String,
+    export_with_scheduling: bool,
     snapshot_id: String,
     backend: Option<AnkiBackend>,
     decks: Vec<(i64, String)>,
@@ -675,6 +676,7 @@ impl StudyPanel {
         self.back.clear();
         self.query.clear();
         self.package.clear();
+        self.export_with_scheduling = false;
         self.snapshot_id.clear();
         self.new_deck.clear();
         self.review = None;
@@ -1053,6 +1055,13 @@ impl StudyPanel {
                 }
                 ui.separator();
                 ui.heading("Anki package");
+                ui.checkbox(
+                    &mut self.export_with_scheduling,
+                    "Include private review history and scheduling in export",
+                );
+                ui.weak(
+                    "Off by default for shareable decks; enabling includes personal study activity.",
+                );
                 ui.horizontal_wrapped(|ui| {
                     let package_label = ui.label("Absolute .apkg path");
                     ui.add(egui::TextEdit::singleline(&mut self.package).desired_width(300.0))
@@ -1067,8 +1076,18 @@ impl StudyPanel {
                     }
                     if ui.button("Export new package").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
-                            match backend.export_apkg_to(Path::new(&self.package)) {
-                                Ok(count) => self.status = format!("Exported {count} notes and media."),
+                            match backend.export_apkg_to_with_scheduling(
+                                Path::new(&self.package),
+                                self.export_with_scheduling,
+                            ) {
+                                Ok(count) => {
+                                    let detail = if self.export_with_scheduling {
+                                        "including personal review history"
+                                    } else {
+                                        "without personal review history"
+                                    };
+                                    self.status = format!("Exported {count} notes and media {detail}.");
+                                }
                                 Err(error) => self.status = format!("Export refused: {error}"),
                             }
                         }

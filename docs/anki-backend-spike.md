@@ -20,6 +20,12 @@ The native Anki-package importer checks that the selected absolute .apkg is a re
 
 Disposable-profile tests construct malicious packages and verify rejection without altering existing note fields or writing outside the selected profile. This check supplements upstream Anki's importer and is not a replacement ZIP extractor or a guarantee against every malicious archive. M6.3 remains pending until feature tests pass. AnkiWeb credentials and sync are not used by this offline import path.
 
+## Private review history in Anki package exports (pending acceptance)
+
+Shareable package export now defaults to excluding scheduling and private review events. The native UI offers an explicit unchecked-by-default setting to include scheduling and personal study history when the learner intentionally needs an archive with that state. It describes the sensitivity before export and resets when closing the profile. Database backup remains a distinct, local recovery operation.
+
+An automated regression compares ordinary and opted-in exports by reimporting both into isolated profiles and inspecting their persisted review logs. This behavior is not credited until feature CI passes. Exports remain no-clobber and include deck definitions, notes and media.
+
 ## Repeatable build experiment
 
 [Anki Rust integration feasibility workflow](../.github/workflows/anki-backend-spike.yml) checks out the exact upstream commit into an isolated temporary directory and attempts `cargo check --locked -p anki` on GitHub's Linux worker. It never writes to the Retivus source tree, modifies Anki, or opens a user's collection. An experiment failure must be documented verbatim, classified (toolchain/dependency/build-script/API/license), and resolved before any claim of successful direct integration.

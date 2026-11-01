@@ -128,9 +128,18 @@ impl AnkiBackend {
         Ok(())
     }
 
-    /// Export all notes/decks/templates and media to a new .apkg. Never overwrite
-    /// an existing user file, even if Anki's internal exporter permits it.
+    /// Export a shareable .apkg without private study history by default.
     pub fn export_apkg_to(&mut self, destination: &Path) -> BackendResult<usize> {
+        self.export_apkg_to_with_scheduling(destination, false)
+    }
+
+    /// Include personal review/scheduling history only after explicit opt-in.
+    /// Never overwrite an existing user file.
+    pub fn export_apkg_to_with_scheduling(
+        &mut self,
+        destination: &Path,
+        include_review_history: bool,
+    ) -> BackendResult<usize> {
         let managed = self
             .managed_dir
             .as_ref()
@@ -158,7 +167,7 @@ impl AnkiBackend {
         let exported = self.collection.export_apkg(
             stage.path(),
             ExportAnkiPackageOptions {
-                with_scheduling: true,
+                with_scheduling: include_review_history,
                 with_deck_configs: true,
                 with_media: true,
                 legacy: false,
@@ -1021,6 +1030,39 @@ mod tests {
             );
             reimport.close().unwrap();
         }
+    }
+
+    #[test]
+    fn shareable_package_redacts_review_history_unless_explicitly_included() {
+        let root = tempdir().unwrap();
+        let mut original = AnkiBackend::create_managed_profile(root.path(), "private").unwrap();
+        original.add_basic_note(1, "sensitive", "private review").unwrap();
+        let card = original.next_review_preview().unwrap().unwrap();
+        original.grade_previewed_card(card.card_id, 4).unwrap();
+        assert_eq!(original.collection_stats().unwrap().review_events, 1);
+
+        let public_package = root.path().join("shareable.apkg");
+        let opt_in_package = root.path().join("with-review-history.apkg");
+        assert_eq!(original.export_apkg_to(&public_package).unwrap(), 1);
+        assert_eq!(
+            original
+                .export_apkg_to_with_scheduling(&opt_in_package, true)
+                .unwrap(),
+            1
+        );
+        original.close().unwrap();
+
+        let mut public = AnkiBackend::create_managed_profile(root.path(), "shareable").unwrap();
+        public.import_apkg(&public_package).unwrap();
+        let stats = public.collection_stats().unwrap();
+        assert_eq!((stats.notes, stats.cards, stats.review_events), (1, 1, 0));
+        public.close().unwrap();
+
+        let mut private = AnkiBackend::create_managed_profile(root.path(), "opted-in").unwrap();
+        private.import_apkg(&opt_in_package).unwrap();
+        let stats = private.collection_stats().unwrap();
+        assert_eq!((stats.notes, stats.cards, stats.review_events), (1, 1, 1));
+        private.close().unwrap();
     }
 
     #[test]
