@@ -55,11 +55,19 @@ jobs:
           test "$peak_kib" -gt 0
           test "$peak_kib" -lt 524288
           echo "Bounded full-release preview peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
-      - name: Import entire verified snapshot atomically into separate SQLite source catalog
+      - name: Import entire verified snapshot atomically within memory budget
         run: |
-          cargo run --bin import-source -- data/study/study.jsonl data/catalog.sqlite3 lex-v0.3.0 | tee data/import-result.txt
+          set -euo pipefail
+          cargo build --bin import-source
+          /usr/bin/time -f '%M' -o data/catalog-peak-rss-kib.txt \
+            ./target/debug/import-source data/study/study.jsonl data/catalog.sqlite3 lex-v0.3.0 \
+            | tee data/import-result.txt
           grep -q 'Imported 124444 Mexilex entries' data/import-result.txt
           test -s data/catalog.sqlite3
+          peak_kib="$(cat data/catalog-peak-rss-kib.txt)"
+          test "$peak_kib" -gt 0
+          test "$peak_kib" -lt 524288
+          echo "Full-release SQLite catalog import peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
       - name: Report independent consumer evidence
         run: |
           echo '## Mexilex published source integration' >> "$GITHUB_STEP_SUMMARY"
