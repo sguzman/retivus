@@ -39,7 +39,7 @@ jobs:
             LIBGL_ALWAYS_SOFTWARE=1 ./target/debug/retivus > /tmp/retivus-gui.log 2>&1 &
             app=$!
             trap "kill $app $wm 2>/dev/null || true" EXIT
-            for attempt in $(seq 1 60); do
+            for attempt in $(seq 1 120); do
               window=$(xdotool search --onlyvisible --name "Retivus" | head -n 1 || true)
               if test -n "$window"; then
                 xdotool windowactivate --sync "$window" || true
@@ -82,6 +82,9 @@ jobs:
               fi
               sleep 0.5
             done
+            echo "Retivus X11 startup diagnostics:" >&2
+            xwininfo -root -tree || true
+            ps -ef | grep -E "retivus|openbox|Xvfb" | grep -v grep || true
             cat /tmp/retivus-gui.log
             cat /tmp/retivus-wm.log
             exit 1

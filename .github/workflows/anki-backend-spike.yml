@@ -232,6 +232,10 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
       - name: Generate and self-verify reproducible Desktop GUI fixture
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           set -euo pipefail
           output_dir="$(mktemp -d)"
