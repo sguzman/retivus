@@ -28,15 +28,19 @@ jobs:
       - name: Smoke-launch real egui window under virtual X11
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq xvfb xdotool scrot libgl1-mesa-dri libxkbcommon-x11-0
+          sudo apt-get install -y -qq xvfb xdotool scrot libgl1-mesa-dri libxkbcommon-x11-0 openbox
           xvfb-run -a bash -euo pipefail -c '
+            openbox > /tmp/retivus-wm.log 2>&1 &
+            wm=$!
             LIBGL_ALWAYS_SOFTWARE=1 ./target/debug/retivus > /tmp/retivus-gui.log 2>&1 &
             app=$!
-            trap "kill $app 2>/dev/null || true" EXIT
+            trap "kill $app $wm 2>/dev/null || true" EXIT
             for attempt in $(seq 1 60); do
-              if xdotool search --name "Retivus" >/dev/null 2>&1; then
+              window=$(xdotool search --onlyvisible --name "Retivus" | head -n 1 || true)
+              if test -n "$window"; then
+                xdotool windowactivate --sync "$window" || true
                 for frame in $(seq 1 25); do
-                  scrot /tmp/retivus-ui.png
+                  scrot --window "$window" /tmp/retivus-ui.png
                   if test -s /tmp/retivus-ui.png && test "$(wc -c < /tmp/retivus-ui.png)" -gt 8000; then
                     exit 0
                   fi
@@ -46,8 +50,9 @@ jobs:
                   fi
                   sleep 1
                 done
-                echo "Retivus window exists, but only blank X11 frames were captured" >&2
+                echo "Retivus window mapped but never produced a nonblank captured frame" >&2
                 cat /tmp/retivus-gui.log
+                cat /tmp/retivus-wm.log
                 exit 1
               fi
               if ! kill -0 "$app" 2>/dev/null; then
@@ -57,6 +62,7 @@ jobs:
               sleep 0.5
             done
             cat /tmp/retivus-gui.log
+            cat /tmp/retivus-wm.log
             exit 1
           '
       - name: Archive actual GUI smoke screenshot
