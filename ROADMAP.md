@@ -2,14 +2,14 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Progress baseline:** 6% verified out of 100%; 0% before repository initialization. The foundation shell is committed but does not count as complete until GitHub CI and a real GUI visual test. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **10%** of 100% (initial baseline 0%; +10 percentage points this first round). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
 | Milestone | Weight | Verified | Status |
 | --- | ---: | ---: | --- |
-| 🧭 M0 Specification, project governance, initial foundation | 8% | 6% | 🟡 |
-| 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 0% | ⏳ |
+| 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
+| 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 2% | 🟡 |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 0% | ⏳ |
 | 🌍 M3 Generic external-source provider engine | 14% | 0% | ⏳ |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
@@ -23,13 +23,13 @@
 
 - ✅ **M0.1 🧭 Establish dual-purpose scope, exclusions and release acceptance** — **2%**. Acceptance: Product charter and stable definition of done are committed. Depends on: none. **verified complete.**
 - ✅ **M0.2 🗺️ Publish weighted, task-level roadmap and update protocol** — **2%**. Acceptance: All milestone tasks include ownerless objective criteria and dependencies. Depends on: M0.1. **verified complete.**
-- 🟡 **M0.3 🦀 Compile native egui skeleton with CI** — **2%**. Acceptance: cargo fmt/clippy/test/build pass on Linux CI; visible window. Depends on: M0.1. **active.**
+- ✅ **M0.3 🦀 Compile native egui skeleton with CI** — **2%**. Acceptance: cargo fmt/clippy/test/build pass on Linux CI; visible window. Depends on: M0.1. **verified complete.**
 - ✅ **M0.4 📜 Keep README, docs, CHANGELOG and contributor contract separated** — **2%**. Acceptance: All four artifact types maintained and navigation works. Depends on: M0.1. **verified complete.**
 
 ### 🔬 M1: Anki Rust backend feasibility and licensing gate (12% of project)
 
-- ⏳ **M1.1 🔎 Pin upstream Anki release/commit and dependency/toolchain inventory** — **2%**. Acceptance: Commit, transitive workspace deps and toolchain recorded. Depends on: M0.3. **pending.**
-- ⏳ **M1.2 ⚙️ Build actual pinned Anki Rust workspace in isolated CI** — **3%**. Acceptance: Repeatable Linux CI build passes. Depends on: M1.1. **pending.**
+- ✅ **M1.1 🔎 Pin upstream Anki release/commit and dependency/toolchain inventory** — **2%**. Acceptance: Commit, transitive workspace deps and toolchain recorded. Depends on: M0.3. **verified complete.**
+- 🟡 **M1.2 ⚙️ Build actual pinned Anki Rust workspace in isolated CI** — **3%**. Acceptance: Repeatable Linux CI build passes. Depends on: M1.1. **active.**
 - ⏳ **M1.3 🧩 Compile external client opening disposable Anki collection** — **3%**. Acceptance: Real read/write deck/note/card queue smoke without user collections. Depends on: M1.2. **pending.**
 - ⏳ **M1.4 ⚖️ Review AGPL licensing, notices, distribution and choose adapter** — **2%**. Acceptance: Document and implement legal compatible dependency boundary. Depends on: M1.3. **pending.**
 - ⏳ **M1.5 🧪 Confirm incremental upgrades/fallback and adapter tests** — **2%**. Acceptance: Pinned backend integration proven or justified alternative verified. Depends on: M1.4. **pending.**
@@ -80,12 +80,12 @@
 - ⏳ **M7.3 🧯 Upgrade/recovery test matrix and no known critical defects** — **2%**. Acceptance: Backups/migration/release gate CI pass. Depends on: M7.2. **pending.**
 - ⏳ **M7.4 🏁 Publish release, tag and final acceptance ledger** — **1%**. Acceptance: Release assets independently downloaded and verified. Depends on: M7.1,M7.2,M7.3. **pending.**
 
-## Verified evidence and next gate
+## Verified evidence and next gate (2026-11-01)
 
-- ✅ M0.1: [docs/product.md](docs/product.md) fixes the initial objective and boundaries.
-- ✅ M0.2: this roadmap gives task-level weights, dependencies, states and completion conditions.
-- ✅ M0.4: README is a public overview; docs hold deep content; [CHANGELOG.md](CHANGELOG.md) contains meaningful changes; [AGENTS.md](AGENTS.md) governs continuity.
-- 🟡 M0.3: initial egui shell + provider validation tests + CI submitted; **Rust compiler and real GUI not yet verified**, no completion credit.
-- Next: get CI green; set up actually rendered GUI smoke and a pinned upstream Anki backend compile spike. Defer actual AGPL adoption until licensing review.
+- ✅ M0.1, M0.2, M0.4: product scope, fixed weights and separated public/docs/changelog/agent guidance committed.
+- ✅ M0.3: native Rust/egui foundation compiled, passed `cargo fmt --check`, Clippy and provider tests, launched a real window in virtual X11 and captured a screenshot. Evidence: [GitHub Actions 41262584259](https://github.com/sguzman/retivus/actions/runs/41262584259). This is a window-open smoke, **not** a full human desktop visual review.
+- ✅ M1.1: pinned upstream `ankitects/anki` revision `136bd42bfbd356fc756b6d3e28cc77b02da11ea7`, toolchain Rust 1.99.0, 12 workspace crates, local dependencies, git-pinned sources, AGPL constraints and required protobuf/translation codegen. Evidence: [backend inventory](docs/anki-backend-spike.md).
+- 🟡 M1.2: the independent, pinned Anki `cargo check -p anki` experiment is running. First attempts exposed missing `protoc` and two translation submodules, now documented and installed. Do **not** count this milestone before the full build is successful.
+- Next: finish the pinned backend build; compile a separate disposable Anki collection client with a real deck/note/card queue; make a source-neutral provider interface and verified Mexilex release import.
 
-**Round reporting:** initial 0% → 6% (+6 pp), milestone M0 6/8 = 75% verified. If tests fail or remain unavailable, state the failed criteria and retry; do not count them as accomplished.
+**Progress accounting:** previous 6% → **10%**, +4 percentage points from M0.3 (2) and M1.1 (2). M0 is 8/8 = 100%, M1 is 2/12 = 16.7%. Against the pre-initialization baseline 0% → 10%. No partial credit for work in progress.
