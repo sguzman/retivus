@@ -35,8 +35,10 @@ jobs:
             trap "kill $app 2>/dev/null || true" EXIT
             for attempt in $(seq 1 60); do
               if xdotool search --name "Retivus" >/dev/null 2>&1; then
+                sleep 1
                 scrot /tmp/retivus-ui.png
                 test -s /tmp/retivus-ui.png
+                test "$(wc -c < /tmp/retivus-ui.png)" -gt 8000
                 exit 0
               fi
               if ! kill -0 "$app" 2>/dev/null; then
