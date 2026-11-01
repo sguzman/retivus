@@ -424,9 +424,7 @@ mod tests {
         assert!(catalog
             .select_sense("other-dictionary", "v1", "ja1", "other")
             .is_err());
-        assert!(catalog
-            .select_sense("mexilex", "v1", "ja1", "s1")
-            .is_err());
+        assert!(catalog.select_sense("mexilex", "v1", "ja1", "s1").is_err());
     }
 
     #[test]

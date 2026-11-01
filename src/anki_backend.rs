@@ -625,16 +625,28 @@ mod tests {
         assert_ne!(first, second);
         assert_eq!(backend.note_fields(first).unwrap(), ["生", "life"]);
         assert_eq!(backend.note_fields(second).unwrap(), ["生", "to live"]);
-        assert!(backend.note_tags(first).unwrap().contains(&life.source_tag()));
-        assert!(backend.note_tags(second).unwrap().contains(&live.source_tag()));
+        assert!(backend
+            .note_tags(first)
+            .unwrap()
+            .contains(&life.source_tag()));
+        assert!(backend
+            .note_tags(second)
+            .unwrap()
+            .contains(&live.source_tag()));
         assert_ne!(life.source_tag(), live.source_tag());
         backend.close().unwrap();
 
         let reopened = AnkiBackend::open_managed_profile(tmp.path(), "source").unwrap();
         assert_eq!(reopened.note_fields(first).unwrap(), ["生", "life"]);
         assert_eq!(reopened.note_fields(second).unwrap(), ["生", "to live"]);
-        assert!(reopened.note_tags(first).unwrap().contains(&life.source_tag()));
-        assert!(reopened.note_tags(second).unwrap().contains(&live.source_tag()));
+        assert!(reopened
+            .note_tags(first)
+            .unwrap()
+            .contains(&life.source_tag()));
+        assert!(reopened
+            .note_tags(second)
+            .unwrap()
+            .contains(&live.source_tag()));
         reopened.close().unwrap();
     }
 
