@@ -5,6 +5,10 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added managed-only `.apkg` import/export with media, template, tag and card round trips; pinned third-party AnkiDroid and MIT sample packages passed independent checks (Anki Desktop GUI interoperability still pending).
+- Added cloze/HTML/CSS/SVG render parity tests across full `.apkg` export/import and reopen.
+- Added offline `.anki2` copy-only migration with schema-checking, source-byte preservation, active WAL refusal, and official upstream Anki Desktop fixture verification.
+- Added persisted 80–150% native UI scale, compact/comfortable density and responsive toolbar/input sizing; full accessibility QA pending.
 - Verified explicit, bounded source snapshot diffs and opt-in reversible identity migrations, with Anki note updates that preserve existing review history and refuse manual-edit conflicts.
 - Verified Anki FSRS four-rating transitions, due queue restart, review persistence and undo using the pinned upstream scheduler.
 - Added explicit sense-specific source card candidates and Anki note creation with immutable provenance tags; homographs and multiple senses retain distinct identities.
