@@ -111,7 +111,6 @@ impl AnkiBackend {
         Ok(note.id.0)
     }
 
-
     /// Existing deck names come from the pinned upstream Anki collection engine.
     pub fn list_decks(&mut self) -> BackendResult<Vec<(i64, String)>> {
         let tree = self.collection.deck_tree(None)?;
@@ -165,7 +164,9 @@ impl AnkiBackend {
             .collection
             .get_notetype_by_name(notetype_name)?
             .ok_or("requested Anki note type does not exist")?;
-        if fields.len() != notetype.fields.len() || fields.iter().any(|field| field.trim().is_empty()) {
+        if fields.len() != notetype.fields.len()
+            || fields.iter().any(|field| field.trim().is_empty())
+        {
             return Err("note must supply all nonempty fields for the chosen note type".into());
         }
         let mut note = notetype.new_note();
@@ -191,7 +192,8 @@ impl AnkiBackend {
             .storage
             .get_note(NoteId(note_id))?
             .ok_or("note ID does not exist")?;
-        if fields.len() != note.fields().len() || fields.iter().any(|field| field.trim().is_empty()) {
+        if fields.len() != note.fields().len() || fields.iter().any(|field| field.trim().is_empty())
+        {
             return Err("updated note fields must match the existing note type".into());
         }
         for (index, field) in fields.iter().enumerate() {
@@ -354,7 +356,11 @@ mod tests {
         let tmp = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "learning").unwrap();
         let deck_id = backend.create_deck("Bidirectional").unwrap();
-        assert!(backend.list_decks().unwrap().iter().any(|deck| deck.0 == deck_id));
+        assert!(backend
+            .list_decks()
+            .unwrap()
+            .iter()
+            .any(|deck| deck.0 == deck_id));
         let kind = "Retivus Bidirectional";
         let type_id = backend.create_bidirectional_notetype(kind).unwrap();
         assert!(type_id > 0);
@@ -398,7 +404,11 @@ mod tests {
 
         let mut reopened = AnkiBackend::open_managed_profile(tmp.path(), "learning").unwrap();
         assert_eq!(reopened.note_fields(note_id).unwrap(), ["dos", "two"]);
-        assert!(reopened.list_decks().unwrap().iter().any(|deck| deck.0 == deck_id));
+        assert!(reopened
+            .list_decks()
+            .unwrap()
+            .iter()
+            .any(|deck| deck.0 == deck_id));
         assert!(reopened
             .list_notetypes()
             .unwrap()
