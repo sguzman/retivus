@@ -8,7 +8,9 @@ use std::path::Path;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let input = args.next().ok_or("usage: import-source <study.jsonl> <new.sqlite3> <snapshot>")?;
+    let input = args
+        .next()
+        .ok_or("usage: import-source <study.jsonl> <new.sqlite3> <snapshot>")?;
     let target = args.next().ok_or("missing new catalog path")?;
     let snapshot = args.next().ok_or("missing snapshot identifier")?;
     if args.next().is_some() {

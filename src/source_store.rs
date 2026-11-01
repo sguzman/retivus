@@ -124,7 +124,8 @@ impl SourceCatalog {
                     || record.provenance.lexical_language != info.lexical_language
                     || record.provenance.definition_language != info.definition_language
                 {
-                    insert_failure = Some("provider changed its declared identity or languages".into());
+                    insert_failure =
+                        Some("provider changed its declared identity or languages".into());
                     return;
                 }
                 if let Err(error) = entries.execute(params![
@@ -229,12 +230,20 @@ mod tests {
         catalog
             .import_snapshot("original", &tsv(), &mut Cursor::new(valid))
             .unwrap();
-        let invalid = format!("{HEADER}a\t橋\tnoun\ts1\tbridge\nb\t犬\tnoun\ts2\tdog\nb\t猫\tnoun\ts3\tcat\n");
+        let invalid = format!(
+            "{HEADER}a\t橋\tnoun\ts1\tbridge\nb\t犬\tnoun\ts2\tdog\nb\t猫\tnoun\ts3\tcat\n"
+        );
         assert!(catalog
             .import_snapshot("broken", &tsv(), &mut Cursor::new(invalid))
             .is_err());
-        assert_eq!(catalog.counts("other-dictionary", "broken").unwrap(), (0, 0));
-        assert_eq!(catalog.counts("other-dictionary", "original").unwrap(), (1, 1));
+        assert_eq!(
+            catalog.counts("other-dictionary", "broken").unwrap(),
+            (0, 0)
+        );
+        assert_eq!(
+            catalog.counts("other-dictionary", "original").unwrap(),
+            (1, 1)
+        );
     }
 
     #[test]
@@ -247,7 +256,10 @@ mod tests {
         assert!(catalog
             .import_snapshot("immutable", &tsv(), &mut Cursor::new(data))
             .is_err());
-        assert_eq!(catalog.counts("other-dictionary", "immutable").unwrap(), (1, 1));
+        assert_eq!(
+            catalog.counts("other-dictionary", "immutable").unwrap(),
+            (1, 1)
+        );
     }
 
     #[test]
