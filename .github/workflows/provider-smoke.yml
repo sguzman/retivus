@@ -40,7 +40,7 @@ jobs:
           test "$(wc -l < data/study/study.jsonl)" -eq 124444
       - name: Stream-validate all real study records with Retivus
         run: |
-          cargo run --locked --bin check-source -- data/study/study.jsonl | tee data/validation-result.txt
+          cargo run --bin check-source -- data/study/study.jsonl | tee data/validation-result.txt
           grep -q 'Validated 124444 Mexilex entries' data/validation-result.txt
       - name: Report independent consumer evidence
         run: |

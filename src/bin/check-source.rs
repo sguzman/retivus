@@ -5,7 +5,9 @@ use std::io::BufReader;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let path = args.next().ok_or("usage: check-source <mexilex-study.jsonl>")?;
+    let path = args
+        .next()
+        .ok_or("usage: check-source <mexilex-study.jsonl>")?;
     if args.next().is_some() {
         return Err("usage: check-source <mexilex-study.jsonl>".into());
     }
