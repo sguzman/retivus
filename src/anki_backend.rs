@@ -688,6 +688,17 @@ impl AnkiBackend {
         Ok((queued.new_count, queued.learning_count, queued.review_count))
     }
 
+    /// Never grade a different due card than the one the learner revealed.
+    pub fn grade_previewed_card(&mut self, expected_card_id: i64, rating: u8) -> BackendResult<()> {
+        if self.next_card_id()? != Some(expected_card_id) {
+            return Err("review queue changed; refresh the displayed card before grading".into());
+        }
+        if self.grade_next_card(rating)? != Some(expected_card_id) {
+            return Err("upstream Anki queue changed while grading".into());
+        }
+        Ok(())
+    }
+
     /// Return Anki's actual next card and native-renderer output without
     /// advancing its scheduler or exposing a remote HTML execution surface.
     pub fn next_review_preview(&mut self) -> BackendResult<Option<ReviewPreview>> {
@@ -1317,7 +1328,8 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         assert!(first.answer_html.contains("dog"));
         assert_eq!(first.card_id, backend.next_review_preview().unwrap().unwrap().card_id);
         assert_eq!(backend.due_counts().unwrap().0, 1);
-        assert_eq!(backend.grade_next_card(4).unwrap(), Some(first.card_id));
+        assert!(backend.grade_previewed_card(first.card_id + 1, 4).is_err());
+        backend.grade_previewed_card(first.card_id, 4).unwrap();
         let reviews: i64 = backend
             .collection
             .storage
