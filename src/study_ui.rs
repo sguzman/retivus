@@ -274,7 +274,8 @@ impl StudyPanel {
             Ok(rows) => {
                 self.diff_status = format!(
                     "Showing {} differences at offset {}. IDs are exact; no automatic merges.",
-                    rows.len(), self.diff_offset
+                    rows.len(),
+                    self.diff_offset
                 );
                 self.diff_rows = rows;
             }
@@ -287,11 +288,12 @@ impl StudyPanel {
 
     /// Read exact source identity and immutable record for the selected note.
     /// The catalog belongs to the open profile, never an arbitrary Anki path.
-    fn selected_source_context(
-        &self,
-    ) -> Result<(i64, SourceCatalog, SourceCardCandidate), String> {
+    fn selected_source_context(&self) -> Result<(i64, SourceCatalog, SourceCardCandidate), String> {
         let id = self.selected_note.ok_or("Select a learner note first")?;
-        let backend = self.backend.as_ref().ok_or("Open a learner profile first")?;
+        let backend = self
+            .backend
+            .as_ref()
+            .ok_or("Open a learner profile first")?;
         let tags = backend.note_tags(id).map_err(|e| e.to_string())?;
         let Some([provider, snapshot, entry, sense]) = Self::source_provenance(&tags)? else {
             return Err("Selected note has no unambiguous external source identity".into());
@@ -357,7 +359,10 @@ impl StudyPanel {
                 return Err("Mapping target changed after preview".into());
             }
             let (id, mut catalog, from) = self.selected_source_context()?;
-            let backend = self.backend.as_ref().ok_or("Open a learner profile first")?;
+            let backend = self
+                .backend
+                .as_ref()
+                .ok_or("Open a learner profile first")?;
             let fields = backend.note_fields(id).map_err(|e| e.to_string())?;
             if fields.len() != 2 || fields[0] != from.word || fields[1] != from.definition {
                 return Err("Learner note was edited; resolve the conflict before mapping".into());
@@ -402,14 +407,18 @@ impl StudyPanel {
     fn apply_recorded_source_mapping(&mut self) {
         let result = (|| -> Result<(), String> {
             let (id, catalog, original) = self.selected_source_context()?;
-            let backend = self.backend.as_mut().ok_or("Open a learner profile first")?;
+            let backend = self
+                .backend
+                .as_mut()
+                .ok_or("Open a learner profile first")?;
             backend
                 .apply_approved_source_reconciliation(&catalog, id, &original)
                 .map_err(|e| e.to_string())
         })();
         match result {
             Ok(()) => {
-                self.status = "Source revision applied to this note; Anki undo is available.".into();
+                self.status =
+                    "Source revision applied to this note; Anki undo is available.".into();
                 self.mapping_preview = None;
                 self.mapping_approved = false;
                 self.refresh();
