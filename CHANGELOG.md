@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Introduced restricted Retivus-owned Anki profile create/reopen APIs and disposable schema migration, isolation, symlink and unsupported-future-version regression tests.
 - Added an opt-in, pinned Anki Git backend module for in-memory deck/note/queue operations and isolated library tests.
 - Bounded source-neutral vocabulary preview in the native egui validation UI, with late-error rollback tests.
 - Verified pinned Anki Rust backend external-client deck/note/card/review-queue interoperability in isolated CI.
