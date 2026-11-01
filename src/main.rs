@@ -15,6 +15,31 @@ enum SourceFormat {
     GenericTsv,
 }
 
+/// A read-only selection from the validated preview, not yet a learner card.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SelectedSense {
+    provider_id: String,
+    edition: String,
+    entry_id: String,
+    sense_id: String,
+    word: String,
+    definition: String,
+}
+
+impl SelectedSense {
+    fn from_record(record: &source_adapter::SourceRecord, sense_id: &str) -> Option<Self> {
+        let sense = record.senses.iter().find(|item| item.sense_id == sense_id)?;
+        Some(Self {
+            provider_id: record.provenance.provider_id.clone(),
+            edition: record.provenance.edition.clone(),
+            entry_id: record.entry_id.clone(),
+            sense_id: sense.sense_id.clone(),
+            word: record.word.clone(),
+            definition: sense.definition.clone(),
+        })
+    }
+}
+
 const THEME_STORAGE_KEY: &str = "retivus.theme.v1";
 impl Theme {
     fn from_stored(value: Option<&str>) -> Self {
@@ -60,6 +85,7 @@ struct Retivus {
     definition_language: String,
     license_notice: String,
     preview: Vec<source_adapter::SourceRecord>,
+    selected_sense: Option<SelectedSense>,
     krypton_font_loaded: bool,
 }
 impl Default for Retivus {
@@ -75,6 +101,7 @@ impl Default for Retivus {
             definition_language: String::new(),
             license_notice: String::new(),
             preview: Vec::new(),
+            selected_sense: None,
             krypton_font_loaded: false,
         }
     }
@@ -170,6 +197,7 @@ impl eframe::App for Retivus {
                 });
                 if ui.button("Validate source").clicked() {
                     self.preview.clear();
+                    self.selected_sense = None;
                     let adapter: Result<Box<dyn source_adapter::SourceAdapter>, String> =
                         match self.source_format {
                             SourceFormat::Mexilex => {
@@ -204,22 +232,56 @@ impl eframe::App for Retivus {
                     };
                 }
                 ui.label(&self.import_status);
+                if let Some(chosen) = &self.selected_sense {
+                    ui.group(|ui| {
+                        ui.heading("Selected meaning (preview only)");
+                        ui.strong(format!("{} → {}", chosen.word, chosen.definition));
+                        ui.weak(format!(
+                            "Provider {} · edition {} · entry {} · sense {}",
+                            chosen.provider_id, chosen.edition, chosen.entry_id, chosen.sense_id
+                        ));
+                        ui.label("No card was created. A verified source snapshot and an explicit learner profile are required before adding cards.");
+                    });
+                }
                 if !self.preview.is_empty() {
                     ui.separator();
                     ui.heading("Vocabulary preview");
-                    ui.weak("First 12 validated records · read-only · no cards created");
+                    ui.weak("First 12 validated records · choose one specific sense · no cards created");
                     for record in &self.preview {
-                        ui.group(|ui| {
-                            ui.horizontal(|ui| {
-                                ui.strong(&record.word);
-                                ui.weak(&record.part_of_speech);
+                        ui.push_id((&record.provenance.provider_id, &record.entry_id), |ui| {
+                            ui.group(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.strong(&record.word);
+                                    ui.weak(&record.part_of_speech);
+                                });
+                                for sense in record.senses.iter().take(3) {
+                                    ui.horizontal_wrapped(|ui| {
+                                        ui.label(&sense.definition);
+                                        if ui.small_button("Select sense").clicked() {
+                                            self.selected_sense =
+                                                SelectedSense::from_record(record, &sense.sense_id);
+                                        }
+                                    });
+                                }
+                                if record.senses.len() > 3 {
+                                    ui.collapsing(
+                                        format!("{} more meanings", record.senses.len() - 3),
+                                        |ui| {
+                                            for sense in record.senses.iter().skip(3) {
+                                                ui.horizontal_wrapped(|ui| {
+                                                    ui.label(&sense.definition);
+                                                    if ui.small_button("Select sense").clicked() {
+                                                        self.selected_sense =
+                                                            SelectedSense::from_record(
+                                                                record, &sense.sense_id,
+                                                            );
+                                                    }
+                                                });
+                                            }
+                                        },
+                                    );
+                                }
                             });
-                            for sense in record.senses.iter().take(3) {
-                                ui.label(&sense.definition);
-                            }
-                            if record.senses.len() > 3 {
-                                ui.weak(format!("{} additional meanings", record.senses.len() - 3));
-                            }
                         });
                     }
                 }
@@ -302,6 +364,32 @@ mod tests {
                 assert_eq!(ctx.theme(), expected);
             }
         }
+    }
+
+    #[test]
+    fn source_preview_selects_exact_homograph_and_rejects_absent_sense() {
+        use retivus::source_adapter::{SourceInfo, StudyTsvV1};
+        use std::io::Cursor;
+
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "fixture".into(),
+            edition: "v1".into(),
+            lexical_language: "ja".into(),
+            definition_language: "es".into(),
+            license_notice: "Original test fixture".into(),
+        })
+        .unwrap();
+        let input = include_str!("../tests/fixtures/independent-ja-es.tsv");
+        let preview = retivus::preview::validate_preview(&adapter, &mut Cursor::new(input))
+            .unwrap();
+        let life = SelectedSense::from_record(&preview.rows[0], "s1").unwrap();
+        let live = SelectedSense::from_record(&preview.rows[1], "s1").unwrap();
+        assert_eq!(life.word, live.word);
+        assert_ne!(life.entry_id, live.entry_id);
+        assert_eq!(life.definition, "vida");
+        assert_eq!(live.definition, "vivir");
+        assert!(SelectedSense::from_record(&preview.rows[0], "invalid").is_none());
+        assert!(Retivus::default().selected_sense.is_none());
     }
 
     #[test]
