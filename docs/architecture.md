@@ -58,3 +58,6 @@ Initial schema compatibility tests create only temporary Retivus-owned profile f
 ## ADR-007: Backend-owned deck, note and template operations
 
 The feature-gated adapter offers deck listing/creation, note-type listing, a two-direction note-type creator using Anki card templates, note creation/edit/deletion, in-session undo and profile reopening through upstream Anki transactions. A disposable integration fixture tests two generated cards for one note, changing its two fields, deleting/undoing it and restoring its content after closing/reopening the collection. Retivus does **not** yet display these operations in the native GUI. No homegrown scheduling or collection schema is added. A user-facing editor, guard prompts and later review/persistence features remain separate tasks.
+
+
+**M2.1 backend acceptance (2026-11-01):** [feature test run 41268857882](https://github.com/sguzman/retivus/actions/runs/41268857882) passed 20 tests with the new bidirectional note/card generation, edit/delete/undo and reopen fixture. The engine's remaining review, backup, and UI integration work is tracked independently.

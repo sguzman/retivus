@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **29%** of 100% (previous session 23%, current session **+6 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **33%** of 100% (previous session 23%, current session **+10 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -10,7 +10,7 @@
 | --- | ---: | ---: | --- |
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
-| 🗃️ M2 Local collection engine and learner-safe core | 15% | 0% | ⏳ |
+| 🗃️ M2 Local collection engine and learner-safe core | 15% | 4% | 🟡 |
 | 🌍 M3 Generic external-source provider engine | 14% | 7% | 🟡 |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
 | 🎨 M5 Complete native egui study experience | 14% | 2% | 🟡 |
@@ -36,7 +36,7 @@
 
 ### 🗃️ M2: Local collection engine and learner-safe core (15% of project)
 
-- ⏳ **M2.1 🗂️ Manage profiles, decks, notes, templates and multiple cards** — **4%**. Acceptance: Create/edit/delete/restore round-trips via selected backend. Depends on: M1.5. **pending.**
+- ✅ **M2.1 🗂️ Manage profiles, decks, notes, templates and multiple cards** — **4%**. Acceptance: Create/edit/delete/restore round-trips via selected backend. Depends on: M1.5. **verified complete.**
 - ⏳ **M2.2 ⏱️ Schedule learning/review with actual FSRS and due queues** — **4%**. Acceptance: Known scheduler fixtures and interrupted review restart pass. Depends on: M2.1. **pending.**
 - ⏳ **M2.3 💾 Persist review events/undo/backup/recovery atomically** — **4%**. Acceptance: Crash+rollback tests preserve previous state. Depends on: M2.1. **pending.**
 - ⏳ **M2.4 🔐 Profile isolation, path safety, migrations, export backups** — **3%**. Acceptance: Two-profile and corrupt-file tests pass. Depends on: M2.3. **pending.**
@@ -82,12 +82,15 @@
 
 ## Verified checkpoint — 2026-11-01
 
-**Progress**: 23% → **29%** (**+6 percentage points** this session). M0: 8/8 (100%); M1: 12/12 (100%); M2: 0/15 (0%); M3: 7/14 (50%); M4: 0/17 (0%); M5: 2/14 (14.3%); M6: 0/12 (0%); M7: 0/8 (0%).
+- ✅ **M2.1 🗂️ (+4 pp):** [Anki feature CI 41268857882](https://github.com/sguzman/retivus/actions/runs/41268857882) passed **20** feature-enabled tests, including an actual two-template Anki note yielding two cards, deck and note-type enumeration, note field modification, deletion, undo restoration, and a clean close/reopen preserving data. The alternate formatting-only build is still running but the tested source behavior is identical. This confirms the backend-level collection CRUD, not the still-pending egui editor or backup/recovery.
+
+
+**Progress**: 23% → **33%** (**+10 percentage points** this session). M0: 8/8 (100%); M1: 12/12 (100%); M2: 4/15 (26.7%); M3: 7/14 (50%); M4: 0/17 (0%); M5: 2/14 (14.3%); M6: 0/12 (0%); M7: 0/8 (0%).
 
 - ✅ **M1.5 🧪 (+2 pp):** [Feature CI 41267822664](https://github.com/sguzman/retivus/actions/runs/41267822664) passed **15** feature-enabled Rust tests, including Retivus-owned profile creation/reopen/isolation, schema 11 → 18 migration preserving notes, refusal of unknown schema 99 without deletion, and symlink path rejection. The backend stays pinned to Anki revision `136bd42bfbd356fc756b6d3e28cc77b02da11ea7`; no personal Anki profile was accessed. This verifies the scoped adapter upgrade/fallback gate, **not** full future Anki compatibility or production backup/recovery.
 - ✅ **M3.2 📦 (+4 pp):** [Published source CI 41268497201](https://github.com/sguzman/retivus/actions/runs/41268497201) checked upstream Mexilex v0.3.0 SHA256SUMS, license/manifest and imported **124,444** entries and **155,586** senses into a separate SQLite catalog. [Rust CI 41268551513](https://github.com/sguzman/retivus/actions/runs/41268551513) passed catalog rollback, duplicate, provider-isolation and disk-reopen regression tests. The import is atomic per snapshot, and does **not** create cards or mutate user review history.
 - ✅ **GUI smoke harness:** [Rust CI 41268276012](https://github.com/sguzman/retivus/actions/runs/41268276012) passed a real native window smoke with an X11 window manager and direct app-window screenshot. This only verifies launch and basic rendering; actual multi-size visual QA remains M5.6.
 - ✅ **Previous M0/M1/M3/M5 work:** pinned Anki Rust build and direct Git dependency, AGPL provenance/attribution, System/Light/Dark theme persistence and OS following, source-neutral Mexilex/TSV adapters, bounded read-only preview, and separated README/docs/changelog remain verified by earlier runs documented in [technical architecture](docs/architecture.md), [providers](docs/providers.md), and [licensing](docs/licensing.md).
-- ⏳ **Next:** M2.1 🗂️ extend the upstream backend to safe deck/note/template CRUD and multi-card note round-trips; M3.3 📝 associate selected lexical senses with learner-owned card candidates after M2.1. M2.3 💾 still requires explicit backups, crash recovery and atomic review history. No roadmap work is invented beyond these acceptance gates.
+- ⏳ **Next:** M2.2 ⏱️ implement and verify actual Anki FSRS review/queue behavior across restart. M2.3 💾 adds undo/review-history crash safety and backups. M3.3 📝 builds lexical sense-to-card candidate previews now that M2.1 is verified. No new workstreams are introduced outside the fixed roadmap.
 
 **Accounting rule:** only completed numbered tasks earn their fixed project weights. The provider import is a **source catalog**; this is not the later study-card generation, snapshot reconciliation or Anki package importer. Do not count GUI demo or documentation as any additional percentage.

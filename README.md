@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Early development. The initial repository establishes the Rust/egui application shell, versioned Mexilex and generic TSV validation adapters, and a weighted [implementation roadmap](ROADMAP.md). **An opt-in, CI-tested Anki Rust backend adapter is available; durable collection storage, complete scheduling, synchronization, and deck interchange are not yet implemented or claimed.**
+Early development. The initial repository establishes the Rust/egui application shell, versioned Mexilex and generic TSV validation adapters, and a weighted [implementation roadmap](ROADMAP.md). **An opt-in, CI-tested Anki Rust backend adapter is available; basic Retivus-owned collection persistence and backend deck/note/template operations have been verified, while full review scheduling, backups, synchronization, and deck interchange remain unfinished.**
 
 ## Architecture
 
