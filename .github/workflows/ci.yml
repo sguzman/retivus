@@ -1,0 +1,24 @@
+name: Rust foundation
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+      - name: Check code
+        run: cargo clippy --all-targets -- -D warnings
+      - name: Test provider boundary
+        run: cargo test --all-targets
+      - name: Compile release UI
+        run: cargo build --release

@@ -1,0 +1,42 @@
+# Architecture and integration decisions
+
+## ADR-001: First evaluate direct use of Anki's Rust backend
+
+**Status:** proposed, evidence-backed reconnaissance; feasibility remains unverified.
+
+The upstream [ankitects/anki](https://github.com/ankitects/anki) repository has a large `rslib` Rust crate, including public modules for `collection`, `card`, `notes`, `notetype`, `decks`, `scheduler`, `import_export`, `sync`, and `media`. The crate is named `anki`, has `publish = false` and `workspace = ".."` in its manifest, and uses extensive other workspace crates, generated protobuf code, assets and build dependencies. A direct one-line crates.io dependency is therefore **not** an established integration strategy.
+
+### Feasibility decision gate (M1)
+
+1. Pin an upstream commit and build Anki's actual Rust workspace in a dedicated CI spike, recording toolchain and Linux dependencies. Do not vendor entire upstream sources without proven benefit.
+2. Compile a **minimal external Rust client** that opens an *isolated, disposable* Anki collection using `anki::collection::CollectionBuilder`, creates a deck, note/card, and retrieves a review queue via documented actual APIs. Verify tests against this pinned commit. No real user collection or credentials in tests.
+3. Inventory required crates, generated artifacts, native deps, upgrade friction, relevant upstream AGPL obligations and runtime-size impact.
+4. If practical, adopt a pinned backend adapter and formally review project licensing first. If blocked, record exact failures and evaluate Anki's protobuf backend service or a narrow clean-room compatible adapter. A fallback must not imply full Anki ecosystem compatibility.
+5. Keep egui concerns out of the engine adapter; the application depends on stable internal traits. Maintain Anki-compatible identifiers and review actions only after verification of upstream semantics.
+
+**Licensing gate:** The repo initially has MIT-licensed original code. Direct incorporation of Anki's AGPL-3.0-or-later code requires compatible overall licensing, source availability and notices. Do **not** import or link `rslib` into distributed Retivus code while claiming the overall binary is solely MIT. Confirm obligations before integration.
+
+## ADR-002: Source-provider boundary
+
+A provider supplies source edition, snapshot identity, language pair, stable entry/sense identifiers, word, meanings, provenance and optional metadata. The importer validates content; *application-owned* IDs, cards, decks and review history remain separate. The initial v1 JSONL validator is deliberately Anki-backend-independent.
+
+**Import transaction:** verify file checksums and manifest first, stream records through validated staging storage, generate a dry-run diff, and commit with rollback only after all records pass. Duplicates and ambiguous meaning mappings are blocked. Provider URL and snapshot are not substitutes for immutable hashes.
+
+**Migration:** new snapshot is compared against the old; exact identities can retain links; changed annotation and candidate IDs require explicit review; missing source records are archived while their cards/history persist. No blind merge.
+
+## ADR-003: Presentation
+
+Rust with eframe/egui, keyboard-first, System/Light/Dark theme, persistent preferences. Respect font licenses; prefer user-installed Krypton Nerd Font if discovered in a safe platform-specific lookup, otherwise native defaults. Avoid a handcrafted rendering engine before baseline egui works.
+
+## ADR-004: Storage ownership
+
+A Retivus profile is the boundary for its own cards, note/deck metadata, preferences, source snapshots, credentials and event log. The adapter must avoid mixing provider-owned metadata with private review state. Use upstream collection storage if the backend spike succeeds; do not create a competing overlapping SRS database without reason.
+
+## Technical risks to resolve
+
+- Anki backend's unpublished workspace and generated protobuf requirements.
+- AGPL obligations and upstream version pinning.
+- Matching Anki's note/card/template and media semantics for exported packages.
+- Atomic migration of user-facing collections and restored backups.
+- AnkiWeb protocol/credentials; never assume network compatibility from local `.apkg` success.
+- Provider volume: Mexilex has 124,444 default study entries and must not be loaded into one unbounded GUI frame.
