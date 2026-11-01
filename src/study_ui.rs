@@ -59,6 +59,11 @@ pub struct StudyPanel {
     stats: CollectionStats,
     selected_note: Option<i64>,
     source_report: String,
+    mapping_to_snapshot: String,
+    mapping_to_entry: String,
+    mapping_to_sense: String,
+    mapping_preview: Option<SourceCardCandidate>,
+    mapping_approved: bool,
     confirm_delete: bool,
     review: Option<ReviewPreview>,
     revealed: bool,
@@ -243,6 +248,119 @@ impl StudyPanel {
         self.status =
             format!("Staged {count} source entries under {snapshot} without creating cards.");
         Ok(count)
+    }
+
+    /// Read exact source identity and immutable record for the selected note.
+    /// The catalog belongs to the open profile, never an arbitrary Anki path.
+    fn selected_source_context(
+        &self,
+    ) -> Result<(i64, SourceCatalog, SourceCardCandidate), String> {
+        let id = self.selected_note.ok_or("Select a learner note first")?;
+        let backend = self.backend.as_ref().ok_or("Open a learner profile first")?;
+        let tags = backend.note_tags(id).map_err(|e| e.to_string())?;
+        let Some([provider, snapshot, entry, sense]) = Self::source_provenance(&tags)? else {
+            return Err("Selected note has no unambiguous external source identity".into());
+        };
+        let path = self.managed_catalog_path()?;
+        let catalog = SourceCatalog::open_existing(&path)?;
+        let original = catalog.select_sense(&provider, &snapshot, &entry, &sense)?;
+        Ok((id, catalog, original))
+    }
+
+    fn preview_source_mapping(&mut self) {
+        self.mapping_preview = None;
+        self.mapping_approved = false;
+        let outcome = (|| -> Result<SourceCardCandidate, String> {
+            let (_, catalog, from) = self.selected_source_context()?;
+            if self.mapping_to_snapshot.trim().is_empty()
+                || self.mapping_to_entry.trim().is_empty()
+                || self.mapping_to_sense.trim().is_empty()
+            {
+                return Err("Specify exact target snapshot, entry and sense".into());
+            }
+            let target = catalog.select_sense(
+                &from.provenance.provider_id,
+                self.mapping_to_snapshot.trim(),
+                self.mapping_to_entry.trim(),
+                self.mapping_to_sense.trim(),
+            )?;
+            if from.snapshot == target.snapshot {
+                return Err("A version mapping must use a distinct source snapshot".into());
+            }
+            if from.provenance.lexical_language != target.provenance.lexical_language
+                || from.provenance.definition_language != target.provenance.definition_language
+            {
+                return Err("Source languages differ; mapping is not permitted".into());
+            }
+            Ok(target)
+        })();
+        match outcome {
+            Ok(target) => {
+                self.status = format!(
+                    "Exact target found: {} → {}. Review the meaning and license before approval.",
+                    target.word, target.definition
+                );
+                self.mapping_preview = Some(target);
+            }
+            Err(error) => self.status = format!("Mapping preview refused: {error}"),
+        }
+    }
+
+    fn record_source_mapping(&mut self) {
+        let result = (|| -> Result<String, String> {
+            if !self.mapping_approved {
+                return Err("Preview the exact target and explicitly approve the mapping".into());
+            }
+            let target = self
+                .mapping_preview
+                .as_ref()
+                .ok_or("No verified target has been previewed")?;
+            if target.snapshot != self.mapping_to_snapshot.trim()
+                || target.entry_id != self.mapping_to_entry.trim()
+                || target.sense_id != self.mapping_to_sense.trim()
+            {
+                return Err("Mapping target changed after preview".into());
+            }
+            let (id, mut catalog, from) = self.selected_source_context()?;
+            let backend = self.backend.as_ref().ok_or("Open a learner profile first")?;
+            let fields = backend.note_fields(id).map_err(|e| e.to_string())?;
+            if fields.len() != 2 || fields[0] != from.word || fields[1] != from.definition {
+                return Err("Learner note was edited; resolve the conflict before mapping".into());
+            }
+            catalog.record_reconciliation(&from, target)?;
+            Ok(format!(
+                "Recorded explicit mapping to {} / {} / {}. Note and reviews remain unchanged.",
+                target.snapshot, target.entry_id, target.sense_id
+            ))
+        })();
+        self.mapping_approved = false;
+        self.status = match result {
+            Ok(message) => message,
+            Err(error) => format!("Source mapping not recorded: {error}"),
+        };
+        self.inspect_selected_source();
+    }
+
+    /// This is a distinct user action after mapping: the Anki backend verifies
+    /// unmodified source fields, unique provenance and preserves review history.
+    fn apply_recorded_source_mapping(&mut self) {
+        let result = (|| -> Result<(), String> {
+            let (id, catalog, original) = self.selected_source_context()?;
+            let backend = self.backend.as_mut().ok_or("Open a learner profile first")?;
+            backend
+                .apply_approved_source_reconciliation(&catalog, id, &original)
+                .map_err(|e| e.to_string())
+        })();
+        match result {
+            Ok(()) => {
+                self.status = "Source revision applied to this note; Anki undo is available.".into();
+                self.mapping_preview = None;
+                self.mapping_approved = false;
+                self.refresh();
+                self.refresh_review();
+            }
+            Err(error) => self.status = format!("Source revision not applied: {error}"),
+        }
     }
 
     /// Compare the selected note with its immutable source payload and any
@@ -432,6 +550,8 @@ impl StudyPanel {
                     format!("Deleted note {note_id}; Undo last Anki edit can restore it.");
                 self.selected_note = None;
                 self.source_report.clear();
+                self.mapping_preview = None;
+                self.mapping_approved = false;
                 self.front.clear();
                 self.back.clear();
                 self.refresh();
@@ -472,6 +592,11 @@ impl StudyPanel {
         self.deck_id = None;
         self.selected_note = None;
         self.source_report.clear();
+        self.mapping_to_snapshot.clear();
+        self.mapping_to_entry.clear();
+        self.mapping_to_sense.clear();
+        self.mapping_preview = None;
+        self.mapping_approved = false;
         self.confirm_delete = false;
         // Never display editor contents, search terms, or file paths from
         // a previous profile after the learner switches collections.
@@ -584,6 +709,8 @@ impl StudyPanel {
                         if ui.selectable_label(self.selected_note == Some(note.id), label).clicked() {
                             self.selected_note = Some(note.id);
                             self.source_report.clear();
+                            self.mapping_preview = None;
+                            self.mapping_approved = false;
                             self.confirm_delete = false;
                             self.front = note.fields.first().cloned().unwrap_or_default();
                             self.back = note.fields.get(1).cloned().unwrap_or_default();
@@ -594,6 +721,8 @@ impl StudyPanel {
                     if ui.button("New basic note").clicked() {
                         self.selected_note = None;
                         self.source_report.clear();
+                        self.mapping_preview = None;
+                        self.mapping_approved = false;
                         self.confirm_delete = false;
                         self.front.clear();
                         self.back.clear();
@@ -646,6 +775,50 @@ impl StudyPanel {
                             ui.label(&self.source_report);
                         }
                     }
+                    ui.collapsing("Explicit source version reconciliation", |ui| {
+                        ui.weak("Stage a new generic source snapshot first. Never match on spelling alone.");
+                        let mut changed = false;
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("Target snapshot");
+                            changed |= ui.text_edit_singleline(&mut self.mapping_to_snapshot).changed();
+                            ui.label("Entry ID");
+                            changed |= ui.text_edit_singleline(&mut self.mapping_to_entry).changed();
+                            ui.label("Sense ID");
+                            changed |= ui.text_edit_singleline(&mut self.mapping_to_sense).changed();
+                        });
+                        if changed {
+                            self.mapping_preview = None;
+                            self.mapping_approved = false;
+                        }
+                        if ui.button("Preview exact target sense").clicked() {
+                            self.preview_source_mapping();
+                        }
+                        if let Some(target) = self.mapping_preview.as_ref() {
+                            ui.label(format!(
+                                "Target: {} → {} · {} / {} / {}",
+                                target.word, target.definition,
+                                target.snapshot, target.entry_id, target.sense_id
+                            ));
+                            ui.weak(format!("License notice: {}", target.provenance.license_notice));
+                            ui.checkbox(
+                                &mut self.mapping_approved,
+                                "I approve recording this exact one-to-one source mapping",
+                            );
+                            if ui
+                                .add_enabled(
+                                    self.mapping_approved,
+                                    egui::Button::new("Record source mapping (no note changes)"),
+                                )
+                                .clicked()
+                            {
+                                self.record_source_mapping();
+                            }
+                        }
+                        if ui.button("Apply already recorded mapping to selected note").clicked() {
+                            self.apply_recorded_source_mapping();
+                        }
+                        ui.weak("Mapping and applying are separate actions; manual edits or ambiguous identities block migration.");
+                    });
                     ui.horizontal_wrapped(|ui| {
                         ui.checkbox(&mut self.confirm_delete, "Confirm removal of selected note");
                         if ui
