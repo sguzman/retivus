@@ -236,6 +236,45 @@ impl AnkiBackend {
         Self::open_managed_profile(&root, profile_id)
     }
 
+    /// Import a *closed*, offline Anki .anki2 database as a new Retivus profile.
+    /// Never opens the source through Anki's potentially migrating writer.
+    /// A live WAL/journal is refused; media must be imported separately as .apkg.
+    pub fn import_offline_anki_collection_copy(
+        root: &Path,
+        profile_id: &str,
+        source: &Path,
+    ) -> BackendResult<Self> {
+        validate_profile_id(profile_id)?;
+        if !source.is_absolute()
+            || source.extension().and_then(|extension| extension.to_str()) != Some("anki2")
+        {
+            return Err("an absolute offline .anki2 source file is required".into());
+        }
+        check_regular(source, false)?;
+        ensure_no_sqlite_sidecars(source)?;
+        let root = fs::canonicalize(root)?;
+        check_regular(&root, true)?;
+        if fs::symlink_metadata(root.join(profile_id)).is_ok() {
+            return Err("target profile already exists; refusing replacement".into());
+        }
+
+        let initial = fs::metadata(source)?;
+        let copied = NamedTempFile::new_in(&root)?;
+        fs::copy(source, copied.path())?;
+        ensure_no_sqlite_sidecars(source)?;
+        let after_copy = fs::metadata(source)?;
+        if initial.len() != after_copy.len()
+            || initial.modified()? != after_copy.modified()?
+            || fs::metadata(copied.path())?.len() != initial.len()
+        {
+            return Err("offline collection changed during copy; source may be active".into());
+        }
+        // Validate the detached copy with Anki's registered custom collations.
+        // The original file is never passed to CollectionBuilder.
+        verify_anki_staged_copy(copied.path())?;
+        Self::restore_backup_as_new_profile(&root, profile_id, copied.path())
+    }
+
     /// The active upstream database schema version, for explicit migration diagnostics.
     pub fn schema_version(&self) -> BackendResult<i32> {
         Ok(self
@@ -657,6 +696,17 @@ fn check_regular(path: &Path, directory: bool) -> BackendResult<()> {
         || (!directory && !meta.file_type().is_file())
     {
         return Err("expected a real directory or regular file, not a symlink".into());
+    }
+    Ok(())
+}
+
+fn ensure_no_sqlite_sidecars(source: &Path) -> BackendResult<()> {
+    for suffix in ["-wal", "-shm", "-journal"] {
+        let mut filename = source.as_os_str().to_os_string();
+        filename.push(suffix);
+        if fs::symlink_metadata(PathBuf::from(filename)).is_ok() {
+            return Err("source has SQLite journal/WAL sidecars; close Anki and export a safe copy".into());
+        }
     }
     Ok(())
 }
@@ -1096,6 +1146,68 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         assert!(AnkiBackend::open_managed_profile(tmp.path(), "future").is_err());
         assert!(path.exists());
         assert!(AnkiBackend::create_managed_profile(tmp.path(), "future").is_err());
+    }
+
+    #[test]
+    fn offline_anki_copy_migrates_schema_without_modifying_source_and_refuses_active_files() {
+        let root = tempdir().unwrap();
+        let mut upstream = AnkiBackend::create_managed_profile(root.path(), "upstream").unwrap();
+        let note_id = upstream.add_basic_note(1, "archivo", "archive").unwrap();
+        upstream.collection.close(Some(SchemaVersion::V11)).unwrap();
+        let source = root.path().join("upstream/collection.anki2");
+        let pristine = fs::read(&source).unwrap();
+
+        let wal = root.path().join("upstream/collection.anki2-wal");
+        fs::write(&wal, b"simulated uncheckpointed write").unwrap();
+        assert!(AnkiBackend::import_offline_anki_collection_copy(
+            root.path(),
+            "blocked",
+            &source
+        )
+        .is_err());
+        assert!(!root.path().join("blocked").exists());
+        fs::remove_file(&wal).unwrap();
+
+        let copied = AnkiBackend::import_offline_anki_collection_copy(
+            root.path(),
+            "imported",
+            &source,
+        )
+        .unwrap();
+        assert_eq!(copied.schema_version().unwrap(), 18);
+        assert_eq!(copied.note_fields(note_id).unwrap(), ["archivo", "archive"]);
+        copied.close().unwrap();
+        assert_eq!(fs::read(&source).unwrap(), pristine);
+        assert!(AnkiBackend::import_offline_anki_collection_copy(
+            root.path(),
+            "imported",
+            &source
+        )
+        .is_err());
+        assert_eq!(fs::read(&source).unwrap(), pristine);
+
+        #[cfg(unix)]
+        {
+            let linked = root.path().join("source-link.anki2");
+            std::os::unix::fs::symlink(&source, &linked).unwrap();
+            assert!(AnkiBackend::import_offline_anki_collection_copy(
+                root.path(),
+                "linked",
+                &linked
+            )
+            .is_err());
+            assert!(!root.path().join("linked").exists());
+        }
+        let damaged = root.path().join("malformed.anki2");
+        fs::write(&damaged, b"not sqlite").unwrap();
+        assert!(AnkiBackend::import_offline_anki_collection_copy(
+            root.path(),
+            "malformed",
+            &damaged
+        )
+        .is_err());
+        assert!(!root.path().join("malformed").exists());
+        assert_eq!(fs::read(&damaged).unwrap(), b"not sqlite");
     }
 
     #[test]
