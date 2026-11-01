@@ -12,6 +12,9 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: retivus-anki-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   upstream:
     runs-on: ubuntu-latest
