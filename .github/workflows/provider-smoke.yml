@@ -68,6 +68,18 @@ jobs:
           test "$peak_kib" -gt 0
           test "$peak_kib" -lt 524288
           echo "Full-release SQLite catalog import peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Benchmark indexed source lookup after full catalog import
+        run: |
+          set -euo pipefail
+          cargo build --bin benchmark-catalog
+          /usr/bin/time -f '%M' -o data/lookup-peak-rss-kib.txt \
+            ./target/debug/benchmark-catalog data/catalog.sqlite3 \
+            | tee data/lookup-result.txt
+          grep -q 'Performed 1000 indexed source catalog lookups' data/lookup-result.txt
+          peak_kib="$(cat data/lookup-peak-rss-kib.txt)"
+          test "$peak_kib" -gt 0
+          test "$peak_kib" -lt 524288
+          echo "1000 indexed source lookups peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
       - name: Report independent consumer evidence
         run: |
           echo '## Mexilex published source integration' >> "$GITHUB_STEP_SUMMARY"

@@ -49,7 +49,7 @@ This is an import/staging foundation, not a complete provider lifecycle: manifes
 
 The provider acceptance workflow benchmarks the **entire verified 124,444-entry Mexilex release**, not a small synthetic excerpt. A dedicated Rust binary streams the records through the exact `validate_preview` function used by the native UI and asserts that it retains at most **12** lexical records while still validating all source entries. The importer writes the independent SQLite catalog without touching any private learner profile.
 
-The CI records peak resident-set memory (RSS) for the preview and catalog import separately using GNU `time`; each is required to stay below **512 MiB** on the Linux runner. The output is retained in the workflow summary. This is a measured bound for the pinned release on the test runner, **not** a general proof that all future source formats or malicious inputs have constant memory use. The performance acceptance remains pending until the workflow executes successfully.
+The CI records peak resident-set memory (RSS) for the preview, catalog import and **1,000 indexed source lookups** separately using GNU `time`; each is required to stay below **512 MiB** on the Linux runner. The lookup benchmark also has a 10-second upper bound. The output is retained in the workflow summary. This is a measured bound for the pinned release on the test runner, **not** a general proof that all future source formats or malicious inputs have constant memory use. The performance acceptance remains pending until the workflow executes successfully.
 
 ## Verified public-release ingestion
 
