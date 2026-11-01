@@ -756,6 +756,80 @@ mod tests {
     }
 
     #[test]
+    fn fsrs_rating_fixture_records_each_choice_and_upstream_queue_transition() {
+        for rating in 1_u8..=4 {
+            let mut backend = AnkiBackend::in_memory().unwrap();
+            backend.enable_fsrs().unwrap();
+            assert!(backend.fsrs_enabled());
+            let note_id = backend
+                .add_basic_note(1, &format!("term {rating}"), "definition")
+                .unwrap();
+            assert_eq!(backend.due_counts().unwrap().0, 1);
+            let before = backend.next_card_id().unwrap().unwrap();
+
+            let card_id = backend.grade_next_card(rating).unwrap().unwrap();
+            assert_eq!(card_id, before);
+            assert_eq!(
+                backend.note_fields(note_id).unwrap(),
+                [format!("term {rating}"), "definition".to_owned()]
+            );
+            let (queue, reps): (i64, i64) = backend
+                .collection
+                .storage
+                .db()
+                .query_row(
+                    "select queue, reps from cards where id=?1",
+                    [card_id],
+                    |row| Ok((row.get(0)?, row.get(1)?)),
+                )
+                .unwrap();
+            assert_eq!(reps, 1);
+            // Anki default learning steps: Again stays in learning; Easy
+            // graduates immediately. Intermediate choices use upstream FSRS.
+            if rating == 1 {
+                assert_eq!(queue, 1);
+            } else if rating == 4 {
+                assert_eq!(queue, 2);
+            }
+            let recorded_rating: i64 = backend
+                .collection
+                .storage
+                .db()
+                .query_row(
+                    "select ease from revlog where cid=?1",
+                    [card_id],
+                    |row| row.get(0),
+                )
+                .unwrap();
+            assert_eq!(recorded_rating, i64::from(rating));
+        }
+    }
+
+    #[test]
+    fn undoing_fsrs_review_reverses_revlog_without_erasing_note() {
+        let mut backend = AnkiBackend::in_memory().unwrap();
+        backend.enable_fsrs().unwrap();
+        let note = backend.add_basic_note(1, "agua", "water").unwrap();
+        let card_id = backend.next_card_id().unwrap().unwrap();
+        assert_eq!(backend.grade_next_card(4).unwrap(), Some(card_id));
+        backend.undo_last().unwrap();
+
+        let event_count: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "select count(*) from revlog where cid=?1",
+                [card_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(event_count, 0);
+        assert_eq!(backend.note_fields(note).unwrap(), ["agua", "water"]);
+        assert_eq!(backend.next_card_id().unwrap(), Some(card_id));
+    }
+
+    #[test]
     fn independent_japanese_spanish_source_can_be_reviewed_without_mixing_homographs() {
         use crate::source_adapter::{SourceInfo, StudyTsvV1};
         use crate::source_store::SourceCatalog;
