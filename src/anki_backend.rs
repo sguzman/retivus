@@ -4,7 +4,7 @@ use anki::collection::CollectionBuilder;
 use anki::decks::DeckId;
 use std::error::Error;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;
 
