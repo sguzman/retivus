@@ -45,6 +45,12 @@ The source-neutral `SourceCatalog` stores externally provided records, sense IDs
 
 This is an import/staging foundation, not a complete provider lifecycle: manifest signature verification, user-initiated snapshot upgrades, review-history reconciliation, and note/card generation are still separate tasks.
 
+## Full-release preview and import memory gate
+
+The provider acceptance workflow benchmarks the **entire verified 124,444-entry Mexilex release**, not a small synthetic excerpt. A dedicated Rust binary streams the records through the exact `validate_preview` function used by the native UI and asserts that it retains at most **12** lexical records while still validating all source entries. The importer writes the independent SQLite catalog without touching any private learner profile.
+
+The CI records peak resident-set memory (RSS) for the preview and catalog import separately using GNU `time`; each is required to stay below **512 MiB** on the Linux runner. The output is retained in the workflow summary. This is a measured bound for the pinned release on the test runner, **not** a general proof that all future source formats or malicious inputs have constant memory use. The performance acceptance remains pending until the workflow executes successfully.
+
 ## Verified public-release ingestion
 
 The [2026-11-01 integration run](https://github.com/sguzman/retivus/actions/runs/41268497201) checked the public Mexilex v0.3.0 release and successfully committed **124,444 entries and 155,586 senses** to the separate SQLite catalog. The [Rust regression run](https://github.com/sguzman/retivus/actions/runs/41268551513) also verified rollback after late input failure and refusal to overwrite an existing snapshot. This is a source ingestion milestone, not a deck/card import or learner-history migration.
