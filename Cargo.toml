@@ -22,6 +22,11 @@ tempfile = { version = "3", optional = true }
 zip = { version = "9.0.5", default-features = false, features = ["deflate", "time"], optional = true }
 zstd = { version = "0.14.3", optional = true }
 
+[[bin]]
+name = "desktop-interop-fixture"
+path = "src/bin/desktop-interop-fixture.rs"
+required-features = ["anki-backend"]
+
 [profile.release]
 lto = "thin"
 strip = true

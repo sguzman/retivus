@@ -231,6 +231,13 @@ jobs:
           path: /tmp/retivus-wayland-*.png
           if-no-files-found: ignore
           retention-days: 7
+      - name: Generate and self-verify reproducible Desktop GUI fixture
+        run: |
+          set -euo pipefail
+          output_dir="$(mktemp -d)"
+          cargo run --features anki-backend --bin desktop-interop-fixture -- generate "$output_dir"
+          test -s "$output_dir/retivus-desktop-interop.apkg"
+          cargo run --features anki-backend --bin desktop-interop-fixture -- verify "$output_dir/retivus-desktop-interop.apkg"
       - name: Verify official Anki Desktop collection copy
         env:
           CARGO_BUILD_JOBS: "2"
