@@ -28,6 +28,14 @@ for i in $(seq 1 120); do
 done
 [[ -n "$window" ]] || { echo "Official Anki window not found"; exit 1; }
 capture desktop-startup
+# Official Anki's first launch asks for a UI language and then requires
+# explicit confirmation. The confirmation defaults to No; an unqualified
+# Return sends the wizard back to the language picker indefinitely.
+xdotool key --clearmodifiers Return
+sleep 2
+xdotool key --clearmodifiers Left Return
+sleep 5
+capture desktop-after-language-confirmation
 notes=0; cards=0
 for i in $(seq 1 120); do
   db="$(find "$ANKI_BASE" -type f -name collection.anki2 -print -quit 2>/dev/null)"
