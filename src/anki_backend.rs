@@ -985,10 +985,10 @@ mod tests {
         // zstd-compressed SQLite collection; older fixtures embed raw SQLite.
         fn original_sqlite_counts(package: &Path) -> (usize, usize) {
             let mut zip = zip::ZipArchive::new(fs::File::open(package).unwrap()).unwrap();
-            let is_new_format = zip.file_names().any(|name| name == "collection.anki21b");
+            let is_new_format = zip.by_name("collection.anki21b").is_ok();
             let filename = if is_new_format {
                 "collection.anki21b"
-            } else if zip.file_names().any(|name| name == "collection.anki21") {
+            } else if zip.by_name("collection.anki21").is_ok() {
                 "collection.anki21"
             } else {
                 "collection.anki2"
