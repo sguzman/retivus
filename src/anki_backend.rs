@@ -26,6 +26,15 @@ pub struct NoteRow {
     pub tags: Vec<String>,
 }
 
+/// Anki's own rendered card result; egui must treat HTML as untrusted text.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ReviewPreview {
+    pub card_id: i64,
+    pub question_html: String,
+    pub answer_html: String,
+    pub css: String,
+}
+
 pub struct AnkiBackend {
     collection: anki::collection::Collection,
     managed_dir: Option<PathBuf>,
@@ -679,6 +688,25 @@ impl AnkiBackend {
         Ok((queued.new_count, queued.learning_count, queued.review_count))
     }
 
+    /// Return Anki's actual next card and native-renderer output without
+    /// advancing its scheduler or exposing a remote HTML execution surface.
+    pub fn next_review_preview(&mut self) -> BackendResult<Option<ReviewPreview>> {
+        let Some(card_id) = self.next_card_id()? else {
+            return Ok(None);
+        };
+        let rendered = self.collection.render_existing_card(
+            anki::card::CardId(card_id),
+            false,
+            false,
+        )?;
+        Ok(Some(ReviewPreview {
+            card_id,
+            question_html: rendered.question().into_owned(),
+            answer_html: rendered.answer().into_owned(),
+            css: rendered.css,
+        }))
+    }
+
     pub fn next_card_id(&mut self) -> BackendResult<Option<i64>> {
         Ok(self
             .collection
@@ -1275,6 +1303,32 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         );
         reopened.close().unwrap();
         assert_eq!(fs::read(&source).unwrap(), original);
+    }
+
+    #[test]
+    fn rendered_due_card_preview_reuses_anki_scheduler_without_grading() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "review").unwrap();
+        backend.enable_fsrs().unwrap();
+        let note_id = backend.add_basic_note(1, "perro", "dog").unwrap();
+        let first = backend.next_review_preview().unwrap().unwrap();
+        assert!(first.card_id > 0);
+        assert!(first.question_html.contains("perro"));
+        assert!(first.answer_html.contains("dog"));
+        assert_eq!(first.card_id, backend.next_review_preview().unwrap().unwrap().card_id);
+        assert_eq!(backend.due_counts().unwrap().0, 1);
+        assert_eq!(backend.grade_next_card(4).unwrap(), Some(first.card_id));
+        let reviews: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row("SELECT count(*) FROM revlog WHERE cid=?1", [first.card_id], |row| row.get(0))
+            .unwrap();
+        assert_eq!(reviews, 1);
+        backend.close().unwrap();
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "review").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["perro", "dog"]);
+        reopened.close().unwrap();
     }
 
     #[test]
