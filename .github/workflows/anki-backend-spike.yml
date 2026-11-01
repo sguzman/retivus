@@ -7,6 +7,8 @@ on:
       - "spikes/anki-collection/**"
       - "spikes/anki-git/**"
       - "src/anki_backend.rs"
+      - "src/study_ui.rs"
+      - "src/main.rs"
       - "src/lib.rs"
       - "Cargo.toml"
   workflow_dispatch:
