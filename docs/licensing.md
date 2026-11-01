@@ -18,7 +18,7 @@ Retivus's **original revisions** were published under MIT, with copyright attrib
 
 The repository's current license is AGPL-3.0-or-later, **not a promise that all future versions will also be available under MIT**. Original independently authored Retivus code remains owned by its copyright holders; copyright ownership and permissions are separate from the license terms for distribution.
 
-The committed [Anki attribution notice](../LICENSES/ANKI-ATTRIBUTION.md) identifies the exact pinned backend source and the currently unmodified Cargo integration. The optional adapter's CI test must pass before this boundary is considered technically verified.
+The committed [Anki attribution notice](../LICENSES/ANKI-ATTRIBUTION.md) identifies the exact pinned backend source and the currently unmodified Cargo integration. The optional adapter's [feature-enabled CI test](https://github.com/sguzman/retivus/actions/runs/41266965280) passed. This verifies the pinned source/build boundary, **not** final release-asset source packaging or legal approval of a distributable; those remain M7 criteria.
 
 ## Requirements when Anki is integrated
 

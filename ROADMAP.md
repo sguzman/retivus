@@ -2,14 +2,14 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **21%** of 100% (previous verified 13%, latest development session +8 percentage points). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
+**Verified progress:** **23%** of 100% (previous verified 13%, latest development session **+10 percentage points**). Native egui compilation, unit tests, and virtual X11 launch were verified. Full Linux desktop design QA remains scheduled for M5.6. Milestone weights deliberately distribute actual work across all eight milestones, not hide it in the last 10%.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
 | Milestone | Weight | Verified | Status |
 | --- | ---: | ---: | --- |
 | 🧭 M0 Specification, project governance, initial foundation | 8% | 8% | ✅ |
-| 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 8% | 🟡 |
+| 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 10% | 🟡 |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 0% | ⏳ |
 | 🌍 M3 Generic external-source provider engine | 14% | 3% | 🟡 |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 0% | ⏳ |
@@ -31,8 +31,8 @@
 - ✅ **M1.1 🔎 Pin upstream Anki release/commit and dependency/toolchain inventory** — **2%**. Acceptance: Commit, transitive workspace deps and toolchain recorded. Depends on: M0.3. **verified complete.**
 - ✅ **M1.2 ⚙️ Build actual pinned Anki Rust workspace in isolated CI** — **3%**. Acceptance: Repeatable Linux CI build passes. Depends on: M1.1. **verified complete.**
 - ✅ **M1.3 🧩 Compile external client opening disposable Anki collection** — **3%**. Acceptance: Real read/write deck/note/card queue smoke without user collections. Depends on: M1.2. **verified complete.**
-- 🟡 **M1.4 ⚖️ Review AGPL licensing, notices, distribution and choose adapter** — **2%**. Acceptance: Document and implement legal compatible dependency boundary. Depends on: M1.3. **active.**
-- ⏳ **M1.5 🧪 Confirm incremental upgrades/fallback and adapter tests** — **2%**. Acceptance: Pinned backend integration proven or justified alternative verified. Depends on: M1.4. **pending.**
+- ✅ **M1.4 ⚖️ Review AGPL licensing, notices, distribution and choose adapter** — **2%**. Acceptance: Document and implement legal compatible dependency boundary. Depends on: M1.3. **verified complete.**
+- 🟡 **M1.5 🧪 Confirm incremental upgrades/fallback and adapter tests** — **2%**. Acceptance: Pinned backend integration proven or justified alternative verified. Depends on: M1.4. **active.**
 
 ### 🗃️ M2: Local collection engine and learner-safe core (15% of project)
 
@@ -85,11 +85,17 @@
 - **M1.3 🧩 (3 points):** [Anki CI run 41266034216](https://github.com/sguzman/retivus/actions/runs/41266034216) compiled and executed the independent Retivus client using pinned `rslib` Rust APIs. It created an isolated in-memory Anki collection, deck, Basic note, card and review queue; no existing profile was accessed. Direct Git dependency packaging is being tested separately; this success is for the isolated path-based adapter.
 - **M3.1 🧱 (3 points):** [Rust CI run 41266324012](https://github.com/sguzman/retivus/actions/runs/41266324012) passed the object-safe `SourceAdapter` contract for Mexilex JSONL and distinct generic TSV, explicit language/licensing metadata, duplicate/malformed rejection and streaming record visits.
 - **M5.1 🌗 (2 points):** the same successful CI passed preference save/restart tests, all three egui theme-rendering paths, and OS light/dark input changes in System mode, in addition to the earlier virtual X11 application launch smoke. Full desktop visual styling and window-size QA remain M5.6.
-- **M1.4 ⚖️ (active, uncredited):** the project adopted AGPL-3.0-or-later and preserved its original MIT notice, but notice provenance and the actual distributed Anki engine adapter still need integration before this task earns points.
+- **M1.4 ⚖️ (verified, +2 points):** the optional pinned Cargo Git backend is now integrated with the Retivus core, CI-confirmed, AGPL-3.0-or-later licensed, and accompanied by an [Anki provenance notice](LICENSES/ANKI-ATTRIBUTION.md). Final release source packaging and complete upstream dependency notices remain separate M7 acceptance criteria.
 - **M3.2 📦 (pending, uncredited):** public Mexilex release checksums and a 124,444-entry streaming validation passed in [run 41262927205](https://github.com/sguzman/retivus/actions/runs/41262927205). A durable transactional installation with rollback has not been built, so it is **not** counted as a completed import.
 - **Current next gate:** test pinned Cargo Git dependency to avoid a manually maintained Anki checkout; then choose and implement the legally compliant shipping adapter and safe profile persistence.
 
-**Session progress:** 13% → **21%** (**+8 percentage points**). M1 = 8/12 (66.7%); M3 = 3/14 (21.4%); M5 = 2/14 (14.3%). Only completed acceptance items earn weight. Do not count partial UI wiring or backend research as extra tasks.
+**Session progress:** 13% → **23%** (**+10 percentage points**). M1 = 10/12 (83.3%); M3 = 3/14 (21.4%); M5 = 2/14 (14.3%). Only completed acceptance items earn weight. Do not count partial UI wiring or backend research as extra tasks.
+
+## ✅ Direct Anki backend acceptance — 2026-11-01
+
+- **M1.4 ⚖️ (+2 points):** [Anki feature CI run 41266965280](https://github.com/sguzman/retivus/actions/runs/41266965280) passed the production-library feature-gated adapter tests after pinned upstream path and Git smoke checks. `src/anki_backend.rs` opens disposable in-memory Anki collections, creates decks and Basic notes, and queries due/next card APIs. The feature uses the Git-pinned upstream `anki` crate with Tokio feature unification; no Anki profile is opened automatically.
+- Default builds remain independent of the AGPL dependency compilation: [Rust CI run 41266965361](https://github.com/sguzman/retivus/actions/runs/41266965361) passed without enabling `anki-backend`. The project itself is AGPL-3.0-or-later, original MIT revisions remain historically licensed, and [Anki source attribution](LICENSES/ANKI-ATTRIBUTION.md) is committed.
+- **M1.5 🧪 still pending:** compatibility upgrading from the pinned revision, fallback/upgrade behavior, and real adapter maintenance tests have not been verified. Persistent user collections, review grading and AnkiWeb synchronization remain unimplemented.
 
 ## ⚖️ License decision (unweighted)
 
