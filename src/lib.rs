@@ -11,3 +11,5 @@ pub mod preview;
 pub mod anki_backend;
 
 pub mod source_store;
+
+pub mod typography;

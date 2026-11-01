@@ -17,6 +17,7 @@ tokio = { version = "1.51.6", features = ["io-util"], optional = true }
 eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "persistence", "wayland", "x11"] }
 serde_json = "1"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
+ttf-parser = "0.25"
 
 [profile.release]
 lto = "thin"

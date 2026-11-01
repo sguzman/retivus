@@ -1,5 +1,5 @@
 use eframe::egui;
-use retivus::{brand, source_adapter};
+use retivus::{brand, source_adapter, typography};
 use std::fs::File;
 use std::io::BufReader;
 
@@ -60,6 +60,7 @@ struct Retivus {
     definition_language: String,
     license_notice: String,
     preview: Vec<source_adapter::SourceRecord>,
+    krypton_font_loaded: bool,
 }
 impl Default for Retivus {
     fn default() -> Self {
@@ -74,6 +75,7 @@ impl Default for Retivus {
             definition_language: String::new(),
             license_notice: String::new(),
             preview: Vec::new(),
+            krypton_font_loaded: false,
         }
     }
 }
@@ -103,6 +105,9 @@ impl eframe::App for Retivus {
                         .color(brand::accent(ctx.theme())),
                 );
                 ui.separator();
+                if self.krypton_font_loaded {
+                    ui.weak("Krypton Nerd Font");
+                }
                 ui.label("Appearance");
                 egui::ComboBox::from_id_salt("appearance")
                     .selected_text(self.theme.name())
@@ -228,7 +233,9 @@ fn main() -> eframe::Result<()> {
         eframe::NativeOptions::default(),
         Box::new(|cc| {
             brand::apply_to_context(&cc.egui_ctx);
-            Ok(Box::new(Retivus::restore(cc.storage)))
+            let mut app = Retivus::restore(cc.storage);
+            app.krypton_font_loaded = typography::install_local_krypton(&cc.egui_ctx);
+            Ok(Box::new(app))
         }),
     )
 }

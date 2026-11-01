@@ -26,3 +26,7 @@
 ## Branding acceptance
 
 Color tokens are committed and tested in code. The application now saves the theme value in eframe native persistence storage and restores it on startup; tests cover every preference, unknown-value fallback, and System-mode selection. The M5.1 completion criteria are now verified by cross-instance preference tests, rendering paths for all three modes, simulated OS theme input transitions in System mode, and the native GUI smoke CI. Full desktop-size visual QA remains M5.6.
+
+## Local typography implementation (M5.2 groundwork)
+
+Retivus now searches the user's local and system font directories for an installed **Krypton Nerd Font** at launch. It prefers a regular style, rejects symlinks, oversized files and invalid TrueType/OpenType bytes, and registers a valid local font at highest egui priority while retaining normal font fallbacks. No font assets are shipped, copied to the repository or supplied to other users. The toolbar confirms Krypton only when successfully installed. If absent, the normal default egui font remains. The M5.2 acceptance still requires keyboard navigation, sizing and real desktop visual QA; font discovery alone does not earn percentage credit.
