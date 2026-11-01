@@ -44,7 +44,9 @@ impl StudyPanel {
     }
 
     fn refresh(&mut self) {
-        let Some(backend) = self.backend.as_mut() else { return };
+        let Some(backend) = self.backend.as_mut() else {
+            return;
+        };
         match (backend.list_decks(), backend.browse_notes(&self.query, 50)) {
             (Ok(decks), Ok(notes)) => {
                 self.decks = decks;
