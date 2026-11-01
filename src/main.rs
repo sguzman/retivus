@@ -665,6 +665,47 @@ mod tests {
     }
 
     #[test]
+    fn accessibility_focus_survives_scaling_density_theme_and_resizing() {
+        use egui_kittest::{kittest::Queryable as _, Harness};
+
+        let mut harness = Harness::new_eframe(|_| Retivus::default());
+        for (window, pixels_per_point, theme, density) in [
+            (egui::vec2(680.0, 560.0), 1.0, Theme::Light, Density::Comfortable),
+            (egui::vec2(720.0, 650.0), 1.5, Theme::Dark, Density::Compact),
+            (egui::vec2(1100.0, 760.0), 0.8, Theme::System, Density::Comfortable),
+        ] {
+            harness.set_size(window);
+            harness.set_pixels_per_point(pixels_per_point);
+            harness.state_mut().theme = theme;
+            harness.state_mut().density = density;
+            harness.run();
+
+            harness
+                .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
+                .scroll_to_me();
+            harness.run();
+            harness
+                .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
+                .focus();
+            harness.run();
+            assert!(
+                harness
+                    .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
+                    .is_focused(),
+                "File input lost keyboard focus at {window:?}, scale={pixels_per_point}"
+            );
+            harness.get_by_label("Validate source").scroll_to_me();
+            harness.run();
+            assert!(
+                harness
+                    .get_by_role_and_label(egui::accesskit::Role::TextInput, "File")
+                    .is_focused(),
+                "Scrolling must not silently move keyboard focus"
+            );
+        }
+    }
+
+    #[test]
     fn unknown_or_malformed_preference_follows_system() {
         let mut storage = TestStorage::default();
         for value in ["", "DARK", "broken", "3"] {

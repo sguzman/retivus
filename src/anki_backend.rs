@@ -983,7 +983,7 @@ mod tests {
         // Read expected counts directly from the original ZIP's SQLite payload,
         // independently of Anki's package importer. New-format decks embed a
         // zstd-compressed SQLite collection; older fixtures embed raw SQLite.
-        fn original_sqlite_counts(package: &Path) -> (usize, usize) {
+        fn original_sqlite_data(package: &Path) -> (usize, usize, Vec<Vec<String>>) {
             let mut zip = zip::ZipArchive::new(fs::File::open(package).unwrap()).unwrap();
             let is_new_format = zip.by_name("collection.anki21b").is_ok();
             let filename = if is_new_format {
@@ -1011,7 +1011,21 @@ mod tests {
                 })
                 .unwrap()
             };
-            (count("notes"), count("cards"))
+            let mut statement = db
+                .prepare("SELECT flds FROM notes ORDER BY id")
+                .unwrap();
+            let mut fields = statement
+                .query_map([], |row| row.get::<_, String>(0))
+                .unwrap()
+                .map(|row| {
+                    row.unwrap()
+                        .split('\u{1f}')
+                        .map(ToOwned::to_owned)
+                        .collect::<Vec<String>>()
+                })
+                .collect::<Vec<_>>();
+            fields.sort();
+            (count("notes"), count("cards"), fields)
         }
 
         for (env_key, minimum_notes, exact_counts) in [
@@ -1021,7 +1035,8 @@ mod tests {
             let path = std::path::PathBuf::from(
                 std::env::var_os(env_key).expect("CI must provide the pinned public package"),
             );
-            let source_counts = original_sqlite_counts(&path);
+            let (source_note_count, source_card_count, source_fields) =
+                original_sqlite_data(&path);
             let root = tempdir().unwrap();
             let mut original =
                 AnkiBackend::create_managed_profile(root.path(), "independent").unwrap();
@@ -1042,8 +1057,20 @@ mod tests {
             );
             assert_eq!(
                 (note_count, card_count),
-                source_counts,
+                (source_note_count, source_card_count),
                 "Anki-imported counts differ from source SQLite payload for {env_key}"
+            );
+            let mut imported_fields = original
+                .collection
+                .search_notes("", SortMode::NoOrder)
+                .unwrap()
+                .into_iter()
+                .map(|id| original.note_fields(id.0).unwrap())
+                .collect::<Vec<_>>();
+            imported_fields.sort();
+            assert_eq!(
+                imported_fields, source_fields,
+                "Anki-imported note fields differ from the source SQLite payload for {env_key}"
             );
             if let Some((notes, cards)) = exact_counts {
                 assert_eq!((note_count, card_count), (notes, cards));
@@ -1085,6 +1112,40 @@ mod tests {
             );
             reimport.close().unwrap();
         }
+    }
+
+    #[test]
+    fn shareable_package_excludes_synthetic_profile_credentials() {
+        use std::io::Read;
+
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "private").unwrap();
+        backend.add_basic_note(1, "public front", "public back").unwrap();
+        // Simulates a future profile-local authorization token: exporting
+        // cards must never bundle unrelated files from the private root.
+        let secret = b"retivus-sensitive-credential-canary-7db29eb";
+        fs::write(root.path().join("private").join("auth-private.json"), secret).unwrap();
+
+        let package = root.path().join("cards-only.apkg");
+        assert_eq!(backend.export_apkg_to(&package).unwrap(), 1);
+        let mut archive = zip::ZipArchive::new(fs::File::open(&package).unwrap()).unwrap();
+        for i in 0..archive.len() {
+            let mut member = archive.by_index(i).unwrap();
+            assert!(
+                !member.name().unwrap().contains("auth-private"),
+                "private profile metadata leaked as package member"
+            );
+            // The central-directory names and raw bytes are not a substitute
+            // for private-data guarantees, but they detect copying arbitrary
+            // profile files into the exported package.
+            let mut bytes = Vec::new();
+            member.read_to_end(&mut bytes).unwrap();
+            assert!(
+                !bytes.windows(secret.len()).any(|window| window == secret),
+                "private profile canary leaked into exported package"
+            );
+        }
+        backend.close().unwrap();
     }
 
     #[test]

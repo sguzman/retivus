@@ -20,6 +20,8 @@ The native Anki-package importer checks that the selected absolute .apkg is a re
 
 Disposable-profile tests construct malicious packages and verify rejection without altering existing note fields or writing outside the selected profile. This check supplements upstream Anki's importer and is not a replacement ZIP extractor or a guarantee against every malicious archive. M6.3 remains pending until feature tests pass. AnkiWeb credentials and sync are not used by this offline import path.
 
+A separate synthetic credential canary regression asserts that shared .apkg files contain no unrelated profile authorization files or matching bytes. This protects against accidental packaging of profile-local private data; it is not a claim of general secret scanning or AnkiWeb integration.
+
 ## Private review history in Anki package exports (pending acceptance)
 
 Shareable package export now defaults to excluding scheduling and private review events. The native UI offers an explicit unchecked-by-default setting to include scheduling and personal study history when the learner intentionally needs an archive with that state. It describes the sensitivity before export and resets when closing the profile. Database backup remains a distinct, local recovery operation.
@@ -30,7 +32,7 @@ An automated regression compares ordinary and opted-in exports by reimporting bo
 
 The Anki feature workflow already imports pinned public AnkiDroid and third-party sample packages, exports them with the pinned engine, and verifies note/card counts after reimport. A stronger pending regression reads the original package's embedded SQLite database *directly*, rather than relying on the Retivus importer as its own baseline. It selects the zstd-compressed collection from modern packages and the raw SQLite collection from legacy packages, then compares the source's exact note/card totals with the Retivus import before any reexport.
 
-This is independent count evidence for real public packages, not proof that the Anki Desktop GUI can open, display and export every card or that CSS/media rendering matches desktop. M4 acceptance is not credited before the new feature CI passes and the separate desktop requirements are met.
+This is independent source count and note-field evidence for real public packages, not proof that the Anki Desktop GUI can open, display and export every card or that CSS/media rendering matches desktop. M4 acceptance is not credited before the new feature CI passes and the separate desktop requirements are met.
 
 ## Repeatable build experiment
 
