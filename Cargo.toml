@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 
 [features]
 default = []
-anki-backend = ["dep:anki", "dep:tokio", "dep:tempfile", "dep:zip"]
+anki-backend = ["dep:anki", "dep:tokio", "dep:tempfile", "dep:zip", "dep:zstd"]
 
 [dependencies]
 anki = { git = "https://github.com/ankitects/anki", rev = "136bd42bfbd356fc756b6d3e28cc77b02da11ea7", optional = true }
@@ -20,6 +20,7 @@ rusqlite = { version = "0.36.0", features = ["bundled"] }
 ttf-parser = "0.25"
 tempfile = { version = "3", optional = true }
 zip = { version = "9.0.5", default-features = false, features = ["deflate", "time"], optional = true }
+zstd = { version = "0.14.3", optional = true }
 
 [profile.release]
 lto = "thin"

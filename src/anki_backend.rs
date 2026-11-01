@@ -980,6 +980,38 @@ mod tests {
     #[test]
     #[ignore = "requires public package fixtures downloaded by integration CI"]
     fn independent_public_apkg_fixtures_match_import_export_note_and_card_counts() {
+        // Read expected counts directly from the original ZIP's SQLite payload,
+        // independently of Anki's package importer. New-format decks embed a
+        // zstd-compressed SQLite collection; older fixtures embed raw SQLite.
+        fn original_sqlite_counts(package: &Path) -> (usize, usize) {
+            let mut zip = zip::ZipArchive::new(fs::File::open(package).unwrap()).unwrap();
+            let is_new_format = zip.file_names().any(|name| name == "collection.anki21b");
+            let filename = if is_new_format {
+                "collection.anki21b"
+            } else if zip.file_names().any(|name| name == "collection.anki21") {
+                "collection.anki21"
+            } else {
+                "collection.anki2"
+            };
+            let mut source = zip.by_name(filename).unwrap();
+            let mut output = NamedTempFile::new().unwrap();
+            if is_new_format {
+                zstd::stream::copy_decode(&mut source, output.as_file_mut()).unwrap();
+            } else {
+                std::io::copy(&mut source, output.as_file_mut()).unwrap();
+            }
+            let db = rusqlite::Connection::open_with_flags(
+                output.path(),
+                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+            )
+            .unwrap();
+            let count = |table: &str| -> usize {
+                db.query_row(&format!("SELECT COUNT(*) FROM {table}"), [], |row| row.get(0))
+                    .unwrap()
+            };
+            (count("notes"), count("cards"))
+        }
+
         for (env_key, minimum_notes, exact_counts) in [
             ("RETIVUS_ANKIDROID_APKG", 1_usize, Some((1_usize, 1_usize))),
             ("RETIVUS_PUBLIC_SAMPLE_APKG", 3_usize, None),
@@ -987,6 +1019,7 @@ mod tests {
             let path = std::path::PathBuf::from(
                 std::env::var_os(env_key).expect("CI must provide the pinned public package"),
             );
+            let source_counts = original_sqlite_counts(&path);
             let root = tempdir().unwrap();
             let mut original =
                 AnkiBackend::create_managed_profile(root.path(), "independent").unwrap();
@@ -1004,6 +1037,11 @@ mod tests {
             assert!(
                 note_count >= minimum_notes && card_count >= note_count,
                 "unexpected public package counts for {env_key}"
+            );
+            assert_eq!(
+                (note_count, card_count),
+                source_counts,
+                "Anki-imported counts differ from source SQLite payload for {env_key}"
             );
             if let Some((notes, cards)) = exact_counts {
                 assert_eq!((note_count, card_count), (notes, cards));
