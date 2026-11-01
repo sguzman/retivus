@@ -37,9 +37,12 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq protobuf-compiler
+          command -v protoc
+          protoc --version
       - name: Compile Anki Rust library from pinned workspace
         working-directory: upstream-anki
         env:
           CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
         run: |
           cargo check --locked -p anki
