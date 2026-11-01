@@ -2,6 +2,9 @@
 //! No user profile is opened by this module's initial construction or tests.
 use crate::source_store::SourceCardCandidate;
 use anki::collection::CollectionBuilder;
+use anki::config::BoolKey;
+use anki::scheduler::answering::{CardAnswer, Rating};
+use anki::timestamp::TimestampMillis;
 use anki::decks::DeckId;
 use anki::notes::NoteId;
 use anki::notetype::{CardTemplate, NotetypeId};
@@ -321,6 +324,51 @@ impl AnkiBackend {
     pub fn undo_last(&mut self) -> BackendResult<()> {
         self.collection.undo()?;
         Ok(())
+    }
+
+    /// Enable upstream FSRS rather than implementing a competing scheduler.
+    pub fn enable_fsrs(&mut self) -> BackendResult<()> {
+        self.collection.set_config_bool(BoolKey::Fsrs, true, false)?;
+        Ok(())
+    }
+
+    pub fn fsrs_enabled(&self) -> bool {
+        self.collection.fsrs_enabled()
+    }
+
+    /// Grade only the next queued card, with Anki computing its actual next state.
+    /// Rating matches Anki: 1=Again, 2=Hard, 3=Good, 4=Easy.
+    pub fn grade_next_card(&mut self, rating: u8) -> BackendResult<Option<i64>> {
+        let rating = match rating {
+            1 => Rating::Again,
+            2 => Rating::Hard,
+            3 => Rating::Good,
+            4 => Rating::Easy,
+            _ => return Err("rating must be 1 (Again) through 4 (Easy)".into()),
+        };
+        let Some(queued) = self.collection.get_next_card()? else {
+            return Ok(None);
+        };
+        let states = queued.states;
+        let next = match rating {
+            Rating::Again => states.again,
+            Rating::Hard => states.hard,
+            Rating::Good => states.good,
+            Rating::Easy => states.easy,
+        };
+        let card_id = queued.card.id();
+        let mut answer = CardAnswer {
+            card_id,
+            current_state: states.current,
+            new_state: next,
+            rating,
+            answered_at: TimestampMillis::now(),
+            milliseconds_taken: 1_000,
+            custom_data: None,
+            from_queue: true,
+        };
+        self.collection.answer_card(&mut answer)?;
+        Ok(Some(card_id.0))
     }
 
     pub fn due_counts(&mut self) -> BackendResult<(usize, usize, usize)> {
@@ -647,6 +695,38 @@ mod tests {
             .note_tags(second)
             .unwrap()
             .contains(&live.source_tag()));
+        reopened.close().unwrap();
+    }
+
+    #[test]
+    fn fsrs_review_grade_and_event_survive_managed_profile_restart() {
+        let tmp = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "fsrs").unwrap();
+        backend.enable_fsrs().unwrap();
+        assert!(backend.fsrs_enabled());
+        let note_id = backend.add_basic_note(1, "cielo", "sky").unwrap();
+        assert!(backend.grade_next_card(0).is_err());
+        let card_id = backend.grade_next_card(3).unwrap().unwrap();
+        assert!(card_id > 0);
+        let events: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row("select count(*) from revlog where cid=?1", [card_id], |row| row.get(0))
+            .unwrap();
+        assert_eq!(events, 1);
+        backend.close().unwrap();
+
+        let reopened = AnkiBackend::open_managed_profile(tmp.path(), "fsrs").unwrap();
+        assert!(reopened.fsrs_enabled());
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["cielo", "sky"]);
+        let persisted: i64 = reopened
+            .collection
+            .storage
+            .db()
+            .query_row("select count(*) from revlog where cid=?1", [card_id], |row| row.get(0))
+            .unwrap();
+        assert_eq!(persisted, 1);
         reopened.close().unwrap();
     }
 
