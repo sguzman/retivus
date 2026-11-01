@@ -44,6 +44,53 @@ impl SelectedSense {
 }
 
 const THEME_STORAGE_KEY: &str = "retivus.theme.v1";
+const SCALE_STORAGE_KEY: &str = "retivus.ui-scale.v1";
+const DENSITY_STORAGE_KEY: &str = "retivus.density.v1";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Density {
+    Compact,
+    Comfortable,
+}
+
+impl Density {
+    fn from_stored(value: Option<&str>) -> Self {
+        match value {
+            Some("compact") => Self::Compact,
+            _ => Self::Comfortable,
+        }
+    }
+
+    fn stored(self) -> &\u0027static str {
+        match self {
+            Self::Compact => "compact",
+            Self::Comfortable => "comfortable",
+        }
+    }
+
+    fn name(self) -> &\u0027static str {
+        match self {
+            Self::Compact => "Compact",
+            Self::Comfortable => "Comfortable",
+        }
+    }
+
+    fn spacing(self) -> egui::Vec2 {
+        match self {
+            Self::Compact => egui::vec2(6.0, 3.0),
+            Self::Comfortable => egui::vec2(9.0, 7.0),
+        }
+    }
+}
+
+fn parse_scale(value: Option<&str>) -> f32 {
+    value
+        .and_then(|raw| raw.parse::<f32>().ok())
+        .filter(|value| value.is_finite())
+        .map(|value| value.clamp(0.80, 1.50))
+        .unwrap_or(1.0)
+}
+
 impl Theme {
     fn from_stored(value: Option<&str>) -> Self {
         match value {
@@ -79,6 +126,8 @@ impl Theme {
 }
 struct Retivus {
     theme: Theme,
+    ui_scale: f32,
+    density: Density,
     source_path: String,
     import_status: String,
     source_format: SourceFormat,
@@ -95,6 +144,8 @@ impl Default for Retivus {
     fn default() -> Self {
         Self {
             theme: Theme::System,
+            ui_scale: 1.0,
+            density: Density::Comfortable,
             source_path: String::new(),
             import_status: "No source checked".into(),
             source_format: SourceFormat::Mexilex,
@@ -111,9 +162,13 @@ impl Default for Retivus {
 }
 impl Retivus {
     fn restore(storage: Option<&dyn eframe::Storage>) -> Self {
-        let value = storage.and_then(|storage| storage.get_string(THEME_STORAGE_KEY));
+        let theme = storage.and_then(|value| value.get_string(THEME_STORAGE_KEY));
+        let scale = storage.and_then(|value| value.get_string(SCALE_STORAGE_KEY));
+        let density = storage.and_then(|value| value.get_string(DENSITY_STORAGE_KEY));
         Self {
-            theme: Theme::from_stored(value.as_deref()),
+            theme: Theme::from_stored(theme.as_deref()),
+            ui_scale: parse_scale(scale.as_deref()),
+            density: Density::from_stored(density.as_deref()),
             ..Self::default()
         }
     }
@@ -122,11 +177,14 @@ impl Retivus {
 impl eframe::App for Retivus {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         storage.set_string(THEME_STORAGE_KEY, self.theme.stored().into());
+        storage.set_string(SCALE_STORAGE_KEY, self.ui_scale.to_string());
+        storage.set_string(DENSITY_STORAGE_KEY, self.density.stored().into());
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Switching back to System must restore live operating-system theme tracking.
         ctx.set_theme(self.theme.preference());
+        ctx.style_mut(|style| style.spacing.item_spacing = self.density.spacing());
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
@@ -146,6 +204,21 @@ impl eframe::App for Retivus {
                         ui.selectable_value(&mut self.theme, Theme::Light, "Light");
                         ui.selectable_value(&mut self.theme, Theme::Dark, "Dark");
                     });
+                ui.separator();
+                ui.label("Density");
+                egui::ComboBox::from_id_salt("density")
+                    .selected_text(self.density.name())
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut self.density, Density::Compact, "Compact");
+                        ui.selectable_value(&mut self.density, Density::Comfortable, "Comfortable");
+                    });
+                ui.separator();
+                if ui
+                    .add(egui::Slider::new(&mut self.ui_scale, 0.80..=1.50).text("Scale"))
+                    .changed()
+                {
+                    ctx.set_zoom_factor(self.ui_scale);
+                }
             });
         });
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -153,6 +226,7 @@ impl eframe::App for Retivus {
             ui.label("Anki ecosystem compatibility and versioned external data providers.");
             ui.separator();
             ui.weak("Preview mode: validated sources only. Study, editing and review controls are not available in this window yet.");
+            ui.weak("Keyboard: Tab and Shift+Tab move between controls; Enter or Space activates the focused control.");
             ui.label("First data source: Mexilex · es-MX → en");
             ui.label("Anki Rust backend: separately feature-gated and under integration; this preview never opens learner collections.");
             ui.separator();
@@ -190,13 +264,13 @@ impl eframe::App for Retivus {
                     ] {
                         ui.horizontal(|ui| {
                             ui.label(label);
-                            ui.add(egui::TextEdit::singleline(value).desired_width(260.0));
+                            ui.add(egui::TextEdit::singleline(value).desired_width(ui.available_width().min(260.0)));
                         });
                     }
                 }
                 ui.horizontal(|ui| {
                     ui.label("File");
-                    ui.add(egui::TextEdit::singleline(&mut self.source_path).desired_width(300.0));
+                    ui.add(egui::TextEdit::singleline(&mut self.source_path).desired_width(ui.available_width().min(300.0)));
                 });
                 if ui.button("Validate source").clicked() {
                     self.preview.clear();
@@ -300,6 +374,7 @@ fn main() -> eframe::Result<()> {
             brand::apply_to_context(&cc.egui_ctx);
             let mut app = Retivus::restore(cc.storage);
             app.krypton_font_loaded = typography::install_local_krypton(&cc.egui_ctx);
+            cc.egui_ctx.set_zoom_factor(app.ui_scale);
             Ok(Box::new(app))
         }),
     )
@@ -367,6 +442,30 @@ mod tests {
                 assert_eq!(ctx.theme(), expected);
             }
         }
+    }
+
+    #[test]
+    fn scale_and_density_preferences_round_trip_with_invalid_value_fallback() {
+        let mut storage = TestStorage::default();
+        let mut state = Retivus::default();
+        state.ui_scale = 1.25;
+        state.density = Density::Compact;
+        eframe::App::save(&mut state, &mut storage);
+        let restored = Retivus::restore(Some(&storage));
+        assert_eq!(restored.ui_scale, 1.25);
+        assert_eq!(restored.density, Density::Compact);
+        assert_eq!(restored.density.spacing(), egui::vec2(6.0, 3.0));
+
+        for invalid in ["NaN", "inf", "nonsense", ""] {
+            eframe::Storage::set_string(&mut storage, SCALE_STORAGE_KEY, invalid.into());
+            assert_eq!(Retivus::restore(Some(&storage)).ui_scale, 1.0);
+        }
+        eframe::Storage::set_string(&mut storage, SCALE_STORAGE_KEY, "9".into());
+        assert_eq!(Retivus::restore(Some(&storage)).ui_scale, 1.5);
+        eframe::Storage::set_string(&mut storage, SCALE_STORAGE_KEY, "-8".into());
+        assert_eq!(Retivus::restore(Some(&storage)).ui_scale, 0.8);
+        eframe::Storage::set_string(&mut storage, DENSITY_STORAGE_KEY, "invalid".into());
+        assert_eq!(Retivus::restore(Some(&storage)).density, Density::Comfortable);
     }
 
     #[test]
