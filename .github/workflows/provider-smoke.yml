@@ -42,6 +42,19 @@ jobs:
         run: |
           cargo run --bin check-source -- data/study/study.jsonl | tee data/validation-result.txt
           grep -q 'Validated 124444 Mexilex entries' data/validation-result.txt
+      - name: Benchmark full release through bounded native preview
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq time
+          cargo build --bin benchmark-source
+          /usr/bin/time -f '%M' -o data/preview-peak-rss-kib.txt \
+            ./target/debug/benchmark-source data/study/study.jsonl \
+            | tee data/preview-result.txt
+          grep -q 'Validated 124444 records, retained 12 preview rows' data/preview-result.txt
+          peak_kib="$(cat data/preview-peak-rss-kib.txt)"
+          test "$peak_kib" -gt 0
+          test "$peak_kib" -lt 524288
+          echo "Bounded full-release preview peak RSS: ${peak_kib} KiB (< 512 MiB)" >> "$GITHUB_STEP_SUMMARY"
       - name: Import entire verified snapshot atomically into separate SQLite source catalog
         run: |
           cargo run --bin import-source -- data/study/study.jsonl data/catalog.sqlite3 lex-v0.3.0 | tee data/import-result.txt
