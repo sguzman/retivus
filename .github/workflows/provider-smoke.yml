@@ -1,0 +1,49 @@
+name: Verify published Mexilex provider contract
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/provider-smoke.yml"
+      - "src/provider.rs"
+      - "src/bin/check-source.rs"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: retivus-provider-smoke
+  cancel-in-progress: true
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Download immutable Mexilex v0.3.0 study package
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p data/published data/study
+          gh release download lex-v0.3.0 --repo sguzman/mexilex --dir data/published
+          (
+            cd data/published
+            sha256sum --check SHA256SUMS
+            tar -tzf mexilex-study-v0.3.0.tar.gz | grep -q 'study.jsonl'
+            tar -xzf mexilex-study-v0.3.0.tar.gz -C ../study
+          )
+      - name: Validate source language, provenance and licensing
+        run: |
+          test -s data/study/CORPUS-LICENSE.md
+          test -s data/study/upstream.sha256
+          test -s data/study/release-manifest.json
+          node -e 'const m=require("./data/study/release-manifest.json");if(m.format_version!==1||m.project!=="mexilex"||m.version!=="0.3.0"||m.lexical_language!=="es-MX"||m.definition_language!=="en"||!m.source_git_commit)process.exit(1)'
+          test "$(wc -l < data/study/study.jsonl)" -eq 124444
+      - name: Stream-validate all real study records with Retivus
+        run: |
+          cargo run --locked --bin check-source -- data/study/study.jsonl | tee data/validation-result.txt
+          grep -q 'Validated 124444 Mexilex entries' data/validation-result.txt
+      - name: Report independent consumer evidence
+        run: |
+          echo '## Mexilex published source integration' >> "$GITHUB_STEP_SUMMARY"
+          cat data/validation-result.txt >> "$GITHUB_STEP_SUMMARY"
+          echo 'Verified upstream release SHA256SUMS, license notice, source identity, and language pair. No user decks or review history accessed.' >> "$GITHUB_STEP_SUMMARY"
