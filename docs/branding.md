@@ -25,4 +25,4 @@
 
 ## Branding acceptance
 
-Color tokens are committed and tested in code. This is **not** the full M5.1 roadmap acceptance: persistence of theme preferences and cross-session operating-system switching must still be verified before that task earns its full weight.
+Color tokens are committed and tested in code. The application now saves the theme value in eframe native persistence storage and restores it on startup; tests cover every preference, unknown-value fallback, and System-mode selection. Final M5.1 verification still includes explicit light/dark rendering and operating-system appearance switching QA.
