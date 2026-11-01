@@ -28,7 +28,7 @@ Anki's [upstream source](https://github.com/ankitects/anki) uses **AGPL-3.0-or-l
 - Include actual upstream source/commit provenance and relevant modification notices, not just an AGPL string in `Cargo.toml`.
 - Verify the real distribution and dependency structure before claiming compliance. Do not assume a separate executable or IPC arrangement categorically changes combined-work analysis.
 
-**Status:** The main application license was proactively changed; Anki `rslib` is **not currently linked into the shipping Retivus application**. The M1.4 roadmap task also requires a working, legally reviewed adapter, notices and packaging; this license commit alone does **not** complete M1.4.
+**Status:** The main application license was proactively changed; Anki `rslib` is available behind an **opt-in `anki-backend` Cargo feature** in the application library, pinned to an exact upstream Git commit. The default build does not enable this feature; distribution of feature-enabled binaries must preserve corresponding-source access and upstream notices. There is still no public Anki-backed release. The M1.4 roadmap task also requires a working, legally reviewed adapter, notices and packaging; this license commit alone does **not** complete M1.4.
 
 ## Separate data and user content
 

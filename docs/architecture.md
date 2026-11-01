@@ -42,3 +42,9 @@ A Retivus profile is the boundary for its own cards, note/deck metadata, prefere
 - Atomic migration of user-facing collections and restored backups.
 - AnkiWeb protocol/credentials; never assume network compatibility from local `.apkg` success.
 - Provider volume: Mexilex has 124,444 default study entries and must not be loaded into one unbounded GUI frame.
+
+## ADR-005: Opt-in pinned Anki backend module
+
+**Status: implementation submitted for CI verification.** Direct Cargo Git consumption of upstream `anki` at commit `136bd42bfbd356fc756b6d3e28cc77b02da11ea7` was verified by the independent [Git dependency integration run](https://github.com/sguzman/retivus/actions/runs/41266535589). Retivus now offers an optional `anki-backend` feature with a small wrapper in `src/anki_backend.rs`. This keeps default Rust/egui builds fast and avoids requiring protobuf code generation until integration is explicitly enabled. The feature adds Tokio `io-util` for upstream feature unification without changing Anki source files.
+
+The initial wrapper only opens an **in-memory Anki collection**, creates a real deck and Basic note, and queries due queues. It deliberately does **not** open, modify, or migrate any existing Anki profile. Persistent storage, note templates and review grading remain later milestones. The integration feature must pass CI before it is called verified; the empty demo does not claim production completeness.

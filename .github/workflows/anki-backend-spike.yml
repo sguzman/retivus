@@ -6,6 +6,9 @@ on:
       - ".github/workflows/anki-backend-spike.yml"
       - "spikes/anki-collection/**"
       - "spikes/anki-git/**"
+      - "src/anki_backend.rs"
+      - "src/lib.rs"
+      - "Cargo.toml"
   workflow_dispatch:
 permissions:
   contents: read
@@ -77,3 +80,10 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           cargo run --manifest-path spikes/anki-git/Cargo.toml
+      - name: Test optional Retivus Anki-backed library integration
+        env:
+          CARGO_BUILD_JOBS: "2"
+          PROTOC: /usr/bin/protoc
+          CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
+        run: |
+          cargo test --features anki-backend --lib

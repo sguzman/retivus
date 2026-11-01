@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Early development. The initial repository establishes the Rust/egui application shell, versioned Mexilex and generic TSV validation adapters, and a weighted [implementation roadmap](ROADMAP.md). **Anki backend integration, native collection access, scheduling, synchronization, and deck interchange are not yet implemented or claimed.**
+Early development. The initial repository establishes the Rust/egui application shell, versioned Mexilex and generic TSV validation adapters, and a weighted [implementation roadmap](ROADMAP.md). **An opt-in Anki Rust backend adapter is under CI integration; durable collection storage, complete scheduling, synchronization, and deck interchange are not yet implemented or claimed.**
 
 ## Architecture
 
@@ -29,7 +29,7 @@ cargo run
 cargo test --all-targets
 ```
 
-The current GUI can read-only validate Mexilex or generic TSV source files. It is a foundation, **not** yet a working flashcard trainer; no learner cards or review history are written.
+An experimental `anki-backend` Cargo feature links the pinned Anki Rust engine and validates an in-memory collection; it is not yet a released backend. The current GUI can read-only validate Mexilex or generic TSV source files. It is a foundation, **not** yet a working flashcard trainer; no learner cards or review history are written.
 
 ## License
 
