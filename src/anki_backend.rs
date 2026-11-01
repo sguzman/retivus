@@ -2,6 +2,8 @@
 //! No user profile is opened by this module's initial construction or tests.
 use anki::collection::CollectionBuilder;
 use anki::decks::DeckId;
+use anki::notes::NoteId;
+use anki::notetype::{CardTemplate, NotetypeId};
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -107,6 +109,110 @@ impl AnkiBackend {
         note.set_field(1, back)?;
         self.collection.add_note(&mut note, DeckId(deck_id))?;
         Ok(note.id.0)
+    }
+
+
+    /// Existing deck names come from the pinned upstream Anki collection engine.
+    pub fn list_decks(&mut self) -> BackendResult<Vec<(i64, String)>> {
+        let tree = self.collection.deck_tree(None)?;
+        let mut pending = tree.children;
+        let mut decks = Vec::new();
+        while let Some(node) = pending.pop() {
+            decks.push((node.deck_id, node.name));
+            pending.extend(node.children);
+        }
+        decks.sort_by(|left, right| left.1.cmp(&right.1));
+        Ok(decks)
+    }
+
+    /// Name and number of card templates, without exposing upstream internal types.
+    pub fn list_notetypes(&mut self) -> BackendResult<Vec<(String, usize)>> {
+        Ok(self
+            .collection
+            .get_all_notetypes()?
+            .into_iter()
+            .map(|notetype| (notetype.name.clone(), notetype.templates.len()))
+            .collect())
+    }
+
+    /// Install a local two-direction template using Anki's own schema and card generator.
+    pub fn create_bidirectional_notetype(&mut self, name: &str) -> BackendResult<i64> {
+        if name.trim().is_empty() || self.collection.get_notetype_by_name(name)?.is_some() {
+            return Err("note type name must be nonempty and unique".into());
+        }
+        let mut notetype = self
+            .collection
+            .get_notetype_by_name("Basic")?
+            .ok_or("Anki Basic template unavailable")?
+            .as_ref()
+            .clone();
+        notetype.id = NotetypeId(0);
+        notetype.name = name.to_owned();
+        notetype
+            .templates
+            .push(CardTemplate::new("Reverse", "{{Back}}", "{{Front}}"));
+        self.collection.add_notetype(&mut notetype, false)?;
+        Ok(notetype.id.0)
+    }
+
+    pub fn add_note_with_notetype(
+        &mut self,
+        deck_id: i64,
+        notetype_name: &str,
+        fields: &[&str],
+    ) -> BackendResult<i64> {
+        let notetype = self
+            .collection
+            .get_notetype_by_name(notetype_name)?
+            .ok_or("requested Anki note type does not exist")?;
+        if fields.len() != notetype.fields.len() || fields.iter().any(|field| field.trim().is_empty()) {
+            return Err("note must supply all nonempty fields for the chosen note type".into());
+        }
+        let mut note = notetype.new_note();
+        for (index, field) in fields.iter().enumerate() {
+            note.set_field(index, *field)?;
+        }
+        self.collection.add_note(&mut note, DeckId(deck_id))?;
+        Ok(note.id.0)
+    }
+
+    pub fn note_fields(&self, note_id: i64) -> BackendResult<Vec<String>> {
+        let note = self
+            .collection
+            .storage
+            .get_note(NoteId(note_id))?
+            .ok_or("note ID does not exist")?;
+        Ok(note.fields().clone())
+    }
+
+    pub fn edit_note_fields(&mut self, note_id: i64, fields: &[&str]) -> BackendResult<()> {
+        let mut note = self
+            .collection
+            .storage
+            .get_note(NoteId(note_id))?
+            .ok_or("note ID does not exist")?;
+        if fields.len() != note.fields().len() || fields.iter().any(|field| field.trim().is_empty()) {
+            return Err("updated note fields must match the existing note type".into());
+        }
+        for (index, field) in fields.iter().enumerate() {
+            note.set_field(index, *field)?;
+        }
+        self.collection.update_note(&mut note)?;
+        Ok(())
+    }
+
+    /// Explicit deletion, with Anki's in-session undo path available to callers.
+    pub fn remove_note(&mut self, note_id: i64) -> BackendResult<()> {
+        if self.collection.storage.get_note(NoteId(note_id))?.is_none() {
+            return Err("cannot delete a missing note".into());
+        }
+        self.collection.remove_notes(&[NoteId(note_id)])?;
+        Ok(())
+    }
+
+    pub fn undo_last(&mut self) -> BackendResult<()> {
+        self.collection.undo()?;
+        Ok(())
     }
 
     pub fn due_counts(&mut self) -> BackendResult<(usize, usize, usize)> {
@@ -241,6 +347,64 @@ mod tests {
         assert!(AnkiBackend::open_managed_profile(tmp.path(), "future").is_err());
         assert!(path.exists());
         assert!(AnkiBackend::create_managed_profile(tmp.path(), "future").is_err());
+    }
+
+    #[test]
+    fn deck_note_template_edit_delete_undo_and_reopen_roundtrip() {
+        let tmp = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(tmp.path(), "learning").unwrap();
+        let deck_id = backend.create_deck("Bidirectional").unwrap();
+        assert!(backend.list_decks().unwrap().iter().any(|deck| deck.0 == deck_id));
+        let kind = "Retivus Bidirectional";
+        let type_id = backend.create_bidirectional_notetype(kind).unwrap();
+        assert!(type_id > 0);
+        assert!(backend.create_bidirectional_notetype(kind).is_err());
+        assert!(backend
+            .list_notetypes()
+            .unwrap()
+            .iter()
+            .any(|item| item.0 == kind && item.1 == 2));
+        assert!(backend
+            .add_note_with_notetype(deck_id, kind, &["one"])
+            .is_err());
+
+        let note_id = backend
+            .add_note_with_notetype(deck_id, kind, &["uno", "one"])
+            .unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["uno", "one"]);
+        assert_eq!(
+            backend
+                .collection
+                .search_cards("front:uno", SortMode::NoOrder)
+                .unwrap()
+                .len(),
+            2
+        );
+        backend.edit_note_fields(note_id, &["dos", "two"]).unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["dos", "two"]);
+        assert_eq!(
+            backend
+                .collection
+                .search_cards("front:dos", SortMode::NoOrder)
+                .unwrap()
+                .len(),
+            2
+        );
+        backend.remove_note(note_id).unwrap();
+        assert!(backend.note_fields(note_id).is_err());
+        backend.undo_last().unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap(), ["dos", "two"]);
+        backend.close().unwrap();
+
+        let mut reopened = AnkiBackend::open_managed_profile(tmp.path(), "learning").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["dos", "two"]);
+        assert!(reopened.list_decks().unwrap().iter().any(|deck| deck.0 == deck_id));
+        assert!(reopened
+            .list_notetypes()
+            .unwrap()
+            .iter()
+            .any(|item| item.0 == kind && item.1 == 2));
+        reopened.close().unwrap();
     }
 
     #[cfg(unix)]
