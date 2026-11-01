@@ -114,6 +114,23 @@ pub fn install_local_krypton(ctx: &egui::Context) -> bool {
     false
 }
 
+
+#[cfg(test)]
+fn install_with_roots(ctx: &egui::Context, roots: &[PathBuf]) -> bool {
+    for path in discover_krypton(roots) {
+        if let Some(bytes) = font_bytes(&path) {
+            let mut fonts = egui::FontDefinitions::default();
+            fonts.font_data.insert(
+                "retivus-local-krypton".into(),
+                Arc::new(egui::FontData::from_owned(bytes)),
+            );
+            ctx.set_fonts(fonts);
+            return true;
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -148,20 +165,4 @@ mod tests {
             &[root.path().to_path_buf()]
         ));
     }
-}
-
-#[cfg(test)]
-fn install_with_roots(ctx: &egui::Context, roots: &[PathBuf]) -> bool {
-    for path in discover_krypton(roots) {
-        if let Some(bytes) = font_bytes(&path) {
-            let mut fonts = egui::FontDefinitions::default();
-            fonts.font_data.insert(
-                "retivus-local-krypton".into(),
-                Arc::new(egui::FontData::from_owned(bytes)),
-            );
-            ctx.set_fonts(fonts);
-            return true;
-        }
-    }
-    false
 }
