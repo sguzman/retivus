@@ -84,6 +84,27 @@ impl StudyPanel {
         }
     }
 
+    /// Use one guarded path for both the grade buttons and automated UI-state tests.
+    fn grade_revealed(&mut self, rating: u8) {
+        if !self.revealed {
+            self.status = "Reveal the answer before choosing a rating.".into();
+            return;
+        }
+        let Some(card_id) = self.review.as_ref().map(|card| card.card_id) else {
+            self.status = "No review card is selected.".into();
+            return;
+        };
+        let Some(backend) = self.backend.as_mut() else {
+            self.status = "Open a Retivus-managed profile first.".into();
+            return;
+        };
+        self.status = match backend.grade_previewed_card(card_id, rating) {
+            Ok(()) => format!("Recorded rating {rating} using Anki's scheduler."),
+            Err(error) => format!("Review not recorded: {error}"),
+        };
+        self.refresh_review();
+    }
+
     fn close(&mut self) {
         if let Some(backend) = self.backend.take() {
             self.status = match backend.close() {
@@ -229,12 +250,7 @@ impl StudyPanel {
                         ui.horizontal_wrapped(|ui| {
                             for (rating, name) in [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")] {
                                 if ui.button(name).clicked() {
-                                    if let Some(backend) = self.backend.as_mut() {
-                                        match backend.grade_previewed_card(card.card_id, rating) {
-                                            Ok(()) => { self.status = format!("Recorded {name} using Anki's scheduler."); self.refresh_review(); }
-                                            Err(error) => { self.status = format!("Review not recorded: {error}"); self.refresh_review(); }
-                                        }
-                                    }
+                                    self.grade_revealed(rating);
                                 }
                             }
                         });
@@ -277,6 +293,56 @@ impl StudyPanel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn stateful_native_study_flow_requires_reveal_and_preserves_review_after_reopen() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel {
+            root: dir.path().to_string_lossy().into_owned(),
+            profile_id: "fixture-learner".into(),
+            ..StudyPanel::default()
+        };
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let backend = panel.backend.as_mut().unwrap();
+        backend.enable_fsrs().unwrap();
+        let deck = backend.create_deck("Sentences").unwrap();
+        let note = backend.add_basic_note(deck, "¿Qué tal?", "How are you?").unwrap();
+        panel.query = "front:tal".into();
+        panel.refresh();
+        assert!(panel.decks.iter().any(|(id, name)| *id == deck && name == "Sentences"));
+        assert_eq!(panel.notes.len(), 1);
+        assert_eq!(panel.notes[0].id, note);
+        panel.refresh_review();
+        let first = panel.review.as_ref().unwrap().card_id;
+        assert!(panel.due.0 >= 1);
+
+        panel.grade_revealed(4);
+        assert!(panel.status.contains("Reveal the answer"));
+        assert_eq!(panel.review.as_ref().unwrap().card_id, first);
+        panel.revealed = true;
+        panel.grade_revealed(4);
+        assert!(panel.status.contains("Recorded rating 4"));
+        assert!(!panel.revealed);
+        assert_ne!(panel.review.as_ref().map(|v| v.card_id), Some(first));
+        panel.close();
+
+        panel.connect(false);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        panel.refresh();
+        assert_eq!(panel.notes[0].id, note);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note).unwrap(),
+            ["¿Qué tal?", "How are you?"]
+        );
+        let revlogs: i64 = panel.backend.as_mut().unwrap().collection
+            .storage
+            .db()
+            .query_row("select count(*) from revlog where cid=?1", [first], |row| row.get(0))
+            .unwrap();
+        assert_eq!(revlogs, 1);
+        panel.close();
+    }
 
     #[test]
     fn learner_workspace_never_opens_user_profiles_on_startup() {
