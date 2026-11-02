@@ -21,13 +21,33 @@ jobs:
         run: bash -n scripts/audit-offline-source.sh
       - name: Vendor all locked Cargo sources and verify offline dependency graph
         run: bash scripts/audit-offline-source.sh "$RUNNER_TEMP/retivus-source-audit"
-      - name: Retain source inventory and verified provenance summary
-        if: always()
+      - name: Build checksummed source-distribution candidate
+        run: |
+          set -euo pipefail
+          root="$RUNNER_TEMP/retivus-source-audit"
+          archive="$root/retivus-source-$GITHUB_SHA.tar.zst"
+          test -s "$root/source/.cargo/config.toml"
+          grep -Fx "Root commit: $GITHUB_SHA" "$root/SOURCE-AUDIT.txt"
+          grep -Fx "Offline Cargo metadata: PASS" "$root/SOURCE-AUDIT.txt"
+          tar --sort=name --mtime="@$(git log -1 --format=%ct)" \
+            --owner=0 --group=0 --numeric-owner \
+            -C "$root" -cf - source | zstd -T1 -9 -o "$archive"
+          (cd "$root" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+          tar --zstd -tf "$archive" > "$root/archive-index.txt"
+          grep -Fx 'source/Cargo.lock' "$root/archive-index.txt"
+          grep -Fx 'source/.cargo/config.toml' "$root/archive-index.txt"
+          grep -Fx 'source/vendor/anki-0.0.0/Cargo.toml' "$root/archive-index.txt"
+          grep -Fx 'source/vendor/percent-encoding-iri-2.2.0/Cargo.toml' "$root/archive-index.txt"
+          (cd "$root" && sha256sum --check "$(basename "$archive").sha256")
+      - name: Retain audited source, checksum and third-party inventory
         uses: actions/upload-artifact@v4
         with:
           name: retivus-locked-source-audit
+          compression-level: 0
           path: |
+            ${{ runner.temp }}/retivus-source-audit/retivus-source-*.tar.zst
+            ${{ runner.temp }}/retivus-source-audit/retivus-source-*.tar.zst.sha256
             ${{ runner.temp }}/retivus-source-audit/THIRD-PARTY-SOURCES.tsv
             ${{ runner.temp }}/retivus-source-audit/SOURCE-AUDIT.txt
-          if-no-files-found: ignore
+          if-no-files-found: error
           retention-days: 7
