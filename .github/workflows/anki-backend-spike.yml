@@ -162,7 +162,7 @@ jobs:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: |
           set -euo pipefail
-          sudo apt-get install -y -qq sway grim jq libegl1
+          sudo apt-get install -y -qq sway grim jq libegl1 fonts-noto-cjk
           mkdir -p "$XDG_RUNTIME_DIR"
           chmod 700 "$XDG_RUNTIME_DIR"
           cat > "$RUNNER_TEMP/retivus-sway.conf" <<'SWAY'
@@ -252,6 +252,7 @@ jobs:
             done
             test "$found" -eq 1 || { cat "/tmp/retivus-wayland-$scene.log"; exit 1; }
             grep -q "Retivus disposable visual QA scene initialized: $scene" "/tmp/retivus-wayland-$scene.log"
+            grep -q "Retivus CJK fallback loaded from locally installed fonts" "/tmp/retivus-wayland-$scene.log"
             sleep 2
             grim -o HEADLESS-1 "/tmp/retivus-wayland-$scene-wide.png"
             test "$(wc -c < "/tmp/retivus-wayland-$scene-wide.png")" -gt 9000
