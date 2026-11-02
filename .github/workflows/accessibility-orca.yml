@@ -34,6 +34,7 @@ jobs:
           path: |
             ${{ runner.temp }}/retivus-orca-speech.txt
             ${{ runner.temp }}/retivus-orca-debug.log
+            ${{ runner.temp }}/retivus-orca-dynamic-debug.log
             ${{ runner.temp }}/retivus-orca-after-validation.png
             ${{ runner.temp }}/retivus-orca-startup.log
             ${{ runner.temp }}/retivus-orca-app.log

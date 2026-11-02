@@ -60,6 +60,18 @@ for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
 echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
+# The static-smoke phase sends dozens of rapid Tab events and floods Orca's
+# AT-SPI queue. Start a new reader with a fresh log for the dynamic event
+# check, so queued static-focus events cannot mask a live announcement.
+kill "$reader" 2>/dev/null || true
+wait "$reader" 2>/dev/null || true
+reader=0
+sleep 1
+debug="$RUNNER_TEMP/retivus-orca-dynamic-debug.log"
+orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
+sleep 3
+kill -0 "$reader" || { echo "Fresh Orca did not start" >&2; exit 1; }
+xdotool windowactivate --sync "$window"
 # Exercise a *dynamic* polite live-region announcement, not only the
 # static accessibility label. Default source path is empty in this disposable
 # profile, so activating validation must report a safe read failure.
