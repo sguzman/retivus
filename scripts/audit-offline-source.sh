@@ -53,8 +53,8 @@ test -n "$(find "$out/source/ftl/qt" -name '*.ftl' -type f -print -quit)"
 # rslib/src/version.rs includes ../../.version, which resolves one level
 # above its vendored crate root. Store the exact upstream tracked version
 # there; do not patch third-party Rust sources.
-git -C "$anki_source" show HEAD:.version > "$out/source/vendor/.version"
-test -s "$out/source/vendor/.version"
+git -C "$anki_source" show HEAD:.version > "$out/vendor/.version"
+test -s "$out/vendor/.version"
 # Translation repositories are true Git submodules pinned by Anki's commit.
 # Copy tracked content from their exact Gitlink revisions, never the tip of a
 # branch or a mutable translation download.
