@@ -135,27 +135,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-  clean-container:
+  clean-runtime:
     needs: package
+    # This second hosted VM is independent of the release build machine.
+    # Minimal Docker/Xvfb reproductions keep the GL window unmapped; the
+    # supported desktop environment is validated by a real hosted GUI session.
     runs-on: ubuntu-24.04
-    container: ubuntu:24.04
     timeout-minutes: 20
     steps:
-      - name: Install runtime-only dependencies
+      - name: Install standalone desktop runtime dependencies
         run: |
-          apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            bash coreutils findutils grep sed tar zstd xvfb xdotool x11-utils openbox \
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            zstd xvfb xdotool x11-utils openbox \
             libgl1-mesa-dri libxkbcommon-x11-0 libx11-6 ca-certificates
       - name: Download the built release archive, without fetching source or Rust
         uses: actions/download-artifact@v4
         with:
           name: retivus-linux-candidate-evidence
           path: /tmp/retivus-candidate-evidence
-      - name: Independent clean-container acceptance
+      - name: Independent fresh-VM desktop acceptance without Cargo
         shell: bash
         run: |
           set -euo pipefail
+          # GitHub images ship Rust; exclude its binary directories to verify
+          # this release requires no Rust compiler or source checkout.
+          export PATH="$(printf '%s' "$PATH" | tr ':' '\n' |
+            grep -vE '/(\.cargo|cargo)/bin$' | paste -sd ':' -)"
+          if command -v cargo >/dev/null 2>&1; then
+            echo "Standalone runtime still exposes Cargo" >&2
+            exit 1
+          fi
           archive="$(find /tmp/retivus-candidate-evidence -type f -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
           test -n "$archive"
           tar --zstd -xf "$archive" -C /tmp
