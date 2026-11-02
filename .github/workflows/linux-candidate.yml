@@ -18,6 +18,20 @@ jobs:
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout exact upstream Anki source
+        uses: actions/checkout@v4
+        with:
+          repository: ankitects/anki
+          ref: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7
+          path: upstream-anki
+          persist-credentials: false
+      - name: Checkout exact transitive rust-url Git source
+        uses: actions/checkout@v4
+        with:
+          repository: ankitects/rust-url
+          ref: bb930b8d089f4d30d7d19c12e54e66191de47b88
+          path: upstream-rust-url
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Install build and headless display prerequisites
         run: |
@@ -33,6 +47,9 @@ jobs:
           echo 'e062551fb2452c43fe3e8c8bfe2c17150ad3ea4847cbb0d8a98110eee9e00f13  Cargo.lock' | sha256sum -c -
           cargo build --locked --release --features anki-backend --bin retivus
       - name: Package source-accompanied candidate
+        env:
+          RETIVUS_ANKI_SOURCE_DIR: upstream-anki
+          RETIVUS_RUST_URL_SOURCE_DIR: upstream-rust-url
         run: |
           bash scripts/package-linux.sh dist
           (cd dist && sha256sum -c *.sha256)
@@ -60,9 +77,15 @@ jobs:
           lock_sha="$(sha256sum "$source_root/Cargo.lock" | cut -d' ' -f1)"
           grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$manifest"
           grep -Fx "Upstream Anki rslib revision: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7" "$manifest"
+          grep -Fx "Upstream rust-url Git revision: bb930b8d089f4d30d7d19c12e54e66191de47b88" "$manifest"
+          grep -Fx 'Pinned Git source snapshots: bundled exact Git source snapshots (submodules and registry crates separately audited)' "$manifest"
+          test -s "$root/share/doc/retivus/source-deps/anki/LICENSE"
+          test -s "$root/share/doc/retivus/source-deps/anki/rslib/Cargo.toml"
+          test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-MIT"
+          test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-APACHE"
+          test -s "$root/share/doc/retivus/source-deps/rust-url/url/Cargo.toml"
           test -s "$root/RELEASE-CANDIDATE.txt"
           grep -Fx "AnkiWeb sync remains unverified." "$root/RELEASE-CANDIDATE.txt"
-          grep -q 'source is pinned but NOT bundled' "$manifest"
           test -s "$prefix/share/retivus/installed-files.sha256"
           "$root/install.sh" "$prefix"
           xvfb-run -a bash -c '

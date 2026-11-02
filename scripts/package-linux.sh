@@ -35,12 +35,45 @@ git archive --format=tar HEAD | tar -x -C "$root/share/doc/retivus/source"
 install -m644 Cargo.lock "$root/share/doc/retivus/source/Cargo.lock"
 pinned_anki="$(grep -Eo 'rev = "[0-9a-f]{40}"' Cargo.toml | head -n 1 | cut -d'"' -f2)"
 test "${#pinned_anki}" -eq 40 || { echo "Missing pinned Anki revision" >&2; exit 1; }
+pinned_rust_url="$(grep '^source = "git+https://github.com/ankitects/rust-url.git' Cargo.lock | sed -nE 's/.*#([0-9a-f]{40})".*/\1/p' | head -n 1)"
+test "${#pinned_rust_url}" -eq 40 || { echo "Missing pinned rust-url Git revision" >&2; exit 1; }
+source_bundle="not bundled"
+# External source snapshots are optional for developer candidates, mandatory in
+# release CI. Never pretend downloaded or locally modified sources match a pin.
+if [[ -n "${RETIVUS_ANKI_SOURCE_DIR:-}" || -n "${RETIVUS_RUST_URL_SOURCE_DIR:-}" ]]; then
+  : "${RETIVUS_ANKI_SOURCE_DIR:?Both pinned Git checkout paths are required}"
+  : "${RETIVUS_RUST_URL_SOURCE_DIR:?Both pinned Git checkout paths are required}"
+  for source_id in anki rust-url; do
+    if [[ "$source_id" == anki ]]; then
+      path="$RETIVUS_ANKI_SOURCE_DIR"; revision="$pinned_anki"
+    else
+      path="$RETIVUS_RUST_URL_SOURCE_DIR"; revision="$pinned_rust_url"
+    fi
+    [[ -d "$path/.git" || -f "$path/.git" ]] || {
+      echo "Missing Git checkout for $source_id: $path" >&2; exit 1
+    }
+    [[ "$(git -C "$path" rev-parse HEAD)" == "$revision" ]] || {
+      echo "Wrong source revision for $source_id" >&2; exit 1
+    }
+    [[ -z "$(git -C "$path" status --porcelain --untracked-files=no)" ]] || {
+      echo "Refusing modified source checkout for $source_id" >&2; exit 1
+    }
+    mkdir -p "$root/share/doc/retivus/source-deps/$source_id"
+    git -C "$path" archive --format=tar HEAD |
+      tar -xf - -C "$root/share/doc/retivus/source-deps/$source_id"
+  done
+  test -s "$root/share/doc/retivus/source-deps/anki/LICENSE"
+  test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-APACHE"
+  test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-MIT"
+  source_bundle="bundled exact Git source snapshots (submodules and registry crates separately audited)"
+fi
 {
   printf 'Retivus source commit: %s\n' "$(git rev-parse HEAD)"
   printf 'Retivus Cargo.lock sha256: %s\n' "$(sha256sum Cargo.lock | cut -d' ' -f1)"
   printf 'Upstream Anki rslib revision: %s\n' "$pinned_anki"
   printf 'Upstream Anki source URL: https://github.com/ankitects/anki\n'
-  printf 'Upstream Anki source is pinned but NOT bundled in this candidate.\n'
+  printf 'Upstream rust-url Git revision: %s\n' "$pinned_rust_url"
+  printf 'Pinned Git source snapshots: %s\n' "$source_bundle"
   printf 'Full corresponding-source and third-party-notice review remains a release gate.\n'
 } > "$root/share/doc/retivus/SOURCE-PROVENANCE.txt"
 install -m755 scripts/install-linux-candidate.sh "$root/install.sh"
@@ -48,8 +81,10 @@ install -m755 scripts/uninstall-linux-candidate.sh "$root/uninstall.sh"
 cat > "$root/RELEASE-CANDIDATE.txt" <<'NOTICE'
 UNRELEASED TEST CANDIDATE — NOT AN ACCEPTED OR PUBLISHED RETIVUS RELEASE.
 Includes Retivus source and resolved Cargo.lock. Linked Anki rslib source is
-pinned by Cargo.toml; see upstream attribution. Corresponding-source/license
-review and release compatibility remain open.
+pinned by Cargo.toml; see upstream attribution and SOURCE-PROVENANCE.txt.
+Bundled source checkouts do not certify full corresponding-source coverage:
+registry crates, submodules and third-party licenses still require review.
+Release compatibility remains open.
 Official Anki Desktop GUI package interoperability passed separately in CI;
 AnkiWeb sync remains unverified.
 No Anki user profiles or private study records are packaged.
