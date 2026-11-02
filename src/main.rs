@@ -594,6 +594,13 @@ fn main() -> eframe::Result<()> {
                 eprintln!("Retivus disposable visual QA scene initialized: {scene}");
             }
             cc.egui_ctx.set_zoom_factor(app.ui_scale);
+            // eframe's native GL backend creates the root window hidden until
+            // its first painted frame, overriding NativeOptions.visible.
+            // Under minimal X11 sessions, no initial repaint may arrive:
+            // explicitly queue a visibility command and first redraw.
+            cc.egui_ctx
+                .send_viewport_cmd(egui::ViewportCommand::Visible(true));
+            cc.egui_ctx.request_repaint();
             Ok(Box::new(app))
         }),
     )
