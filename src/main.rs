@@ -49,6 +49,8 @@ impl SelectedSense {
 const THEME_STORAGE_KEY: &str = "retivus.theme.v1";
 const SCALE_STORAGE_KEY: &str = "retivus.ui-scale.v1";
 const DENSITY_STORAGE_KEY: &str = "retivus.density.v1";
+const HIGH_CONTRAST_STORAGE_KEY: &str = "retivus.high-contrast.v1";
+const REDUCED_MOTION_STORAGE_KEY: &str = "retivus.reduced-motion.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Density {
@@ -131,6 +133,8 @@ struct Retivus {
     theme: Theme,
     ui_scale: f32,
     density: Density,
+    high_contrast: bool,
+    reduced_motion: bool,
     source_path: String,
     import_status: String,
     source_format: SourceFormat,
@@ -151,6 +155,8 @@ impl Default for Retivus {
             theme: Theme::System,
             ui_scale: 1.0,
             density: Density::Comfortable,
+            high_contrast: false,
+            reduced_motion: false,
             source_path: String::new(),
             import_status: "No source checked".into(),
             source_format: SourceFormat::Mexilex,
@@ -270,13 +276,63 @@ impl Retivus {
         let theme = storage.and_then(|value| value.get_string(THEME_STORAGE_KEY));
         let scale = storage.and_then(|value| value.get_string(SCALE_STORAGE_KEY));
         let density = storage.and_then(|value| value.get_string(DENSITY_STORAGE_KEY));
+        let high_contrast = storage.and_then(|value| value.get_string(HIGH_CONTRAST_STORAGE_KEY));
+        let reduced_motion = storage.and_then(|value| value.get_string(REDUCED_MOTION_STORAGE_KEY));
         Self {
             theme: Theme::from_stored(theme.as_deref()),
             ui_scale: parse_scale(scale.as_deref()),
             density: Density::from_stored(density.as_deref()),
+            high_contrast: high_contrast.as_deref() == Some("true"),
+            reduced_motion: reduced_motion.as_deref() == Some("true"),
             ..Self::default()
         }
     }
+}
+
+fn apply_accessibility_style(
+    ctx: &egui::Context,
+    density: Density,
+    high_contrast: bool,
+    reduced_motion: bool,
+) {
+    let dark = ctx.theme() == egui::Theme::Dark;
+    ctx.style_mut(|style| {
+        style.spacing.item_spacing = density.spacing();
+        style.animation_time = if reduced_motion {
+            0.0
+        } else {
+            egui::Style::default().animation_time
+        };
+        // Reset every changed field when contrast is disabled. That also
+        // preserves live System theme switching without stale overrides.
+        let defaults = if dark {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        };
+        style.visuals.override_text_color = None;
+        style.visuals.weak_text_color = defaults.weak_text_color;
+        style.visuals.panel_fill = defaults.panel_fill;
+        style.visuals.window_fill = defaults.window_fill;
+        style.visuals.extreme_bg_color = defaults.extreme_bg_color;
+        if high_contrast {
+            let foreground = if dark {
+                egui::Color32::WHITE
+            } else {
+                egui::Color32::BLACK
+            };
+            let background = if dark {
+                egui::Color32::BLACK
+            } else {
+                egui::Color32::WHITE
+            };
+            style.visuals.override_text_color = Some(foreground);
+            style.visuals.weak_text_color = Some(foreground);
+            style.visuals.panel_fill = background;
+            style.visuals.window_fill = background;
+            style.visuals.extreme_bg_color = background;
+        }
+    });
 }
 
 impl eframe::App for Retivus {
@@ -284,12 +340,14 @@ impl eframe::App for Retivus {
         storage.set_string(THEME_STORAGE_KEY, self.theme.stored().into());
         storage.set_string(SCALE_STORAGE_KEY, self.ui_scale.to_string());
         storage.set_string(DENSITY_STORAGE_KEY, self.density.stored().into());
+        storage.set_string(HIGH_CONTRAST_STORAGE_KEY, self.high_contrast.to_string());
+        storage.set_string(REDUCED_MOTION_STORAGE_KEY, self.reduced_motion.to_string());
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Switching back to System must restore live operating-system theme tracking.
         ctx.set_theme(self.theme.preference());
-        ctx.style_mut(|style| style.spacing.item_spacing = self.density.spacing());
+        apply_accessibility_style(ctx, self.density, self.high_contrast, self.reduced_motion);
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             ui.horizontal_wrapped(|ui| {
                 ui.label(
@@ -328,6 +386,10 @@ impl eframe::App for Retivus {
                 {
                     ctx.set_zoom_factor(self.ui_scale);
                 }
+                ui.checkbox(&mut self.high_contrast, "High contrast")
+                    .on_hover_text("Use high-contrast text and backgrounds in either color scheme.");
+                ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                    .on_hover_text("Disable standard widget transitions in Retivus.");
             });
         });
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -582,6 +644,53 @@ mod tests {
             Retivus::restore(Some(&storage)).density,
             Density::Comfortable
         );
+    }
+
+    #[test]
+    fn high_contrast_and_reduced_motion_persist_and_reset() {
+        let mut storage = TestStorage::default();
+        let mut app = Retivus {
+            high_contrast: true,
+            reduced_motion: true,
+            ..Retivus::default()
+        };
+        eframe::App::save(&mut app, &mut storage);
+        let restored = Retivus::restore(Some(&storage));
+        assert!(restored.high_contrast);
+        assert!(restored.reduced_motion);
+        assert!(!Retivus::default().high_contrast);
+        assert!(!Retivus::default().reduced_motion);
+
+        let ctx = egui::Context::default();
+        for (theme, fg, bg) in [
+            (egui::Theme::Dark, egui::Color32::WHITE, egui::Color32::BLACK),
+            (egui::Theme::Light, egui::Color32::BLACK, egui::Color32::WHITE),
+        ] {
+            ctx.set_theme(if theme == egui::Theme::Dark {
+                egui::ThemePreference::Dark
+            } else {
+                egui::ThemePreference::Light
+            });
+            apply_accessibility_style(&ctx, Density::Comfortable, true, true);
+            let style = ctx.style();
+            assert_eq!(style.visuals.override_text_color, Some(fg));
+            assert_eq!(style.visuals.panel_fill, bg);
+            assert_eq!(style.animation_time, 0.0);
+            apply_accessibility_style(&ctx, Density::Comfortable, false, false);
+            let reset = ctx.style();
+            assert_eq!(reset.visuals.override_text_color, None);
+            assert_eq!(reset.animation_time, egui::Style::default().animation_time);
+            assert_eq!(reset.visuals.panel_fill, if theme == egui::Theme::Dark {
+                egui::Visuals::dark().panel_fill
+            } else {
+                egui::Visuals::light().panel_fill
+            });
+        }
+        eframe::Storage::set_string(&mut storage, HIGH_CONTRAST_STORAGE_KEY, "invalid".into());
+        eframe::Storage::set_string(&mut storage, REDUCED_MOTION_STORAGE_KEY, "invalid".into());
+        let invalid = Retivus::restore(Some(&storage));
+        assert!(!invalid.high_contrast);
+        assert!(!invalid.reduced_motion);
     }
 
     #[test]
