@@ -3,14 +3,16 @@
 set -euo pipefail
 app="$(realpath "$1")"
 test -x "$app"
-export HOME="$RUNNER_TEMP/retivus-orca-home"
+mode="${2:?Usage: qa-orca.sh RETIVUS_BINARY static|dynamic}"
+case "$mode" in static|dynamic) ;; *) echo "Unknown Orca test mode: $mode" >&2; exit 2;; esac
+export HOME="$RUNNER_TEMP/retivus-orca-home-$mode"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
-debug="$RUNNER_TEMP/retivus-orca-debug.log"
-app_log="$RUNNER_TEMP/retivus-orca-app.log"
-reader_log="$RUNNER_TEMP/retivus-orca-startup.log"
-wm_log="$RUNNER_TEMP/retivus-orca-wm.log"
+debug="$RUNNER_TEMP/retivus-orca-$mode-debug.log"
+app_log="$RUNNER_TEMP/retivus-orca-$mode-app.log"
+reader_log="$RUNNER_TEMP/retivus-orca-$mode-startup.log"
+wm_log="$RUNNER_TEMP/retivus-orca-$mode-wm.log"
 wm=0; reader=0; learner=0
 cleanup() {
   code=$?
@@ -39,6 +41,7 @@ done
 [[ -n "$window" ]] || { echo "Retivus window not found"; exit 1; }
 xdotool windowactivate --sync "$window"
 sleep 2
+if [[ "$mode" == static ]]; then
 # A real Orca instance must receive the AT-SPI focus events caused by Tab.
 for cycle in 1 2; do
   for i in $(seq 1 22); do
@@ -60,18 +63,10 @@ for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
 echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
-# The static-smoke phase sends dozens of rapid Tab events and floods Orca's
-# AT-SPI queue. Start a new reader with a fresh log for the dynamic event
-# check, so queued static-focus events cannot mask a live announcement.
-kill "$reader" 2>/dev/null || true
-wait "$reader" 2>/dev/null || true
-reader=0
-sleep 1
-debug="$RUNNER_TEMP/retivus-orca-dynamic-debug.log"
-orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
-sleep 3
-kill -0 "$reader" || { echo "Fresh Orca did not start" >&2; exit 1; }
-xdotool windowactivate --sync "$window"
+  exit 0
+fi
+# Dynamic validation runs in a completely fresh app, Orca, and DBus session.
+# No static Tab flood or persisted focus can contaminate this result.
 # Exercise a *dynamic* polite live-region announcement, not only the
 # static accessibility label. Default source path is empty in this disposable
 # profile, so activating validation must report a safe read failure.
