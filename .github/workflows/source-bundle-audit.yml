@@ -18,6 +18,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout exact upstream Anki protobuf source
+        uses: actions/checkout@v4
+        with:
+          repository: ankitects/anki
+          ref: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7
+          path: upstream-anki
+          persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify audit script shell syntax
         run: |
@@ -39,6 +46,7 @@ jobs:
           (cd "$root" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
           tar --zstd -tf "$archive" > "$root/archive-index.txt"
           grep -Fx 'source/Cargo.lock' "$root/archive-index.txt"
+          test -n "$(grep -E '^source/proto/anki/[^/]+\.proto$' "$root/archive-index.txt" | head -n 1)"
           grep -Fx 'source/THIRD-PARTY-SOURCES.tsv' "$root/archive-index.txt"
           grep -Fx 'source/LICENSE-FILE-AUDIT.tsv' "$root/archive-index.txt"
           grep -Fx 'source/.cargo/config.toml' "$root/archive-index.txt"

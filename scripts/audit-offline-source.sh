@@ -25,6 +25,31 @@ grep -Fq 'directory = "vendor"' "$out/vendor-config.toml" || {
 mkdir -p "$out/source/.cargo"
 git -C "$repo" archive --format=tar HEAD | tar -xf - -C "$out/source"
 install -m644 "$repo/Cargo.lock" "$out/source/Cargo.lock"
+# Anki's anki_proto build script accesses ../../proto/anki while compiling
+# from its vendored crate path. Cargo vendor copies Rust crates, not the
+# upstream repository's sibling protobuf schema. Bundle exactly the pinned
+# tracked protobuf definitions as corresponding build input.
+anki_source="$repo/upstream-anki"
+expected_anki="136bd42bfbd356fc756b6d3e28cc77b02da11ea7"
+test -d "$anki_source/proto/anki" || {
+  echo "Missing exact Anki upstream checkout required for protobuf build inputs" >&2
+  exit 1
+}
+test "$(git -C "$anki_source" rev-parse HEAD)" = "$expected_anki" || {
+  echo "Refusing proto sources from a different upstream Anki revision" >&2
+  exit 1
+}
+test -z "$(git -C "$anki_source" status --porcelain --untracked-files=no)" || {
+  echo "Refusing modified Anki proto source checkout" >&2
+  exit 1
+}
+git -C "$anki_source" archive --format=tar HEAD proto | tar -xf - -C "$out/source"
+test -s "$out/source/proto/anki/backend.proto" || {
+  test -n "$(find "$out/source/proto/anki" -name '*.proto' -type f -print -quit)" || {
+    echo "No tracked Anki protobuf definitions included" >&2
+    exit 1
+  }
+}
 cp "$out/vendor-config.toml" "$out/source/.cargo/config.toml"
 mv "$out/vendor" "$out/source/vendor"
 # Capture each locked package's declared SPDX expression or missing-license
@@ -62,6 +87,7 @@ trap 'rm -rf "$empty_home"' EXIT
   printf 'Registry packages: %s\n' "$registry_count"
   printf 'Vendored crates: %s\n' "$vendored_count"
   printf 'Offline Cargo metadata: PASS\n'
+  printf 'Pinned Anki proto build inputs: %s\n' "$expected_anki"
   printf 'Source/release licensing and notices: NOT YET CERTIFIED\n'
 } > "$out/SOURCE-AUDIT.txt"
 cat "$out/SOURCE-AUDIT.txt"

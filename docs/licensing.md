@@ -53,3 +53,7 @@ The independent [locked Cargo source audit](../.github/workflows/source-bundle-a
 ## Locked dependency license-file evidence
 
 The offline source audit generates `LICENSE-FILE-AUDIT.tsv` alongside its existing `THIRD-PARTY-SOURCES.tsv` report. For each vendored Git or registry crate it records the declared license expression and whether an identifiable license/notice file exists at the crate's top level. Entries marked `REVIEW_PARENT_OR_UPSTREAM` require manual investigation of workspace parent repositories, nested files or required attribution; a missing crate-local file **does not by itself establish a violation**. The report is also embedded in the checksummed source archive and compared byte-for-byte by the release artifact-parity job. This improves evidence for M7.1 without certifying compliance or authorizing a production release.
+
+### Pinned Anki protobuf build inputs
+
+A fresh `--offline` compilation exposed a missing source input which `cargo vendor` cannot infer from Cargo dependency metadata: the pinned `anki_proto` build script reads the upstream repository's sibling `proto/anki/*.proto` files. The source audit now checks out Anki commit `136bd42bfbd356fc756b6d3e28cc77b02da11ea7`, rejects a modified/different revision, and embeds its tracked `proto` directory in the source candidate. The subsequent fresh offline build check must pass before this is accepted as a complete compilation source; other upstream workspace assets may still be required. No license-compliance certification is implied.
