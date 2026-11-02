@@ -23,13 +23,28 @@ cleanup() {
     tail -n 35 "$app_log" >&2 || true
   fi
   if (( learner > 0 )); then kill "$learner" 2>/dev/null || true; fi
-  if (( reader > 0 )); then kill "$reader" 2>/dev/null || true; fi
+  if (( reader > 0 )); then
+    # Orca is a single-instance screen reader. A terminated launcher can leave
+    # its actual daemon registered, breaking the next independent QA session.
+    orca --quit >/dev/null 2>&1 || true
+    kill "$reader" 2>/dev/null || true
+  fi
   if (( wm > 0 )); then kill "$wm" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
 openbox > "$wm_log" 2>&1 & wm=$!
-orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
+orca --replace --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
 sleep 3
+if ! kill -0 "$reader" 2>/dev/null; then
+  echo 'Orca launcher failed before Retivus started' >&2
+  cat "$reader_log" >&2 || true
+  exit 1
+fi
+if grep -Fq 'Another screen reader process is already running' "$reader_log"; then
+  echo 'Orca singleton collision: replacement failed' >&2
+  cat "$reader_log" >&2
+  exit 1
+fi
 LIBGL_ALWAYS_SOFTWARE=1 "$app" > "$app_log" 2>&1 & learner=$!
 window=""
 for i in $(seq 1 60); do
