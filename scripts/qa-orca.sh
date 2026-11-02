@@ -54,6 +54,36 @@ done
 [[ -n "$window" ]] || { echo "Retivus window not found"; exit 1; }
 xdotool windowactivate --sync "$window"
 sleep 2
+# Dynamic check uses the same known-good Orca and DBus session.
+# Wake Orca's focus tracking on the real File input before the status update.
+# There has not yet been any static keyboard-navigation event flood.
+xdotool mousemove --window "$window" 130 305 click 1
+sleep 1
+announce_start="$(wc -c < "$debug")"
+# The 800x600 native content frame places Validate source at x=8..105,
+# y=322..342. Clicking the button is the isolated status-change stimulus.
+xdotool mousemove --window "$window" 70 331 click 1
+sleep 6
+# Preserve the visual result to establish that the keyboard action did run.
+scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
+# This fresh home contains exactly one validation activation. Require both
+# the emitted AT-SPI announcement AND its observed Orca speech-dispatch call.
+# Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
+# the previous offset assertion missed an event that the retained log proves
+# was spoken and incorrectly failed an otherwise successful run.
+if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
+   ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
+  echo 'Orca did not speak updated validation status after direct button activation' >&2
+  tail -c "+$((announce_start + 1))" "$debug" \
+    | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
+    | tail -n 65 >&2 || true
+  exit 1
+fi
+echo 'PASS: Orca speaks changed validation status before static navigation.'
+
+
+# Static accessibility navigation runs after the live announcement,
+# so its focus-event burst cannot delay or suppress the first update.
 # A real Orca instance must receive the AT-SPI focus events caused by Tab.
 for cycle in 1 2; do
   for i in $(seq 1 22); do
@@ -75,26 +105,3 @@ for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
 echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
-# Dynamic check uses the same known-good Orca and DBus session.
-announce_start="$(wc -c < "$debug")"
-# The 800x600 native content frame places Validate source at x=8..105,
-# y=322..342. Clicking the button is the isolated status-change stimulus.
-xdotool mousemove --window "$window" 70 331 click 1
-sleep 6
-# Preserve the visual result to establish that the keyboard action did run.
-scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
-# This fresh home contains exactly one validation activation. Require both
-# the emitted AT-SPI announcement AND its observed Orca speech-dispatch call.
-# Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
-# the previous offset assertion missed an event that the retained log proves
-# was spoken and incorrectly failed an otherwise successful run.
-if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
-   ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
-  echo 'Orca did not speak updated validation status after direct button activation' >&2
-  tail -c "+$((announce_start + 1))" "$debug" \
-    | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
-    | tail -n 65 >&2 || true
-  exit 1
-fi
-echo 'PASS: Orca speaks the changed validation status after direct button activation.'
-
