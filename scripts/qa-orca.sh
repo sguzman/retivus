@@ -25,7 +25,6 @@ cleanup() {
   if (( wm > 0 )); then kill "$wm" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
-trap 'code=$?; echo "Orca QA error at line $LINENO: $BASH_COMMAND (exit $code)" >&2; exit "$code"' ERR
 openbox > "$wm_log" 2>&1 & wm=$!
 orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
 sleep 3
@@ -60,20 +59,10 @@ grep -F "SPEECH DISPATCHER: Speaking 'File'" "$debug" >/dev/null || { echo "Orca
 for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
-echo "PASS: Orca spoke all five required control labels."
 # Trigger a real changing live region through a coordinate discovered from the
 # AT-SPI object tree. No hard-coded screen coordinates or user profile are used.
-busctl --user set-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled b true
-raw_bus="$(busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress)" || {
-  echo "Could not obtain Orca's AT-SPI bus address" >&2
-  exit 1
-}
-address="$(printf '%s\n' "$raw_bus" | sed -nE 's/^s "([^"]+)"$/\1/p')"
-[[ -n "$address" ]] || {
-  echo "Unexpected AT-SPI bus response: $raw_bus" >&2
-  exit 1
-}
-echo "PASS: Orca AT-SPI bus is accessible."
+address="$(busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress | sed -n 's/^s "\\(.*\\)"$/\\1/p')"
+test -n "$address"
 find_action_center() {
   local service="$1" object="$2" depth="$3" name rect tag x y width height children child_service child_path
   (( depth <= 12 && SECONDS - scan_start < 12 )) || return 1
@@ -98,32 +87,20 @@ find_action_center() {
 roots="$(busctl --timeout=2s --address="$address" call org.a11y.atspi.Registry /org/a11y/atspi/accessible/root org.a11y.atspi.Accessible GetChildren)"
 center=""
 scan_start=$SECONDS
-while IFS=
+while IFS=$'\t' read -r service object; do
   [[ -n "$service" && -n "$object" ]] || continue
   if center="$(find_action_center "$service" "$object" 0)"; then
     break
   fi
 done < <(printf '%s\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
 [[ -n "$center" ]] || { echo "Could not locate visible Validate source bounds on the real AT-SPI tree" >&2; exit 1; }
-echo "PASS: Validate source bounds found through AT-SPI: $center."
 read -r click_x click_y <<< "$center"
 xdotool mousemove "$click_x" "$click_y" click 1
 sleep 4
-\t' read -r service object; do
-  [[ -n "$service" && -n "$object" ]] || continue
-  if center="$(find_action_center "$service" "$object" 0)"; then
-    break
-  fi
-done < <(printf '%s\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
-[[ -n "$center" ]] || { echo "Could not locate visible Validate source bounds on the real AT-SPI tree" >&2; exit 1; }
-echo "PASS: Validate source bounds found through AT-SPI: $center."
-read -r click_x click_y <<< "$center"
-xdotool mousemove "$click_x" "$click_y" click 1
-sleep 4
-# The validation button has been physically clicked using its AT-SPI bounds.
-# Only actual Orca speech can satisfy dynamic-announcement acceptance.
+# Empty source path intentionally fails. Verify the new status is actually
+# spoken, rather than merely exposing a passive AccessKit node.
 grep -E 'SPEECH DISPATCHER: Speaking .*Could not open source' "$debug" >/dev/null || {
   echo "Orca did not speak the changing source-validation status" >&2
   exit 1
 }
-echo "PASS: Orca spoke named controls and changing validation status."
+echo "PASS: Orca announced named controls and changing validation status through native AT-SPI."
