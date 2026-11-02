@@ -20,7 +20,7 @@
 - **System is the default** and follows the operating-system day/night setting; the two other explicit modes override the preference.
 - Shared code lives in `src/brand.rs` and is used by the live egui application. Never scatter independent hex literals across screens.
 - Selected text uses contrast-aware strokes (dark foreground over the light pink selection background; white over deep rose on light themes), while the rest of the interface retains native egui text legibility.
-- Typography follows the usual compact, legible approach: prefer local **Krypton Nerd Font** if available in a later dedicated font-loading feature; fallback to native defaults without bundling or sharing font files. Do not falsely claim the font is already loaded.
+- Typography prefers an already-installed **Krypton Nerd Font** and optionally appends a local **Noto Sans CJK** font for Japanese glyph fallback. Native defaults remain available, and no font files are bundled or redistributed. The toolbar reports Krypton only if it actually loads.
 - This brand does not copy Anki logos or visual assets. Content/provider-specific source palettes must not override Retivus's identity.
 
 ## Branding acceptance
@@ -29,4 +29,4 @@ Color tokens are committed and tested in code. The application now saves the the
 
 ## Local typography implementation (M5.2 groundwork)
 
-Retivus now searches the user's local and system font directories for an installed **Krypton Nerd Font** at launch. It prefers a regular style, rejects symlinks, oversized files and invalid TrueType/OpenType bytes, and registers a valid local font at highest egui priority while retaining normal font fallbacks. No font assets are shipped, copied to the repository or supplied to other users. The toolbar confirms Krypton only when successfully installed. If absent, the normal default egui font remains. The M5.2 acceptance still requires keyboard navigation, sizing and real desktop visual QA; font discovery alone does not earn percentage credit.
+Retivus now searches the user's local and system font directories for an installed **Krypton Nerd Font** at launch. It prefers a regular style, rejects symlinks, oversized files and invalid TrueType/OpenType bytes, and registers a valid local font at highest egui priority while retaining normal font fallbacks. No font assets are shipped, copied to the repository or supplied to other users. The toolbar confirms Krypton only when successfully installed. If absent, the normal default egui font remains. M5.2 was already accepted on its separate keyboard/sizing QA evidence. The newer optional Noto CJK fallback is additional multilingual QA hardening; real populated-screen glyph inspection and M6.4 acceptance remain separate and pending.

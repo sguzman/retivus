@@ -5,6 +5,9 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added optional **local-only Noto Sans CJK** fallback selection for multilingual study screens, preserving the Krypton preference without redistributing fonts; populated Wayland glyph inspection is still required.
+- Removed the standard Anki `<hr id=answer>` separator from the inert, text-only back-side preview. Other card HTML remains unexecuted; full rich-card rendering is not claimed.
+- Included exact Retivus commit, Cargo.lock SHA-256 and pinned Anki revision in release-candidate source provenance, explicitly stating that upstream Anki source is not bundled and corresponding-source compliance remains a release gate.
 - Added polite AccessKit live-region metadata for review, due, source-validation and conflict status updates; native build and end-to-end CI passed, while actual dynamic Orca speech remains unverified.
 - Introduced disposable debug-only populated reviewer/conflict scenes for Sway Wayland screenshot QA, with real Anki-backed notes, no personal profiles and wide/narrow captures. The screenshot acceptance job remains in verification.
 - Added persisted High contrast and Reduce motion UI preferences for both theme schemes, including strong foreground/background overrides, disabled widget/scroll transitions and regression tests for restoring defaults; screen-reader/Wayland user acceptance remains separate.
