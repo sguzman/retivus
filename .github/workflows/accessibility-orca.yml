@@ -4,6 +4,8 @@ on:
     paths:
       - .github/workflows/accessibility-orca.yml
       - scripts/qa-orca.sh
+      - src/main.rs
+      - src/study_ui.rs
   workflow_dispatch:
 permissions:
   contents: read
