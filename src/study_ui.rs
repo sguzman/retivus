@@ -90,6 +90,14 @@ impl Drop for StudyPanel {
 
 /// Present changing status text as a polite native accessibility live region.
 /// This augments normal visual text; it never changes focus or repeats a dialog.
+/// Anki renders the answer with the question followed by its standard HTML
+/// separator. In the text-only native fallback, show just the back side.
+/// Other markup remains inert rather than being executed as active HTML.
+fn inert_review_answer(html: &str) -> &str {
+    html.split_once("<hr id=answer>")
+        .map_or(html, |(_, answer)| answer.trim())
+}
+
 fn live_status(ui: &mut egui::Ui, text: &str) {
     let response = ui.label(text);
     ui.ctx().accesskit_node_builder(response.id, |node| {
@@ -1112,7 +1120,8 @@ impl StudyPanel {
                     if self.revealed {
                         ui.separator();
                         ui.label("Answer");
-                        ui.label(egui::RichText::new(&card.answer_html).monospace());
+                        let safe_answer = inert_review_answer(&card.answer_html);
+                        ui.label(egui::RichText::new(safe_answer).monospace());
                         ui.horizontal_wrapped(|ui| {
                             for (rating, name) in [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")] {
                                 if ui.button(name).clicked() {
@@ -1185,6 +1194,19 @@ impl StudyPanel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn review_answer_fallback_hides_anki_separator_without_executing_html() {
+        assert_eq!(
+            inert_review_answer("Question<hr id=answer>\nAnswer"),
+            "Answer"
+        );
+        assert_eq!(inert_review_answer("Plain response"), "Plain response");
+        assert_eq!(
+            inert_review_answer("<script>alert('x')</script>"),
+            "<script>alert('x')</script>"
+        );
+    }
 
     #[test]
     fn browse_scope_distinguishes_source_notes_plain_notes_and_identity_conflicts() {

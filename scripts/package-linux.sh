@@ -27,13 +27,23 @@ Categories=Education;
 DESKTOP
 git archive --format=tar HEAD | tar -x -C "$root/share/doc/retivus/source"
 install -m644 Cargo.lock "$root/share/doc/retivus/source/Cargo.lock"
+pinned_anki="$(grep -Eo 'rev = "[0-9a-f]{40}"' Cargo.toml | head -n 1 | cut -d'"' -f2)"
+test "${#pinned_anki}" -eq 40 || { echo "Missing pinned Anki revision" >&2; exit 1; }
+{
+  printf 'Retivus source commit: %s\n' "$(git rev-parse HEAD)"
+  printf 'Retivus Cargo.lock sha256: %s\n' "$(sha256sum Cargo.lock | cut -d' ' -f1)"
+  printf 'Upstream Anki rslib revision: %s\n' "$pinned_anki"
+  printf 'Upstream Anki source URL: https://github.com/ankitects/anki\n'
+  printf 'Upstream Anki source is pinned but NOT bundled in this candidate.\n'
+  printf 'Full corresponding-source and third-party-notice review remains a release gate.\n'
+} > "$root/share/doc/retivus/SOURCE-PROVENANCE.txt"
 install -m755 scripts/install-linux-candidate.sh "$root/install.sh"
 install -m755 scripts/uninstall-linux-candidate.sh "$root/uninstall.sh"
 cat > "$root/RELEASE-CANDIDATE.txt" <<'NOTICE'
 UNRELEASED TEST CANDIDATE — NOT AN ACCEPTED OR PUBLISHED RETIVUS RELEASE.
 Includes Retivus source and resolved Cargo.lock. Linked Anki rslib source is
 pinned by Cargo.toml; see upstream attribution. Corresponding-source/license
-review and release compatibility remain open. Official Anki Desktop GUI package\ninteroperability passed separately in CI; AnkiWeb sync remains unverified.
+review and release compatibility remain open. Official Anki Desktop GUI package interoperability passed separately in CI;\nAnkiWeb sync remains unverified.
 No Anki user profiles or private study records are packaged.
 NOTICE
 stamp="$(git log -1 --format=%ct)"
