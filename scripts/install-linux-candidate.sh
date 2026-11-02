@@ -49,13 +49,35 @@ else
     }
   done
 fi
+# Stage every required candidate file before modifying any installed file.
+# Copy the bytes, never follow source symlinks; a malformed bundle must fail
+# before replacing even the executable of an otherwise healthy installation.
+stage="$(mktemp -d)"
+tmp=""
+cleanup() {
+  [[ -z "$tmp" ]] || rm -f -- "$tmp"
+  rm -rf -- "$stage"
+}
+trap cleanup EXIT
+for rel in bin/retivus share/applications/retivus.desktop share/doc/retivus/LICENSE share/doc/retivus/ANKI-ATTRIBUTION.md share/doc/retivus/MIT-original.txt share/doc/retivus/README.md; do
+  source="$here/$rel"
+  [[ -f "$source" && ! -L "$source" && -r "$source" ]] || {
+    echo "Candidate file missing, unreadable or symlinked: $rel" >&2
+    exit 1
+  }
+  mkdir -p "$stage/$(dirname "$rel")"
+  mode=644
+  [[ "$rel" != bin/retivus ]] || mode=755
+  install -m "$mode" -- "$source" "$stage/$rel"
+done
 mkdir -p "$prefix/bin" "$prefix/share/applications" "$prefix/share/doc/retivus" "$prefix/share/retivus"
-tmp="$prefix/bin/retivus.$$"; trap 'rm -f "$tmp"' EXIT
-install -m755 "$here/bin/retivus" "$tmp"
+tmp="$prefix/bin/retivus.$"
+install -m755 "$stage/bin/retivus" "$tmp"
 mv -f "$tmp" "$prefix/bin/retivus"
-install -m644 "$here/share/applications/retivus.desktop" "$prefix/share/applications/retivus.desktop"
+tmp=""
+install -m644 "$stage/share/applications/retivus.desktop" "$prefix/share/applications/retivus.desktop"
 for item in LICENSE ANKI-ATTRIBUTION.md MIT-original.txt README.md; do
-  install -m644 "$here/share/doc/retivus/$item" "$prefix/share/doc/retivus/$item"
+  install -m644 "$stage/share/doc/retivus/$item" "$prefix/share/doc/retivus/$item"
 done
 (cd "$prefix" && sha256sum -- bin/retivus share/applications/retivus.desktop share/doc/retivus/LICENSE share/doc/retivus/ANKI-ATTRIBUTION.md share/doc/retivus/MIT-original.txt share/doc/retivus/README.md) > "$manifest"
 sha256sum "$prefix/bin/retivus" | cut -d' ' -f1 > "$marker"
