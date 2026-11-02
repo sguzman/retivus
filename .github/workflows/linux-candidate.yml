@@ -78,7 +78,7 @@ jobs:
           grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$manifest"
           grep -Fx "Upstream Anki rslib revision: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7" "$manifest"
           grep -Fx "Upstream rust-url Git revision: bb930b8d089f4d30d7d19c12e54e66191de47b88" "$manifest"
-          grep -Fx 'Pinned Git source snapshots: bundled exact Git source snapshots (submodules and registry crates separately audited)' "$manifest"
+          grep -Fx 'Pinned Git source snapshots: bundled exact Git source snapshots (submodules and registry crates not included or audited)' "$manifest"
           test -s "$root/share/doc/retivus/source-deps/anki/LICENSE"
           test -s "$root/share/doc/retivus/source-deps/anki/rslib/Cargo.toml"
           test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-MIT"

@@ -65,7 +65,7 @@ if [[ -n "${RETIVUS_ANKI_SOURCE_DIR:-}" || -n "${RETIVUS_RUST_URL_SOURCE_DIR:-}"
   test -s "$root/share/doc/retivus/source-deps/anki/LICENSE"
   test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-APACHE"
   test -s "$root/share/doc/retivus/source-deps/rust-url/LICENSE-MIT"
-  source_bundle="bundled exact Git source snapshots (submodules and registry crates separately audited)"
+  source_bundle="bundled exact Git source snapshots (submodules and registry crates not included or audited)"
 fi
 {
   printf 'Retivus source commit: %s\n' "$(git rev-parse HEAD)"
