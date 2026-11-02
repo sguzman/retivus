@@ -24,7 +24,7 @@ jobs:
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
             bash coreutils findutils grep sed tar zstd xvfb xdotool x11-utils openbox \
-            dbus-x11 mesa-utils strace procps fonts-dejavu-core \
+            dbus-x11 mesa-utils strace procps scrot fonts-dejavu-core \
             libgl1-mesa-dri libxkbcommon-x11-0 libx11-6 ca-certificates
       - name: Download previously built candidate archive
         uses: actions/download-artifact@v4
@@ -58,12 +58,24 @@ jobs:
               MESA_LOADER_DRIVER_OVERRIDE=llvmpipe LIBGL_DEBUG=verbose \
               "$1" > /tmp/replay-app.log 2>&1 & app=$!
             trap "kill $app $wm 2>/dev/null || true" EXIT
+            forced=0
             for tick in $(seq 1 35); do
               for id in $(xdotool search --name Retivus 2>/dev/null || true); do
                 state="$(xwininfo -id "$id" 2>/dev/null | grep "Map State:" || true)"
                 if [[ "$state" == *IsViewable* ]]; then
-                  echo "PASS: mapped Retivus window $id after $tick ticks: $state"
+                  if (( forced )); then
+                    sleep 3
+                    scrot /tmp/replay-forced-window.png || true
+                    echo "DIAGNOSTIC: forced X11 map restored visibility, not an app-driven pass"
+                    exit 1
+                  fi
+                  echo "PASS: app mapped native Retivus window $id after $tick ticks: $state"
                   exit 0
+                fi
+                if (( tick == 8 )); then
+                  echo "DIAGNOSTIC: forcing MapWindow on hidden Retivus $id"
+                  xdotool windowmap "$id" || true
+                  forced=1
                 fi
               done
               if ! kill -0 "$app" 2>/dev/null; then
@@ -88,3 +100,12 @@ jobs:
             cat /tmp/replay-app.log || true
             exit 1
           ' bash "$bin"
+
+      - name: Retain forced-map screenshot for root-cause analysis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-runtime-forced-map-screenshot
+          path: /tmp/replay-forced-window.png
+          if-no-files-found: ignore
+          retention-days: 3
