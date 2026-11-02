@@ -78,12 +78,15 @@ done
 announce_start="$(wc -c < "$debug")"
 xdotool key --clearmodifiers Return
 sleep 6
+# Preserve the visual result to establish that the keyboard action did run.
+scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
 if ! tail -c "+$((announce_start + 1))" "$debug" \
     | grep -F 'SPEECH DISPATCHER: Speaking' \
     | grep -F 'Could not open source' >/dev/null; then
   echo 'Orca did not speak the changed validation status as a live announcement' >&2
   tail -c "+$((announce_start + 1))" "$debug" \
-    | grep -E 'SPEECH DISPATCHER|Retivus|source' | tail -n 55 >&2 || true
+    | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
+    | tail -n 65 >&2 || true
   exit 1
 fi
 echo 'PASS: real Orca speaks updated validation status after keyboard activation.'
