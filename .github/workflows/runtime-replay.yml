@@ -42,7 +42,13 @@ jobs:
           tar --zstd -xf "$archive" -C /tmp
           bin="$(find /tmp -path '*/retivus-*-linux-x86_64/bin/retivus' -type f -print -quit)"
           test -x "$bin"
-          export HOME="$(mktemp -d)"
+          # GitHub container jobs run root by default, unlike the passing
+          # host-runner GUI smoke. Reproduce a normal desktop user faithfully.
+          useradd --create-home --shell /bin/bash retivus-qa
+          runuser -u retivus-qa -- env RETIVUS_BIN="$bin" bash <<'USER_REPLAY'
+          set -euo pipefail
+          test "$(id -u)" -ne 0
+          export HOME=/home/retivus-qa
           export XDG_CONFIG_HOME="$HOME/.config"
           export XDG_DATA_HOME="$HOME/.local/share"
           export XDG_RUNTIME_DIR="$HOME/runtime"
@@ -111,7 +117,8 @@ jobs:
             echo "--- App ---"
             cat /tmp/replay-app.log || true
             exit 1
-          ' bash "$bin"
+          ' bash "$RETIVUS_BIN"
+          USER_REPLAY
 
       - name: Retain forced-map screenshot for root-cause analysis
         if: always()
