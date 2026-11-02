@@ -57,3 +57,7 @@ The offline source audit generates `LICENSE-FILE-AUDIT.tsv` alongside its existi
 ### Pinned Anki protobuf build inputs
 
 A fresh `--offline` compilation exposed a missing source input which `cargo vendor` cannot infer from Cargo dependency metadata: the pinned `anki_proto` build script reads the upstream repository's sibling `proto/anki/*.proto` files. The source audit now checks out Anki commit `136bd42bfbd356fc756b6d3e28cc77b02da11ea7`, rejects a modified/different revision, and embeds its tracked `proto` directory in the source candidate. The subsequent fresh offline build check must pass before this is accepted as a complete compilation source; other upstream workspace assets may still be required. No license-compliance certification is implied.
+
+### Pinned Anki Fluent translations and workspace version input
+
+The independent offline source compilation also identified required `anki_i18n` build inputs outside Cargo crates: `ftl/core`, `ftl/qt`, and the upstream `ftl/core-repo` and `ftl/qt-repo` translation Git submodules. The audit now checks out only these two submodules at their exact parent Gitlink revisions, confirms clean tracked files, and archives their source content together with the required upstream `.version` file at the path expected by vendored Anki. An independently completed offline compilation—not this copying step—is the remaining acceptance test. No external Anki profile or translation service is contacted during the subsequent offline build.

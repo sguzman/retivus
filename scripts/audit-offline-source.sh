@@ -43,13 +43,38 @@ test -z "$(git -C "$anki_source" status --porcelain --untracked-files=no)" || {
   echo "Refusing modified Anki proto source checkout" >&2
   exit 1
 }
-git -C "$anki_source" archive --format=tar HEAD proto | tar -xf - -C "$out/source"
-test -s "$out/source/proto/anki/backend.proto" || {
-  test -n "$(find "$out/source/proto/anki" -name '*.proto' -type f -print -quit)" || {
-    echo "No tracked Anki protobuf definitions included" >&2
+# Include every upstream workspace input referenced by the vendored
+# anki_proto and anki_i18n build scripts, preserving the pinned Git commits.
+git -C "$anki_source" archive --format=tar HEAD proto ftl/core ftl/qt |
+  tar -xf - -C "$out/source"
+test -n "$(find "$out/source/proto/anki" -name '*.proto' -type f -print -quit)"
+test -n "$(find "$out/source/ftl/core" -name '*.ftl' -type f -print -quit)"
+test -n "$(find "$out/source/ftl/qt" -name '*.ftl' -type f -print -quit)"
+# rslib/src/version.rs includes ../../.version, which resolves one level
+# above its vendored crate root. Store the exact upstream tracked version
+# there; do not patch third-party Rust sources.
+git -C "$anki_source" show HEAD:.version > "$out/source/vendor/.version"
+test -s "$out/source/vendor/.version"
+# Translation repositories are true Git submodules pinned by Anki's commit.
+# Copy tracked content from their exact Gitlink revisions, never the tip of a
+# branch or a mutable translation download.
+for module in core-repo qt-repo; do
+  sub="$anki_source/ftl/$module"
+  expected="$(git -C "$anki_source" ls-tree HEAD:ftl "$module" | awk '$1=="160000" {print $3}')"
+  actual="$(git -C "$sub" rev-parse HEAD)"
+  test -n "$expected" && test "$actual" = "$expected" || {
+    echo "Anki translation submodule $module is absent or on the wrong revision" >&2
     exit 1
   }
-}
+  test -z "$(git -C "$sub" status --porcelain --untracked-files=no)" || {
+    echo "Modified translation submodule: $module" >&2
+    exit 1
+  }
+  mkdir -p "$out/source/ftl/$module"
+  git -C "$sub" archive --format=tar HEAD | tar -xf - -C "$out/source/ftl/$module"
+done
+test -d "$out/source/ftl/core-repo/core"
+test -d "$out/source/ftl/qt-repo/desktop"
 cp "$out/vendor-config.toml" "$out/source/.cargo/config.toml"
 mv "$out/vendor" "$out/source/vendor"
 # Capture each locked package's declared SPDX expression or missing-license
@@ -88,6 +113,7 @@ trap 'rm -rf "$empty_home"' EXIT
   printf 'Vendored crates: %s\n' "$vendored_count"
   printf 'Offline Cargo metadata: PASS\n'
   printf 'Pinned Anki proto build inputs: %s\n' "$expected_anki"
+  printf 'Pinned Anki translation submodules: core-repo=%s qt-repo=%s\n' "$(git -C "$anki_source/ftl/core-repo" rev-parse HEAD)" "$(git -C "$anki_source/ftl/qt-repo" rev-parse HEAD)"
   printf 'Source/release licensing and notices: NOT YET CERTIFIED\n'
 } > "$out/SOURCE-AUDIT.txt"
 cat "$out/SOURCE-AUDIT.txt"

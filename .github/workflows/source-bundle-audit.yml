@@ -25,6 +25,8 @@ jobs:
           ref: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7
           path: upstream-anki
           persist-credentials: false
+      - name: Resolve exact Anki translation Gitlink revisions
+        run: git -C upstream-anki submodule update --init --depth 1 -- ftl/core-repo ftl/qt-repo
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify audit script shell syntax
         run: |
@@ -47,6 +49,9 @@ jobs:
           tar --zstd -tf "$archive" > "$root/archive-index.txt"
           grep -Fx 'source/Cargo.lock' "$root/archive-index.txt"
           test -n "$(grep -E '^source/proto/anki/[^/]+\.proto$' "$root/archive-index.txt" | head -n 1)"
+          grep -Fx 'source/vendor/.version' "$root/archive-index.txt"
+          test -n "$(grep -E '^source/ftl/core/[^/]+\.ftl$' "$root/archive-index.txt" | head -n 1)"
+          test -n "$(grep -E '^source/ftl/qt/[^/]+\.ftl$' "$root/archive-index.txt" | head -n 1)"
           grep -Fx 'source/THIRD-PARTY-SOURCES.tsv' "$root/archive-index.txt"
           grep -Fx 'source/LICENSE-FILE-AUDIT.tsv' "$root/archive-index.txt"
           grep -Fx 'source/.cargo/config.toml' "$root/archive-index.txt"
