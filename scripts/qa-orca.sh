@@ -59,4 +59,49 @@ grep -F "SPEECH DISPATCHER: Speaking 'File'" "$debug" >/dev/null || { echo "Orca
 for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
-echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
+# Trigger a real changing live region through a coordinate discovered from the
+# AT-SPI object tree. No hard-coded screen coordinates or user profile are used.
+address="$(busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress | sed -n 's/^s "\\(.*\\)"$/\\1/p')"
+test -n "$address"
+find_action_center() {
+  local service="$1" object="$2" depth="$3" name rect tag x y width height children child_service child_path
+  (( depth <= 12 )) || return 1
+  name="$(busctl --address="$address" get-property "$service" "$object" org.a11y.atspi.Accessible Name 2>/dev/null || true)"
+  if [[ "$name" == *'"Validate source"'* ]]; then
+    rect="$(busctl --address="$address" call "$service" "$object" org.a11y.atspi.Component GetExtents u 0 2>/dev/null || true)"
+    read -r tag x y width height <<< "$rect"
+    if [[ "$x" =~ ^-?[0-9]+$ && "$y" =~ ^-?[0-9]+$ && "$width" =~ ^[0-9]+$ && "$height" =~ ^[0-9]+$ ]] && (( width > 2 && height > 2 )); then
+      echo "$((x + width / 2)) $((y + height / 2))"
+      return 0
+    fi
+  fi
+  children="$(busctl --address="$address" call "$service" "$object" org.a11y.atspi.Accessible GetChildren 2>/dev/null || true)"
+  while IFS=
+\\t' read -r child_service child_path; do
+    [[ -n "$child_service" && -n "$child_path" ]] || continue
+    if find_action_center "$child_service" "$child_path" "$((depth + 1))"; then
+      return 0
+    fi
+  done < <(printf '%s\\n' "$children" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+  return 1
+}
+roots="$(busctl --address="$address" call org.a11y.atspi.Registry /org/a11y/atspi/accessible/root org.a11y.atspi.Accessible GetChildren)"
+center=""
+while IFS=
+\\t' read -r service object; do
+  [[ -n "$service" && -n "$object" ]] || continue
+  if center="$(find_action_center "$service" "$object" 0)"; then
+    break
+  fi
+done < <(printf '%s\\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+[[ -n "$center" ]] || { echo "Could not locate visible Validate source bounds on the real AT-SPI tree" >&2; exit 1; }
+read -r click_x click_y <<< "$center"
+xdotool mousemove "$click_x" "$click_y" click 1
+sleep 4
+# Empty source path intentionally fails. Verify the new status is actually
+# spoken, rather than merely exposing a passive AccessKit node.
+grep -E 'SPEECH DISPATCHER: Speaking .*Could not open source' "$debug" >/dev/null || {
+  echo "Orca did not speak the changing source-validation status" >&2
+  exit 1
+}
+echo "PASS: Orca announced named controls and changing validation status through native AT-SPI."
