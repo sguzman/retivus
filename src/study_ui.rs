@@ -105,8 +105,7 @@ impl StudyPanel {
         if scene != "review" && scene != "conflict" {
             return Err("Unknown visual QA scene".into());
         }
-        let root =
-            std::env::temp_dir().join(format!("retivus-visual-qa-{}", std::process::id()));
+        let root = std::env::temp_dir().join(format!("retivus-visual-qa-{}", std::process::id()));
         fs::create_dir(&root).map_err(|error| format!("QA temp root: {error}"))?;
         self.root = root.to_string_lossy().into_owned();
         self.profile_id = "retivus-disposable-qa".into();
