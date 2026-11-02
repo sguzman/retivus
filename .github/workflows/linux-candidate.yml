@@ -6,6 +6,7 @@ on:
       - .github/workflows/source-bundle-audit.yml
       - scripts/audit-offline-source.sh
       - scripts/audit-license-files.sh
+      - scripts/audit-parent-notices.sh
       - scripts/check-source-parity.sh
       - Cargo.toml
       - Cargo.lock

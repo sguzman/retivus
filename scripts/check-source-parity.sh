@@ -19,6 +19,7 @@ grep -Fx "Root commit: $expected_sha" "$sources/SOURCE-AUDIT.txt"
 grep -Fx 'Offline Cargo metadata: PASS' "$sources/SOURCE-AUDIT.txt"
 test -s "$sources/THIRD-PARTY-SOURCES.tsv"
 test -s "$sources/LICENSE-FILE-AUDIT.tsv"
+test -s "$sources/PARENT-NOTICE-REVIEW.tsv"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 tar --zstd -xf "$binary" -C "$tmp"
@@ -33,6 +34,7 @@ grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$binary_root/share/doc/retivus/
 grep -Fx "Cargo.lock sha256: $lock_sha" "$sources/SOURCE-AUDIT.txt"
 cmp "$sources/THIRD-PARTY-SOURCES.tsv" <(tar --zstd -xOf "$source_archive" source/THIRD-PARTY-SOURCES.tsv)
 cmp "$sources/LICENSE-FILE-AUDIT.tsv" <(tar --zstd -xOf "$source_archive" source/LICENSE-FILE-AUDIT.tsv)
+cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/PARENT-NOTICE-REVIEW.tsv)
 index="$tmp/source-index.txt"
 tar --zstd -tf "$source_archive" > "$index"
 for required in source/.cargo/config.toml source/vendor/anki-0.0.0/Cargo.toml source/vendor/percent-encoding-iri-2.2.0/Cargo.toml; do

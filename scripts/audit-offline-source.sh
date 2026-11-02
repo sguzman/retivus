@@ -86,8 +86,10 @@ cargo metadata --manifest-path "$repo/Cargo.toml" --locked \
 test -s "$out/THIRD-PARTY-SOURCES.tsv"
 # Record concrete license-file evidence, including missing top-level files.
 bash "$repo/scripts/audit-license-files.sh" "$out"
+bash "$repo/scripts/audit-parent-notices.sh" "$out"
 install -m644 "$out/THIRD-PARTY-SOURCES.tsv" "$out/source/THIRD-PARTY-SOURCES.tsv"
 install -m644 "$out/LICENSE-FILE-AUDIT.tsv" "$out/source/LICENSE-FILE-AUDIT.tsv"
+install -m644 "$out/PARENT-NOTICE-REVIEW.tsv" "$out/source/PARENT-NOTICE-REVIEW.tsv"
 registry_count="$(grep -c '^source = "registry+' "$repo/Cargo.lock")"
 vendored_count="$(find "$out/source/vendor" -mindepth 2 -maxdepth 2 -name '.cargo-checksum.json' -type f | wc -l)"
 if (( vendored_count < registry_count )); then
