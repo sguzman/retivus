@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **84%** of 100% (previous verified checkpoint 80%, this continuation **+4 percentage points**). Source-independent public package counts, rich-card parity, safe offline collection-copy migration, and official Anki Desktop GUI reexport are verified. Authenticated AnkiWeb sync, accessibility and remaining release acceptance are pending. Milestone weights distribute work across all eight milestones.
+**Verified progress:** **87%** of 100% (previous verified checkpoint 84%, this continuation **+3 percentage points**). Verified package interoperability, source-neutral provider integration, FSRS persistence, archive privacy, and cross-layer end-to-end regressions are green. Authenticated AnkiWeb sync, broader accessibility and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -14,7 +14,7 @@
 | 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
 | 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 15% | 🟡 |
 | 🎨 M5 Complete native egui study experience | 14% | 14% | ✅ |
-| 🧪 M6 Integration hardening, performance and correctness | 12% | 6% | 🟡 |
+| 🧪 M6 Integration hardening, performance and correctness | 12% | 9% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
 ## Milestones, phases and objective criteria
@@ -68,7 +68,7 @@
 
 ### 🧪 M6: Integration hardening, performance and correctness (12% of project)
 
-- ⏳ **M6.1 🧪 Repeatable fixtures/CI for backend, provider, scheduler and .apkg** — **3%**. Acceptance: End-to-end regression tests green. Depends on: M2,M3,M4. **pending.**
+- ✅ **M6.1 🧪 Repeatable fixtures/CI for backend, provider, scheduler and .apkg** — **3%**. Acceptance: End-to-end regression tests green. Depends on: M2,M3,M4. **verified complete.**
 - ✅ **M6.2 ⚡ Large dataset streaming, search and memory benchmarks** — **3%**. Acceptance: 124444-record Mexilex load without unbounded UI RAM. Depends on: M3.2,M5.3. **verified complete.**
 - ✅ **M6.3 🛡️ Corrupt/malicious archive, Unicode, media path and credential guards** — **3%**. Acceptance: Adversarial tests block zip slip, malformed data and leaks. Depends on: M4.1,M3.2. **verified complete.**
 - ⏳ **M6.4 ♿ Keyboard, screen scaling, focus and accessibility regression** — **3%**. Acceptance: Real system QA checklist and automated smoke pass. Depends on: M5.6. **pending.**
@@ -219,3 +219,10 @@
 **Progress: 84% → 84% (+0 percentage points).** 🧪 M6 remains **6/12**, with M6.4 **0/3** pending its full acceptance criteria.
 
 - 🟡 **M6.4 ♿ partial verified engineering, no milestone credit:** Explicit `eframe/accesskit` enabled in native builds; [foundation CI 41371981400](https://github.com/sguzman/retivus/actions/runs/41371981400) passed code/provider tests and actual X11 launch. [AT-SPI CI 41371103522](https://github.com/sguzman/retivus/actions/runs/41371103522) discovered 23 accessible nodes in an isolated Linux session, including File and Validate source. [Orca CI 41371981361](https://github.com/sguzman/retivus/actions/runs/41371981361) recorded actual speech dispatch announcing Appearance, Density, Format, File and Validate source; combo-box labels were fixed after the first Orca run. Existing scale/density/theme/resize keyboard regression now activates source validation by Enter. **Remaining:** screen-reader announcements of dynamic review/due/status changes, populated conflict/reviewer UI at both scales in real Wayland, high contrast and reduced motion. The 3-point task remains open; no unrelated feature or milestone was silently accepted.
+
+## Verified continuation checkpoint — 2026-11-01 (87%)
+
+**Progress: 84% → 87% (+3 percentage points).** M0: 8/8; M1: 12/12; M2: 15/15; M3: 14/14; M4: 15/17; M5: 14/14; **M6: 9/12**; M7: 0/8.
+
+- ✅ **M6.1 🧪 (+3 pp):** [Unified end-to-end CI 41373832561](https://github.com/sguzman/retivus/actions/runs/41373832561) passed on commit `69c3291` using the committed `Cargo.lock`. It passed the generic-provider baseline, then a **single cross-layer test** reading the independent Japanese-to-Spanish source, selecting two meanings for one homograph, creating two persistent Anki notes/cards, grading with FSRS, restarting, exporting private and public .apkg packages without overwrites, and independently importing into separate managed profiles. The public/default imports had **zero** personal review events; explicit scheduling-history export and import preserved **one** event. The same CI run then passed all **48 Anki library tests** (2 explicitly ignored external fixture tests), **24 native learner tests**, and its standalone 4-note/5-card interoperability fixture check. [Rust foundation CI 41373832416](https://github.com/sguzman/retivus/actions/runs/41373832416) passed formatting, Clippy, provider tests, build and real X11 smoke. Independently passed official Anki Desktop GUI package exchange remains M4.2; authenticated sync remains M4.5.
+- ⏳ **Next:** M6.4 physical Wayland populated-state/accessibility gates, M4.5 authenticated AnkiWeb sync or owner-approved classification, and M7 license/installer/release work remain open. No milestone credit for these in this checkpoint.
