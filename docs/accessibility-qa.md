@@ -10,7 +10,7 @@ This document scopes **M6.4** against Retivus's actual Rust/egui desktop UI. Aut
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
 | Note edit/search controls respond to keyboard/mouse | Native editor and search end-to-end regression in src/study_ui.rs | Verified in feature CI 41347374839 |
 | System, Light and Dark persist correctly | App preference tests in src/main.rs | Verified in foundation CI |
-| Scale, density, window resizing and labelled input focus | accessibility_focus_survives_scaling_density_theme_and_resizing | **Pending its own CI** |
+| Scale, density, window resizing, labelled input focus and Enter-activated validation | `accessibility_focus_survives_scaling_density_theme_and_resizing` in `src/main.rs` | Regression strengthened; **pending new CI** |
 | Real compositor renders wide and narrow windows | Retained native Sway Wayland 1080×800 and 720×650 screenshot artifact, reviewed for initial-window clipping and missing glyphs | Verified in Anki CI 41343238570 |
 
 ## Real-system visual and assistive-technology checks
@@ -21,4 +21,4 @@ This document scopes **M6.4** against Retivus's actual Rust/egui desktop UI. Aut
 - [ ] Verify screen-reader announcements of form labels, deck choices, status updates and due-card transitions with an actual screen reader
 - [ ] Validate high-contrast mode and any reduced-motion platform preference against user testing
 
-**Scope:** No automatic success or milestone credit for unchecked manual items. Check only observed evidence. The automated focus/resize regression must pass before M6.4 can be considered for acceptance, and broad assistive-technology support is not claimed here.
+**Scope:** No automatic success or milestone credit for unchecked manual items. Check only observed evidence. Keyboard Enter activation after each theme, scale, density and resize state is now an explicit automated gate, but must pass CI before being credited. Screen-reader announcements, high-contrast/reduced-motion behavior and populated real-system windows still need independent acceptance; broad assistive-technology support is not claimed.

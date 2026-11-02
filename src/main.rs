@@ -712,6 +712,22 @@ mod tests {
                     .is_focused(),
                 "Scrolling must not silently move keyboard focus"
             );
+
+            // Exercise keyboard activation after a scale/theme/density switch,
+            // not just accessibility-tree focus inspection. No user data exists.
+            harness.get_by_label("Validate source").focus();
+            harness.run();
+            assert!(
+                harness.get_by_label("Validate source").is_focused(),
+                "Validate source button was not keyboard focusable"
+            );
+            harness.key_press(egui::Key::Enter);
+            harness.run();
+            assert!(
+                harness.state().import_status.starts_with("Could not open source:"),
+                "Enter did not activate the focused validation button at {window:?}, scale={pixels_per_point}"
+            );
+            assert!(harness.state().preview.is_empty());
         }
     }
 
