@@ -152,6 +152,7 @@ jobs:
           name: retivus-linux-candidate-evidence
           path: /tmp/retivus-candidate-evidence
       - name: Independent clean-container acceptance
+        shell: bash
         run: |
           set -euo pipefail
           archive="$(find /tmp/retivus-candidate-evidence -type f -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
