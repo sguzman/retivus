@@ -14,7 +14,7 @@ anki-backend = ["dep:anki", "dep:tokio", "dep:tempfile", "dep:zip", "dep:zstd"]
 anki = { git = "https://github.com/ankitects/anki", rev = "136bd42bfbd356fc756b6d3e28cc77b02da11ea7", optional = true }
 # Ensures Anki's async I/O feature requirements resolve via Cargo feature unification.
 tokio = { version = "1.51.6", features = ["io-util"], optional = true }
-eframe = { version = "0.33", default-features = false, features = ["default_fonts", "glow", "persistence", "wayland", "x11"] }
+eframe = { version = "0.33", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
 serde_json = "1"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
 ttf-parser = "0.25"

@@ -2,10 +2,15 @@
 
 This document scopes **M6.4** against Retivus's actual Rust/egui desktop UI. Automation is necessary but does not replace a screen-reader or assistive-technology evaluation. Keep unverified items pending.
 
+## Native platform accessibility bridge
+
+Retivus disables eframe default features to control its native build. Its explicit `accesskit` feature is now enabled in `Cargo.toml` alongside X11 and Wayland so the application can expose its standard egui widget tree to supported Linux AT-SPI assistive technology. This is a **build-time prerequisite**, not evidence that Orca actually announced content correctly. A real accessibility bus/screen-reader test and dynamic status announcements still need verification; do not mark M6.4 complete just because the feature compiles.
+
 ## Automated coverage
 
 | Contract | Test/evidence | Status |
 | --- | --- | --- |
+| AccessKit platform accessibility implementation compiled into release profile | Explicit `eframe/accesskit` Cargo feature, plus native build CI | **Pending CI; no assistive-technology QA claim** |
 | Keyboard focus follows Tab and Shift+Tab | Native egui_kittest source-file focus and reversal test in src/main.rs | Verified in feature CI 41347374839 |
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
 | Note edit/search controls respond to keyboard/mouse | Native editor and search end-to-end regression in src/study_ui.rs | Verified in feature CI 41347374839 |
