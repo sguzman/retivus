@@ -45,3 +45,7 @@ An application's AGPL license does **not** automatically require disclosure of a
 - [GNU GPL FAQ](https://www.gnu.org/licenses/gpl-faq.html)
 
 This document describes project practice, not formal legal advice.
+
+## Offline corresponding-source inventory (release gate in progress)
+
+The independent [locked Cargo source audit](../.github/workflows/source-bundle-audit.yml) vendors all resolved registry and Git dependency crates into a disposable Retivus source snapshot, records their license-expression inventory, and verifies that Cargo can resolve the feature-enabled graph with a fresh empty Cargo home and `--offline --locked`. Audit artifacts retain counts and provenance, **not** the complete vendor tree. Passing this audit is preparation for bundling registry sources and checking third-party notices in the actual release archive; it does not itself satisfy M7.1 or establish legal compliance.

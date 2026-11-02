@@ -1,0 +1,33 @@
+name: Locked Cargo source bundle audit
+on:
+  push:
+    paths:
+      - scripts/audit-offline-source.sh
+      - .github/workflows/source-bundle-audit.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: retivus-source-audit-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Verify audit script shell syntax
+        run: bash -n scripts/audit-offline-source.sh
+      - name: Vendor all locked Cargo sources and verify offline dependency graph
+        run: bash scripts/audit-offline-source.sh "$RUNNER_TEMP/retivus-source-audit"
+      - name: Retain source inventory and verified provenance summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-locked-source-audit
+          path: |
+            ${{ runner.temp }}/retivus-source-audit/THIRD-PARTY-SOURCES.tsv
+            ${{ runner.temp }}/retivus-source-audit/SOURCE-AUDIT.txt
+          if-no-files-found: ignore
+          retention-days: 7
