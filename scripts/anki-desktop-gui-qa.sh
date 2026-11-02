@@ -28,10 +28,9 @@ for i in $(seq 1 120); do
 done
 [[ -n "$window" ]] || { echo "Official Anki window not found"; exit 1; }
 capture desktop-startup
-# On a new official 26.09.3 profile the language-picker has not yet
-# focused its OK button when the first window becomes visible. Select English
-# (United States) and the OK button by the pinned screenshot-confirmed GUI
-# positions, then explicitly click Yes in the next confirmation dialog.
+# Official Anki's first launch asks for a UI language and then requires
+# explicit confirmation. The confirmation defaults to No; select the observed
+# Yes button directly rather than looping back through the language chooser.
 sleep 2
 xdotool mousemove --sync 516 396 click 1
 sleep 1
@@ -51,67 +50,28 @@ for i in $(seq 1 120); do
   [[ "$notes" == 4 && "$cards" == 5 ]] && break
   if [[ "$i" == 8 || "$i" == 20 || "$i" == 40 ]]; then
     capture "import-dialog-$i"
+    : # Captures remain available for GUI diagnosis
   fi
   if [[ "$i" == 8 ]]; then
-    # Official Anki's Svelte Import File toolbar binds Ctrl+Enter to Import.
-    xdotool key --clearmodifiers ctrl+Return
+    # Use screenshot-confirmed official Desktop Import button (1280x900 Xvfb).
+    xdotool mousemove --sync 957 59 click 1
+    sleep 2
+    capture desktop-after-import-click
   fi
   sleep 1
 done
 capture desktop-import-result
 [[ "$notes" == 4 && "$cards" == 5 ]] || { echo "Official GUI import did not create 4 notes / 5 cards"; exit 1; }
 echo "Official Anki Desktop imported 4 notes / 5 cards"
-# Dismiss the completed import window; Ctrl+E must reach the main UI.
-import_window="$(xdotool search --onlyvisible --name '^Import File
-sleep 3
-capture desktop-export-dialog
-dialog="$(xdotool search --onlyvisible --name Export 2>/dev/null | tail -n 1 || true)"
-[[ -n "$dialog" ]] || { echo "Official Desktop Export dialog missing"; exit 1; }
-xdotool windowactivate --sync "$dialog" || true
-xdotool mousemove --window "$dialog" 220 50 click 1 || true
-xdotool key --clearmodifiers Home Return
-sleep 1
-capture desktop-apkg-selected
-xdotool key --clearmodifiers Return
-sleep 2
-capture desktop-save-chooser
-xdotool key --clearmodifiers ctrl+a
-xdotool type --clearmodifiers --delay 5 "$root/anki-desktop-reexport.apkg"
-xdotool key --clearmodifiers Return
-for i in $(seq 1 50); do
-  [[ -s "$root/anki-desktop-reexport.apkg" ]] && exit 0
-  sleep 1
-done
-echo "Official Desktop .apkg reexport did not appear"; exit 1
- 2>/dev/null | tail -n 1 || true)"
+# Close the completed importer and restore keyboard focus to the main window.
+import_window="$(xdotool search --onlyvisible --name "Import File" 2>/dev/null | tail -n 1 || true)"
 if [[ -n "$import_window" ]]; then
   xdotool windowclose "$import_window" || true
-  sleep 1
+  sleep 2
 fi
-main_window="$(xdotool search --onlyvisible --name ' - Anki
-sleep 3
-capture desktop-export-dialog
-dialog="$(xdotool search --onlyvisible --name Export 2>/dev/null | tail -n 1 || true)"
-[[ -n "$dialog" ]] || { echo "Official Desktop Export dialog missing"; exit 1; }
-xdotool windowactivate --sync "$dialog" || true
-xdotool mousemove --window "$dialog" 220 50 click 1 || true
-xdotool key --clearmodifiers Home Return
-sleep 1
-capture desktop-apkg-selected
-xdotool key --clearmodifiers Return
-sleep 2
-capture desktop-save-chooser
-xdotool key --clearmodifiers ctrl+a
-xdotool type --clearmodifiers --delay 5 "$root/anki-desktop-reexport.apkg"
-xdotool key --clearmodifiers Return
-for i in $(seq 1 50); do
-  [[ -s "$root/anki-desktop-reexport.apkg" ]] && exit 0
-  sleep 1
-done
-echo "Official Desktop .apkg reexport did not appear"; exit 1
- 2>/dev/null | head -n 1 || true)"
-[[ -n "$main_window" ]] || { echo "Anki main window disappeared after import"; exit 1; }
-xdotool windowactivate --sync "$main_window" || true
+main_window="$(xdotool search --onlyvisible --name " - Anki" 2>/dev/null | head -n 1 || true)"
+[[ -n "$main_window" ]] || { echo "Main Anki window missing after import"; exit 1; }
+xdotool windowactivate --sync "$main_window"
 xdotool key --clearmodifiers ctrl+e
 sleep 3
 capture desktop-export-dialog
