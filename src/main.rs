@@ -301,22 +301,26 @@ impl eframe::App for Retivus {
                 if self.krypton_font_loaded {
                     ui.weak("Krypton Nerd Font");
                 }
-                ui.label("Appearance");
+                let appearance_label = ui.label("Appearance");
                 egui::ComboBox::from_id_salt("appearance")
                     .selected_text(self.theme.name())
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.theme, Theme::System, "System");
                         ui.selectable_value(&mut self.theme, Theme::Light, "Light");
                         ui.selectable_value(&mut self.theme, Theme::Dark, "Dark");
-                    });
+                    })
+                    .response
+                    .labelled_by(appearance_label.id);
                 ui.separator();
-                ui.label("Density");
+                let density_label = ui.label("Density");
                 egui::ComboBox::from_id_salt("density")
                     .selected_text(self.density.name())
                     .show_ui(ui, |ui| {
                         ui.selectable_value(&mut self.density, Density::Compact, "Compact");
                         ui.selectable_value(&mut self.density, Density::Comfortable, "Comfortable");
-                    });
+                    })
+                    .response
+                    .labelled_by(density_label.id);
                 ui.separator();
                 if ui
                     .add(egui::Slider::new(&mut self.ui_scale, 0.80..=1.50).text("Scale"))
@@ -346,7 +350,7 @@ impl eframe::App for Retivus {
                 ui.heading("Validate a local source file");
                 ui.weak("Read-only validation · never creates cards or changes review history");
                 ui.horizontal(|ui| {
-                    ui.label("Format");
+                    let format_label = ui.label("Format");
                     egui::ComboBox::from_id_salt("source-format")
                         .selected_text(match self.source_format {
                             SourceFormat::Mexilex => "Mexilex study JSONL v1",
@@ -363,7 +367,9 @@ impl eframe::App for Retivus {
                                 SourceFormat::GenericTsv,
                                 "Generic study TSV v1",
                             );
-                        });
+                        })
+                        .response
+                        .labelled_by(format_label.id);
                 });
                 if self.source_format == SourceFormat::GenericTsv {
                     ui.weak("Supply source identifiers and licensing metadata for this import.");

@@ -54,6 +54,9 @@ sleep 4
 test -s "$debug" || { echo "Orca produced no debug log"; exit 1; }
 grep -F 'SPEECH DISPATCHER: Speaking' "$debug" > "$RUNNER_TEMP/retivus-orca-speech.txt" || true
 test -s "$RUNNER_TEMP/retivus-orca-speech.txt" || { echo "Orca did not record speech dispatch"; exit 1; }
-grep -F 'Validate source' "$debug" >/dev/null || { echo "Orca debug did not mention Validate source"; exit 1; }
-grep -F 'File' "$debug" >/dev/null || { echo "Orca debug did not mention File"; exit 1; }
+grep -F "SPEECH DISPATCHER: Speaking 'Validate source'" "$debug" >/dev/null || { echo "Orca did not announce Validate source"; exit 1; }
+grep -F "SPEECH DISPATCHER: Speaking 'File'" "$debug" >/dev/null || { echo "Orca did not announce File"; exit 1; }
+for label in Appearance Density Format; do
+  grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
+done
 echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
