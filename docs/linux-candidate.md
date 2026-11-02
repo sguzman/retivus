@@ -9,3 +9,7 @@ The [candidate CI workflow](../.github/workflows/linux-candidate.yml) builds and
 ## Independent runtime-only container acceptance
 
 After the release build uploads its candidate archive, CI downloads that artifact into a fresh Ubuntu 24.04 container without checking out source or installing a Rust toolchain. The archived `scripts/test-clean-linux-candidate.sh` verifies the SHA256 sidecar, attribution and pinned source snapshots, installation and reinstallation, an actual X11 virtual-display GUI window, uninstall and preservation of private user data. This is independent *runtime* acceptance, not verification on every Linux distribution or a physical Wayland workstation. M6.4, M7.1 and final release criteria remain open.
+
+## Runtime glibc baseline
+
+Build the Linux x86_64 candidate on the fixed `ubuntu-24.04` host rather than the rolling `ubuntu-latest` image: a prior archive linked against GLIBC_2.43 and failed to launch on Debian 13 even though it passed its same-host GUI test. A separate `ubuntu:24.04` runtime container now requires the packaged binary to launch on the older glibc baseline, without a Rust compiler. The portable-runtime check must pass before considering M7.2 complete; this still does not guarantee compatibility with older Linux systems or other architectures.
