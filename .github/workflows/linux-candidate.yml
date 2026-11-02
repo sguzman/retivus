@@ -51,11 +51,17 @@ jobs:
             test -s "$prefix/share/doc/retivus/$item"
           done
           grep -q '136bd42bfbd356fc756b6d3e28cc77b02da11ea7' "$prefix/share/doc/retivus/ANKI-ATTRIBUTION.md"
-          test -s "$root/share/doc/retivus/source/Cargo.lock"
+          source_root="$root/share/doc/retivus/source"
+          test -s "$source_root/Cargo.lock"
+          cmp "$source_root/Cargo.lock" Cargo.lock
           manifest="$root/share/doc/retivus/SOURCE-PROVENANCE.txt"
           test -s "$manifest"
           grep -Fx "Retivus source commit: $GITHUB_SHA" "$manifest"
+          lock_sha="$(sha256sum "$source_root/Cargo.lock" | cut -d\x27 \x27 -f1)"
+          grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$manifest"
           grep -Fx "Upstream Anki rslib revision: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7" "$manifest"
+          test -s "$root/RELEASE-CANDIDATE.txt"
+          grep -Fx "AnkiWeb sync remains unverified." "$root/RELEASE-CANDIDATE.txt"
           grep -q 'source is pinned but NOT bundled' "$manifest"
           test -s "$prefix/share/retivus/installed-files.sha256"
           "$root/install.sh" "$prefix"

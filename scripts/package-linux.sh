@@ -3,6 +3,12 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 test -x target/release/retivus || { echo "Build target/release/retivus first" >&2; exit 1; }
 test -f Cargo.lock || { echo "A resolved Cargo.lock is required" >&2; exit 1; }
+# The included source snapshot is exactly HEAD; never package a locally
+# modified tracked tree as if its binary and source came from that commit.
+[[ -z "$(git status --porcelain --untracked-files=no)" ]] || {
+  echo "Refusing candidate packaging from a modified tracked source tree" >&2
+  exit 1
+}
 version="$(sed -n '/^\[package\]/,/^\[/{s/^version = "\([^"]*\)"/\1/p;}' Cargo.toml | head -n 1)"
 [[ -n "$version" ]] || { echo "Missing Cargo package version" >&2; exit 1; }
 name="retivus-$version-linux-x86_64"
@@ -43,7 +49,9 @@ cat > "$root/RELEASE-CANDIDATE.txt" <<'NOTICE'
 UNRELEASED TEST CANDIDATE — NOT AN ACCEPTED OR PUBLISHED RETIVUS RELEASE.
 Includes Retivus source and resolved Cargo.lock. Linked Anki rslib source is
 pinned by Cargo.toml; see upstream attribution. Corresponding-source/license
-review and release compatibility remain open. Official Anki Desktop GUI package interoperability passed separately in CI;\nAnkiWeb sync remains unverified.
+review and release compatibility remain open.
+Official Anki Desktop GUI package interoperability passed separately in CI;
+AnkiWeb sync remains unverified.
 No Anki user profiles or private study records are packaged.
 NOTICE
 stamp="$(git log -1 --format=%ct)"
