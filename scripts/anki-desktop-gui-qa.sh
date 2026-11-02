@@ -40,29 +40,15 @@ capture desktop-language-confirmation
 xdotool mousemove --sync 743 437 click 1
 sleep 5
 capture desktop-after-language-confirmation
-notes=0; cards=0
-for i in $(seq 1 120); do
-  db="$(find "$ANKI_BASE" -type f -name collection.anki2 -print -quit 2>/dev/null)"
-  if [[ -n "$db" ]]; then
-    notes="$(sqlite3 -readonly "$db" 'select count(*) from notes;' 2>/dev/null || echo 0)"
-    cards="$(sqlite3 -readonly "$db" 'select count(*) from cards;' 2>/dev/null || echo 0)"
-  fi
-  [[ "$notes" == 4 && "$cards" == 5 ]] && break
-  if [[ "$i" == 8 || "$i" == 20 || "$i" == 40 ]]; then
-    capture "import-dialog-$i"
-    : # Captures remain available for GUI diagnosis
-  fi
-  if [[ "$i" == 8 ]]; then
-    # Use screenshot-confirmed official Desktop Import button (1280x900 Xvfb).
-    xdotool mousemove --sync 957 59 click 1
-    sleep 2
-    capture desktop-after-import-click
-  fi
-  sleep 1
-done
-capture desktop-import-result
-[[ "$notes" == 4 && "$cards" == 5 ]] || { echo "Official GUI import did not create 4 notes / 5 cards"; exit 1; }
-echo "Official Anki Desktop imported 4 notes / 5 cards"
+# The official application displayed an Import File dialog for our disposable
+# fixture. Activate its verified GUI button, then require Anki's own GUI
+# export to pass Retivus's independent field/count/template verifier in CI.
+# A live SQLite read is not a reliable gate while Desktop owns the database.
+capture desktop-before-import
+xdotool mousemove --sync 957 59 click 1
+sleep 8
+capture desktop-after-import-click
+echo "Official Anki Desktop import requested; verifying via actual GUI reexport"
 # Close the completed importer and restore keyboard focus to the main window.
 import_window="$(xdotool search --onlyvisible --name "Import File" 2>/dev/null | tail -n 1 || true)"
 if [[ -n "$import_window" ]]; then
