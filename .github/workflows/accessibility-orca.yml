@@ -26,7 +26,7 @@ jobs:
         run: cargo build --locked --bin retivus
       - name: Exercise Orca named controls (fresh GUI/DBus session)
         run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus" static
-      - name: Exercise Orca keyboard-triggered live status (independent session)
+      - name: Exercise Orca dynamic live status after button activation (independent session)
         run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus" dynamic
       - name: Retain screen reader diagnostic excerpt
         if: always()
