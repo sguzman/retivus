@@ -5,10 +5,11 @@ on:
       - scripts/audit-offline-source.sh
       - .github/workflows/source-bundle-audit.yml
   workflow_dispatch:
+  workflow_call:
 permissions:
   contents: read
 concurrency:
-  group: retivus-source-audit-${{ github.ref }}
+  group: retivus-source-audit-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   audit:

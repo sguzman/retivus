@@ -3,6 +3,10 @@ on:
   push:
     paths:
       - .github/workflows/linux-candidate.yml
+      - .github/workflows/source-bundle-audit.yml
+      - scripts/audit-offline-source.sh
+      - Cargo.toml
+      - Cargo.lock
       - scripts/package-linux.sh
       - scripts/install-linux-candidate.sh
       - scripts/uninstall-linux-candidate.sh
@@ -172,3 +176,59 @@ jobs:
           root="$(find /tmp -mindepth 1 -maxdepth 1 -type d -name 'retivus-*-linux-x86_64' -print -quit)"
           test -s "$root/share/doc/retivus/source/scripts/test-clean-linux-candidate.sh"
           bash "$root/share/doc/retivus/source/scripts/test-clean-linux-candidate.sh" "$(dirname "$archive")"
+
+  source-bundle:
+    # Reuse the independently verified vendoring/audit workflow so there is
+    # only one source-generation path and its artifact is from this same SHA.
+    uses: ./.github/workflows/source-bundle-audit.yml
+    permissions:
+      contents: read
+
+  source-parity:
+    needs: [package, source-bundle]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Install archive reader (no source checkout)
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zstd
+      - name: Download current-run binary candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: retivus-linux-candidate-evidence
+          path: ${{ runner.temp }}/binary
+      - name: Download current-run locked-source candidate
+        uses: actions/download-artifact@v4
+        with:
+          name: retivus-locked-source-audit
+          path: ${{ runner.temp }}/source
+      - name: Verify binary and full vendored source belong to exactly the same commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          binaries="$RUNNER_TEMP/binary"
+          sources="$RUNNER_TEMP/source"
+          binary="$(find "$binaries" -maxdepth 1 -type f -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
+          source_archive="$(find "$sources" -maxdepth 1 -type f -name 'retivus-source-*.tar.zst' -print -quit)"
+          test -n "$binary" && test -n "$source_archive"
+          test "$(basename "$source_archive")" = "retivus-source-$GITHUB_SHA.tar.zst"
+          (cd "$binaries" && sha256sum --check "$(basename "$binary").sha256")
+          (cd "$sources" && sha256sum --check "$(basename "$source_archive").sha256")
+          grep -Fx "Root commit: $GITHUB_SHA" "$sources/SOURCE-AUDIT.txt"
+          grep -Fx 'Offline Cargo metadata: PASS' "$sources/SOURCE-AUDIT.txt"
+          test -s "$sources/THIRD-PARTY-SOURCES.tsv"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          tar --zstd -xf "$binary" -C "$tmp"
+          binary_root="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -name 'retivus-*-linux-x86_64' -print -quit)"
+          test -n "$binary_root"
+          grep -Fx "Retivus source commit: $GITHUB_SHA" "$binary_root/share/doc/retivus/SOURCE-PROVENANCE.txt"
+          binary_lock="$binary_root/share/doc/retivus/source/Cargo.lock"
+          test -s "$binary_lock"
+          cmp "$binary_lock" <(tar --zstd -xOf "$source_archive" source/Cargo.lock)
+          lock_sha="$(sha256sum "$binary_lock" | cut -d' ' -f1)"
+          grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$binary_root/share/doc/retivus/SOURCE-PROVENANCE.txt"
+          grep -Fx "Cargo.lock sha256: $lock_sha" "$sources/SOURCE-AUDIT.txt"
+          tar --zstd -tf "$source_archive" | grep -Fx 'source/.cargo/config.toml'
+          tar --zstd -tf "$source_archive" | grep -Fx 'source/vendor/anki-0.0.0/Cargo.toml'
+          tar --zstd -tf "$source_archive" | grep -Fx 'source/vendor/percent-encoding-iri-2.2.0/Cargo.toml'
+          echo "PASS: same-commit binary and checksummed, offline-resolved source archives."
