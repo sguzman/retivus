@@ -23,6 +23,8 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq protobuf-compiler zstd xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0
+      - name: Verify installer security and recovery contracts before expensive release build
+        run: bash scripts/test-installer-contract.sh
       - name: Resolve dependency lock and compile feature-enabled release
         env:
           CARGO_BUILD_JOBS: '2'

@@ -6,6 +6,19 @@ prefix="$HOME/.local"; if (( $# )); then prefix="$1"; fi
 [[ "$prefix" = /* && "$prefix" != "/" && ! -L "$prefix" ]] || {
   echo "Require an absolute non-root, non-symlink install prefix" >&2; exit 1
 }
+# Refuse symlinked prefixes, ancestor components, managed directories and
+# managed files. Without this, a symlink under the prefix could redirect
+# install or removal to an unrelated path outside the selected directory.
+[[ "$prefix" == "$(realpath -m -- "$prefix")" ]] || {
+  echo "Install prefix must not traverse a symlink or contain dot segments" >&2
+  exit 1
+}
+for folder in "$prefix" "$prefix/bin" "$prefix/share" "$prefix/share/applications" "$prefix/share/doc" "$prefix/share/doc/retivus" "$prefix/share/retivus"; do
+  [[ ! -L "$folder" ]] || { echo "Refusing symlinked managed directory: $folder" >&2; exit 1; }
+done
+for rel in bin/retivus share/applications/retivus.desktop share/doc/retivus/LICENSE share/doc/retivus/ANKI-ATTRIBUTION.md share/doc/retivus/MIT-original.txt share/doc/retivus/README.md share/retivus/installed-sha256 share/retivus/installed-files.sha256; do
+  [[ ! -L "$prefix/$rel" ]] || { echo "Refusing symlinked managed file: $rel" >&2; exit 1; }
+done
 marker="$prefix/share/retivus/installed-sha256"
 manifest="$prefix/share/retivus/installed-files.sha256"
 bin="$prefix/bin/retivus"

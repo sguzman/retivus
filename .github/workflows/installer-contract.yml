@@ -1,0 +1,24 @@
+name: Linux installer safety and recovery contract
+on:
+  push:
+    paths:
+      - .github/workflows/installer-contract.yml
+      - scripts/install-linux-candidate.sh
+      - scripts/uninstall-linux-candidate.sh
+      - scripts/test-installer-contract.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  installer-safety:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate shell syntax
+        run: |
+          bash -n scripts/install-linux-candidate.sh
+          bash -n scripts/uninstall-linux-candidate.sh
+          bash -n scripts/test-installer-contract.sh
+      - name: Run isolated update, rollback, symlink and data-preservation matrix
+        run: bash scripts/test-installer-contract.sh
