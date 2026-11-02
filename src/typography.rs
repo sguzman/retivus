@@ -109,9 +109,7 @@ fn discover_cjk(roots: &[PathBuf]) -> Vec<PathBuf> {
                 let name = entry.file_name().to_string_lossy().to_ascii_lowercase();
                 if (name.contains("notosanscjk") || name.contains("notosansjp"))
                     && name.contains("regular")
-                    && (name.ends_with(".ttf")
-                        || name.ends_with(".otf")
-                        || name.ends_with(".ttc"))
+                    && (name.ends_with(".ttf") || name.ends_with(".otf") || name.ends_with(".ttc"))
                 {
                     found.push(path);
                 }
@@ -159,12 +157,15 @@ pub fn install_local_krypton(ctx: &egui::Context) -> bool {
             continue;
         };
         let name = "retivus-local-krypton".to_owned();
-        fonts.font_data.insert(
-            name.clone(),
-            Arc::new(egui::FontData::from_owned(bytes)),
-        );
+        fonts
+            .font_data
+            .insert(name.clone(), Arc::new(egui::FontData::from_owned(bytes)));
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
-            fonts.families.entry(family).or_default().insert(0, name.clone());
+            fonts
+                .families
+                .entry(family)
+                .or_default()
+                .insert(0, name.clone());
         }
         krypton = true;
         break;
@@ -174,10 +175,9 @@ pub fn install_local_krypton(ctx: &egui::Context) -> bool {
             continue;
         };
         let name = "retivus-local-noto-cjk".to_owned();
-        fonts.font_data.insert(
-            name.clone(),
-            Arc::new(egui::FontData::from_owned(bytes)),
-        );
+        fonts
+            .font_data
+            .insert(name.clone(), Arc::new(egui::FontData::from_owned(bytes)));
         for family in [egui::FontFamily::Proportional, egui::FontFamily::Monospace] {
             fonts.families.entry(family).or_default().push(name.clone());
         }

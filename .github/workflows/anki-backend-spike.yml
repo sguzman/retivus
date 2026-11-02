@@ -257,6 +257,16 @@ jobs:
             grim -o HEADLESS-1 "/tmp/retivus-wayland-$scene-wide.png"
             test "$(wc -c < "/tmp/retivus-wayland-$scene-wide.png")" -gt 9000
             swaymsg output HEADLESS-1 mode 720x650
+            sleep 1
+            geometry="$(swaymsg -t get_tree | jq -r '.. | objects | select(.name? == "Retivus") | .rect.width' | head -n 1)"
+            if test -z "$geometry" || test "$geometry" -gt 720; then
+              swaymsg '[title="Retivus"] floating enable'
+              swaymsg '[title="Retivus"] resize set width 710 px height 640 px'
+              swaymsg '[title="Retivus"] move position 0 0'
+              sleep 1
+              geometry="$(swaymsg -t get_tree | jq -r '.. | objects | select(.name? == "Retivus") | .rect.width' | head -n 1)"
+            fi
+            test -n "$geometry" && test "$geometry" -le 720
             sleep 2
             grim -o HEADLESS-1 "/tmp/retivus-wayland-$scene-narrow.png"
             test "$(wc -c < "/tmp/retivus-wayland-$scene-narrow.png")" -gt 7000

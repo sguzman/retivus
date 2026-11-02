@@ -354,6 +354,7 @@ impl eframe::App for Retivus {
         ctx.set_theme(self.theme.preference());
         apply_accessibility_style(ctx, self.density, self.high_contrast, self.reduced_motion);
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+            let narrow_toolbar = ui.available_width() < 860.0;
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new("Retivus")
@@ -391,13 +392,25 @@ impl eframe::App for Retivus {
                 {
                     ctx.set_zoom_factor(self.ui_scale);
                 }
-                ui.checkbox(&mut self.high_contrast, "High contrast")
-                    .on_hover_text(
-                        "Use high-contrast text and backgrounds in either color scheme.",
-                    );
-                ui.checkbox(&mut self.reduced_motion, "Reduce motion")
-                    .on_hover_text("Disable standard widget transitions in Retivus.");
+                if !narrow_toolbar {
+                    ui.checkbox(&mut self.high_contrast, "High contrast")
+                        .on_hover_text(
+                            "Use high-contrast text and backgrounds in either color scheme.",
+                        );
+                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                        .on_hover_text("Disable standard widget transitions in Retivus.");
+                }
             });
+            if narrow_toolbar {
+                ui.horizontal_wrapped(|ui| {
+                    ui.checkbox(&mut self.high_contrast, "High contrast")
+                        .on_hover_text(
+                            "Use high-contrast text and backgrounds in either color scheme.",
+                        );
+                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                        .on_hover_text("Disable standard widget transitions in Retivus.");
+                });
+            }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Learn from any source.");
