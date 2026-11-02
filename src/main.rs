@@ -494,7 +494,11 @@ impl eframe::App for Retivus {
                 {
                     self.stage_validated_source_to_study();
                 }
-                let import_status = ui.label(&self.import_status);
+                // Keep the live-region node identity stable when its text changes,
+                // so AT-SPI consumers never chase a newly allocated label node.
+                let import_status = ui
+                    .push_id("import-status-live-region", |ui| ui.label(&self.import_status))
+                    .inner;
                 ui.ctx().accesskit_node_builder(import_status.id, |node| {
                     // A live property on a generic label did not trigger a
                     // spoken announcement in real Orca/AT-SPI testing. Expose
