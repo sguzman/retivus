@@ -1,0 +1,52 @@
+name: Clean Ubuntu release runtime acceptance
+on:
+  push:
+    paths:
+      - .github/workflows/clean-runtime.yml
+  workflow_dispatch:
+    inputs:
+      release_run:
+        description: Existing Linux release job with a source-accompanied archive
+        default: '41496711599'
+        required: false
+permissions:
+  contents: read
+  actions: read
+jobs:
+  clean-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Install standalone desktop runtime packages
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq zstd xvfb xdotool x11-utils openbox \
+            libgl1-mesa-dri libxkbcommon-x11-0 libgl1 ca-certificates
+      - name: Download existing candidate from separate release run
+        uses: actions/download-artifact@v4
+        with:
+          name: retivus-linux-candidate-evidence
+          run-id: ${{ inputs.release_run || '41496711599' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/retivus-release
+      - name: Verify archive on fresh hosted VM without source checkout or compiler
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$(find "$RUNNER_TEMP/retivus-release" -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
+          test -n "$archive"
+          sandbox="$(mktemp -d)"
+          trap 'rm -rf "$sandbox"' EXIT
+          tar --zstd -xf "$archive" -C "$sandbox"
+          root="$(find "$sandbox" -mindepth 1 -maxdepth 1 -type d -name 'retivus-*-linux-x86_64' -print -quit)"
+          test -s "$root/share/doc/retivus/source/scripts/test-clean-linux-candidate.sh"
+          # The hosted image includes development tools by default. Remove any
+          # Cargo binary directories from PATH to prove none are needed here.
+          export PATH="$(printf '%s' "$PATH" | tr ':' '\n' |
+            grep -vE '/(\.cargo|cargo)/bin$' | paste -sd ':' -)"
+          if command -v cargo >/dev/null 2>&1; then
+            echo "Standalone runtime test still sees Cargo on PATH" >&2
+            exit 1
+          fi
+          bash "$root/share/doc/retivus/source/scripts/test-clean-linux-candidate.sh" \
+            "$(dirname "$archive")"
