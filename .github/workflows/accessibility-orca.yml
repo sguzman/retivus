@@ -22,7 +22,7 @@ jobs:
           sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0
       - name: Build native AccessKit-enabled Retivus
         run: cargo build --locked --bin retivus
-      - name: Exercise real Orca keyboard focus and speech dispatcher
+      - name: Exercise Orca named controls and dynamic status speech
         run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus"
       - name: Retain screen reader diagnostic excerpt
         if: always()

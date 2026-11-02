@@ -60,3 +60,31 @@ for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
 echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
+# Exercise a *dynamic* polite live-region announcement, not only the
+# static accessibility label. Default source path is empty in this disposable
+# profile, so activating validation must report a safe read failure.
+start_bytes="$(wc -c < "$debug")"
+found=0
+for attempt in $(seq 1 120); do
+  xdotool key --clearmodifiers Tab
+  sleep 0.25
+  if tail -c "+$((start_bytes + 1))" "$debug" \
+      | grep -F "SPEECH DISPATCHER: Speaking 'Validate source'" >/dev/null; then
+    found=1
+    break
+  fi
+done
+(( found )) || { echo "Orca did not reacquire the Validate source button" >&2; exit 1; }
+announce_start="$(wc -c < "$debug")"
+xdotool key --clearmodifiers Return
+sleep 6
+if ! tail -c "+$((announce_start + 1))" "$debug" \
+    | grep -F 'SPEECH DISPATCHER: Speaking' \
+    | grep -F 'Could not open source' >/dev/null; then
+  echo 'Orca did not speak the changed validation status as a live announcement' >&2
+  tail -c "+$((announce_start + 1))" "$debug" \
+    | grep -E 'SPEECH DISPATCHER|Retivus|source' | tail -n 55 >&2 || true
+  exit 1
+fi
+echo 'PASS: real Orca speaks updated validation status after keyboard activation.'
+
