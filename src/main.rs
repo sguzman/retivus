@@ -303,6 +303,11 @@ fn apply_accessibility_style(
         } else {
             egui::Style::default().animation_time
         };
+        style.scroll_animation = if reduced_motion {
+            egui::style::ScrollAnimation::none()
+        } else {
+            egui::style::ScrollAnimation::default()
+        };
         // Reset every changed field when contrast is disabled. That also
         // preserves live System theme switching without stale overrides.
         let defaults = if dark {
@@ -686,10 +691,15 @@ mod tests {
             assert_eq!(style.visuals.override_text_color, Some(fg));
             assert_eq!(style.visuals.panel_fill, bg);
             assert_eq!(style.animation_time, 0.0);
+            assert_eq!(style.scroll_animation, egui::style::ScrollAnimation::none());
             apply_accessibility_style(&ctx, Density::Comfortable, false, false);
             let reset = ctx.style();
             assert_eq!(reset.visuals.override_text_color, None);
             assert_eq!(reset.animation_time, egui::Style::default().animation_time);
+            assert_eq!(
+                reset.scroll_animation,
+                egui::style::ScrollAnimation::default()
+            );
             assert_eq!(
                 reset.visuals.panel_fill,
                 if theme == egui::Theme::Dark {
@@ -816,6 +826,8 @@ mod tests {
             harness.set_pixels_per_point(pixels_per_point);
             harness.state_mut().theme = theme;
             harness.state_mut().density = density;
+            harness.state_mut().high_contrast = pixels_per_point >= 1.0;
+            harness.state_mut().reduced_motion = pixels_per_point >= 1.0;
             harness.run();
 
             harness

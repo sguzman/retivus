@@ -17,6 +17,7 @@ Retivus disables eframe default features to control its native build. Its explic
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
 | Note edit/search controls respond to keyboard/mouse | Native editor and search end-to-end regression in src/study_ui.rs | Verified in feature CI 41347374839 |
 | System, Light and Dark persist correctly | App preference tests in src/main.rs | Verified in foundation CI |
+| High-contrast and reduced-motion controls (including disabled scroll transitions) | Persisted native preferences and light/dark override/reset tests in `src/main.rs` | **Implementation committed; CI and real-user visual QA pending** |
 | Scale, density, window resizing, labelled input focus and Enter-activated validation | `accessibility_focus_survives_scaling_density_theme_and_resizing` in `src/main.rs` | **Verified foundation CI 41371103471** |
 | Real compositor renders wide and narrow windows | Retained native Sway Wayland 1080×800 and 720×650 screenshot artifact, reviewed for initial-window clipping and missing glyphs | Verified in Anki CI 41343238570 |
 
@@ -26,6 +27,6 @@ Retivus disables eframe default features to control its native build. Its explic
 - [x] Real keyboard/pointer test navigates source entry selection, grading and persistence
 - [ ] Inspect **populated** browse, source conflict and reviewer states at both scales in a physical Wayland session
 - [ ] Verify screen-reader announcements of form labels, deck choices, status updates and due-card transitions with an actual screen reader
-- [ ] Validate high-contrast mode and any reduced-motion platform preference against user testing
+- [ ] Inspect High contrast and Reduce motion controls in light/dark and narrow/wide windows; the new settings persist, but OS-level reduced-motion autodetection and physical Wayland usability have not been verified
 
 **Scope:** Native AT-SPI registration, keyboard/scale/theme focus regression, and **Orca announcements for the named core controls** have passed CI. **M6.4 remains pending (0/3 points)** because populated browse/reviewer/conflict states in a physical Wayland session, broader screen-reader status/due-card announcements, and high-contrast/reduced-motion preferences have not been independently accepted. The tests do not claim universal assistive-technology usability.
