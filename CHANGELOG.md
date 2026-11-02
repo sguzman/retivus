@@ -5,6 +5,8 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added polite AccessKit live-region metadata for review, due, source-validation and conflict status updates; native build and end-to-end CI passed, while actual dynamic Orca speech remains unverified.
+- Introduced disposable debug-only populated reviewer/conflict scenes for Sway Wayland screenshot QA, with real Anki-backed notes, no personal profiles and wide/narrow captures. The screenshot acceptance job remains in verification.
 - Added persisted High contrast and Reduce motion UI preferences for both theme schemes, including strong foreground/background overrides, disabled widget/scroll transitions and regression tests for restoring defaults; screen-reader/Wayland user acceptance remains separate.
 - Verified a unified end-to-end provider → Anki FSRS → restart → public/private `.apkg` interoperability and review-history privacy regression in [CI 41373832561](https://github.com/sguzman/retivus/actions/runs/41373832561), alongside the complete 48-library/24-native-test feature suite and standalone package fixture. M6.1 is accepted; AnkiWeb sync and remaining accessibility/release gates are not.
 - Associated the Appearance, Density and Format combo boxes with their visible labels for native screen readers. [Orca CI 41371981361](https://github.com/sguzman/retivus/actions/runs/41371981361) verified actual speech-dispatch logs naming all three, plus File and Validate source; broad accessibility acceptance remains pending.
