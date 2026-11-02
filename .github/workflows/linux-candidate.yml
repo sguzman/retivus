@@ -57,7 +57,7 @@ jobs:
           manifest="$root/share/doc/retivus/SOURCE-PROVENANCE.txt"
           test -s "$manifest"
           grep -Fx "Retivus source commit: $GITHUB_SHA" "$manifest"
-          lock_sha="$(sha256sum "$source_root/Cargo.lock" | cut -d\x27 \x27 -f1)"
+          lock_sha="$(sha256sum "$source_root/Cargo.lock" | cut -d' ' -f1)"
           grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$manifest"
           grep -Fx "Upstream Anki rslib revision: 136bd42bfbd356fc756b6d3e28cc77b02da11ea7" "$manifest"
           test -s "$root/RELEASE-CANDIDATE.txt"
