@@ -44,12 +44,29 @@ xvfb-run -a bash -c '
   openbox >/tmp/retivus-container-wm.log 2>&1 & wm=$!
   LIBGL_ALWAYS_SOFTWARE=1 "$1" >/tmp/retivus-container-app.log 2>&1 & app=$!
   trap "kill $app $wm 2>/dev/null || true" EXIT
-  for i in $(seq 1 60); do
-    if xdotool search --onlyvisible --name Retivus >/dev/null 2>&1; then exit 0; fi
-    kill -0 "$app" || { cat /tmp/retivus-container-app.log; exit 1; }
+  for i in $(seq 1 90); do
+    # The WM_HINTS 'visible' state varies with window-manager timing in a
+    # disposable container. Require an actual mapped X11 window instead.
+    for win in $(xdotool search --name Retivus 2>/dev/null || true); do
+      if xwininfo -id "$win" 2>/dev/null | grep -q "Map State: IsViewable"; then
+        echo "PASS: mapped native Retivus window $win"
+        exit 0
+      fi
+    done
+    kill -0 "$app" || {
+      echo "Retivus process exited before window was mapped"
+      cat /tmp/retivus-container-app.log
+      exit 1
+    }
     sleep 1
   done
-  cat /tmp/retivus-container-app.log
+  echo "Retivus process survived but no mapped window appeared"
+  echo "--- X11 tree ---"
+  xwininfo -root -tree 2>&1 | tail -n 35 || true
+  echo "--- Openbox log ---"
+  cat /tmp/retivus-container-wm.log || true
+  echo "--- Retivus log ---"
+  cat /tmp/retivus-container-app.log || true
   exit 1
 ' bash "$prefix/bin/retivus"
 "$root/uninstall.sh" "$prefix"

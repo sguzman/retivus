@@ -144,7 +144,7 @@ jobs:
         run: |
           apt-get update -qq
           DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
-            bash coreutils findutils grep sed tar zstd xvfb xdotool openbox \
+            bash coreutils findutils grep sed tar zstd xvfb xdotool x11-utils openbox \
             libgl1-mesa-dri libxkbcommon-x11-0 libx11-6 ca-certificates
       - name: Download the built release archive, without fetching source or Rust
         uses: actions/download-artifact@v4
