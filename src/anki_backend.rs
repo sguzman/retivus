@@ -2365,6 +2365,106 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
     }
 
     #[test]
+    fn end_to_end_provider_review_restart_package_and_history_privacy() {
+        use crate::source_adapter::{SourceInfo, StudyTsvV1};
+        use crate::source_store::SourceCatalog;
+        use std::io::Cursor;
+
+        // Drive real interfaces end to end rather than combining unrelated
+        // assertions from in-memory or backend-only tests.
+        let adapter = StudyTsvV1::new(SourceInfo {
+            provider_id: "independent-ja-es".into(),
+            edition: "2026-11-01".into(),
+            lexical_language: "ja".into(),
+            definition_language: "es".into(),
+            license_notice: "Original test fixture: CC0-1.0".into(),
+        })
+        .unwrap();
+        let mut catalog = SourceCatalog::in_memory().unwrap();
+        assert_eq!(
+            catalog
+                .import_snapshot(
+                    "ja-es-v1",
+                    &adapter,
+                    &mut Cursor::new(include_str!("../tests/fixtures/independent-ja-es.tsv")),
+                )
+                .unwrap(),
+            3
+        );
+        let life = catalog
+            .select_sense("independent-ja-es", "ja-es-v1", "ja1", "s1")
+            .unwrap();
+        let live = catalog
+            .select_sense("independent-ja-es", "ja-es-v1", "ja2", "s1")
+            .unwrap();
+        assert_eq!(life.word, live.word);
+        assert_ne!(life.definition, live.definition);
+
+        let root = tempdir().unwrap();
+        let mut learner = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+        learner.enable_fsrs().unwrap();
+        let life_id = learner.add_source_candidate(1, &life).unwrap();
+        let live_id = learner.add_source_candidate(1, &live).unwrap();
+        assert_eq!((learner.collection_stats().unwrap().notes, learner.collection_stats().unwrap().cards), (2, 2));
+        assert!(learner.due_counts().unwrap().0 >= 2);
+        learner.grade_next_card(3).unwrap().unwrap();
+        assert_eq!(learner.collection_stats().unwrap().review_events, 1);
+        learner.close().unwrap();
+
+        let mut restarted = AnkiBackend::open_managed_profile(root.path(), "learner").unwrap();
+        assert!(restarted.fsrs_enabled());
+        assert_eq!(restarted.note_fields(life_id).unwrap(), ["生", "vida"]);
+        assert_eq!(restarted.note_fields(live_id).unwrap(), ["生", "vivir"]);
+        assert_eq!(restarted.collection_stats().unwrap().review_events, 1);
+        let shareable = root.path().join("shareable.apkg");
+        let private = root.path().join("private-opt-in.apkg");
+        assert_eq!(restarted.export_apkg_to(&shareable).unwrap(), 2);
+        assert!(restarted.export_apkg_to(&shareable).is_err());
+        assert_eq!(
+            restarted
+                .export_apkg_to_with_scheduling(&private, true)
+                .unwrap(),
+            2
+        );
+        restarted.close().unwrap();
+
+        let mut shared = AnkiBackend::create_managed_profile(root.path(), "shared").unwrap();
+        shared.import_apkg(&shareable).unwrap();
+        assert_eq!(shared.collection_stats().unwrap(), CollectionStats {
+            notes: 2,
+            cards: 2,
+            review_events: 0,
+        });
+        for (expected_fields, tag) in [
+            (["生", "vida"], life.source_tag()),
+            (["生", "vivir"], live.source_tag()),
+        ] {
+            let notes = shared
+                .collection
+                .search_notes(&format!("tag:{tag}"), SortMode::NoOrder)
+                .unwrap();
+            assert_eq!(notes.len(), 1);
+            assert_eq!(shared.note_fields(notes[0].0).unwrap(), expected_fields);
+        }
+        shared.close().unwrap();
+
+        let mut no_import = AnkiBackend::create_managed_profile(root.path(), "no-history").unwrap();
+        no_import.import_apkg(&private).unwrap();
+        assert_eq!(no_import.collection_stats().unwrap().review_events, 0);
+        no_import.close().unwrap();
+
+        let mut restored = AnkiBackend::create_managed_profile(root.path(), "private-history").unwrap();
+        restored.import_apkg_with_scheduling(&private, true).unwrap();
+        assert_eq!(restored.collection_stats().unwrap(), CollectionStats {
+            notes: 2,
+            cards: 2,
+            review_events: 1,
+        });
+        restored.close().unwrap();
+        assert!(AnkiBackend::open_managed_profile(root.path(), "learner").is_ok());
+    }
+
+    #[test]
     fn independent_japanese_spanish_source_can_be_reviewed_without_mixing_homographs() {
         use crate::source_adapter::{SourceInfo, StudyTsvV1};
         use crate::source_store::SourceCatalog;

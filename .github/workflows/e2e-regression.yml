@@ -1,0 +1,51 @@
+name: End-to-end provider, scheduler and Anki package acceptance
+on:
+  push:
+    paths:
+      - .github/workflows/e2e-regression.yml
+      - src/anki_backend.rs
+      - src/study_ui.rs
+      - src/source_adapter.rs
+      - src/source_store.rs
+      - src/main.rs
+      - Cargo.toml
+      - Cargo.lock
+      - tests/fixtures/**
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: retivus-e2e-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  complete-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      CARGO_BUILD_JOBS: "2"
+      PROTOC: /usr/bin/protoc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Install Anki native protocol compilation prerequisite
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq protobuf-compiler
+      - name: Verify generic provider and locked dependency regression baseline
+        run: |
+          cargo test --locked --all-targets
+          cargo run --locked --bin import-generic -- tests/fixtures/independent-ja-es.tsv "$RUNNER_TEMP/retivus-independent.sqlite3" ja-es-v1 independent-ja-es 2026-11-01 ja es CC0-1.0 | tee "$RUNNER_TEMP/provider-check.txt"
+          grep -q "Imported 3 entries and 3 senses from independent provider independent-ja-es" "$RUNNER_TEMP/provider-check.txt"
+      - name: Run single cross-layer provider to Anki FSRS to package privacy test
+        run: |
+          cargo test --locked --features anki-backend --lib end_to_end_provider_review_restart_package_and_history_privacy -- --nocapture
+      - name: Verify all Anki backend, native review and GUI integration regressions
+        run: |
+          cargo test --locked --features anki-backend --lib
+          cargo test --locked --features anki-backend --bin retivus
+      - name: Verify deterministic public interoperability fixture
+        run: |
+          mkdir "$RUNNER_TEMP/retivus-fixture"
+          cargo run --locked --features anki-backend --bin desktop-interop-fixture -- generate "$RUNNER_TEMP/retivus-fixture"
+          cargo run --locked --features anki-backend --bin desktop-interop-fixture -- verify "$RUNNER_TEMP/retivus-fixture/retivus-desktop-interop.apkg"

@@ -1,0 +1,7 @@
+# M6.1 — unified end-to-end regression acceptance
+
+The [single end-to-end CI workflow](../.github/workflows/e2e-regression.yml) runs from one checked-out Retivus commit, using the committed Cargo.lock. It verifies the generic external provider independently, then uses a real managed Anki profile to transform a three-entry Japanese-to-Spanish TSV into two distinct homograph notes/cards. The scoped integration test checks FSRS grading, an interruption/restart, retained source identities, shareable .apkg export with zero review history, explicit-history export, no-overwrite behavior, and separate default/opt-in imports with exact review-event counts. It then runs the complete feature-gated backend and native GUI test suites and independently self-verifies the deterministic interoperability fixture.
+
+The separately [passed official Anki Desktop GUI reexport](https://github.com/sguzman/retivus/actions/runs/41368266062), [real external shared-deck verification](https://github.com/sguzman/retivus/actions/runs/41354009838), [Mexilex large-data verification](https://github.com/sguzman/retivus/actions/runs/41342157443) and [native screen-reader QA](https://github.com/sguzman/retivus/actions/runs/41371981361) remain separate evidence with independent scopes.
+
+**Acceptance pending:** The new aggregate workflow must pass, including the new cross-layer test, before M6.1's three percentage points can be credited. Its success must not be described as proof of authenticated AnkiWeb sync or full accessibility/release acceptance.
