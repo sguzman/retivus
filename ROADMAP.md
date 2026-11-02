@@ -246,3 +246,13 @@
 - ⏳ **Milestone accounting unchanged:** M4.5 2%, M6.4 3%, M7.1–M7.4 8% still pending; M7.2 depends on M6. No tag or production release.
 
 **Progress: 87% → 87%, Δ +0 percentage points.** Passing CI subchecks does not award partial milestone weight.
+
+## Continuation checkpoint — verified Orca diagnostics and notice-indexed source (87%, Δ +0 pp)
+
+- ✅ **Orca event delivery evidence:** [run 41515229029](https://github.com/sguzman/retivus/actions/runs/41515229029) uploaded a full debug log recording both the native AT-SPI `object:announcement` event and an actual Orca `SPEECH DISPATCHER: Speaking` call for the changed validation status. That workflow failed because of a log-offset assertion, not because the uploaded trace lacked speech. Other independent runs ([41516840629](https://github.com/sguzman/retivus/actions/runs/41516840629), [41517601063](https://github.com/sguzman/retivus/actions/runs/41517601063)) intermittently queued the announcement but did not record speech processing. **[Issue #1](https://github.com/sguzman/retivus/issues/1) remains open**. This does not complete M6.4 or replace populated physical Wayland/Orca and contrast/motion QA.
+- ✅ **Exact vendored-source parent-notice review:** [audit 41518957845](https://github.com/sguzman/retivus/actions/runs/41518957845) passed and archived `PARENT-NOTICE-REVIEW.tsv`, listing **72** crate-local notice review targets across **28** upstream URLs, no undeclared upstream location. This is an unresolved review queue, **not** 72 confirmed violations or a completed notice-compliance review. The parent review inventory is included in the source tarball and checked by same-run binary/source parity.
+- ✅ **Fresh offline compilation of the notice-indexed source:** [run 41519423880](https://github.com/sguzman/retivus/actions/runs/41519423880) passed `cargo check --locked --offline --features anki-backend` from the checksummed archive using a fresh Cargo home without checking out Retivus.
+- ✅ **Previous complete binary/source/runtime acceptance:** [run 41517601368](https://github.com/sguzman/retivus/actions/runs/41517601368) passed all four Linux candidate jobs after the status-widget change. [Latest notice-indexed release run 41518958042](https://github.com/sguzman/retivus/actions/runs/41518958042) was still compiling at this checkpoint; not claimed green.
+- ⏳ **Strict roadmap accounting:** M4.5 2%, M6.4 3%, M7.1–M7.4 8% remain pending. No production release/tag; no unverified partial milestone credit.
+
+**Verified progress: 87% → 87%; Δ +0 percentage points.**
