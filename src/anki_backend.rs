@@ -2405,7 +2405,13 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         learner.enable_fsrs().unwrap();
         let life_id = learner.add_source_candidate(1, &life).unwrap();
         let live_id = learner.add_source_candidate(1, &live).unwrap();
-        assert_eq!((learner.collection_stats().unwrap().notes, learner.collection_stats().unwrap().cards), (2, 2));
+        assert_eq!(
+            (
+                learner.collection_stats().unwrap().notes,
+                learner.collection_stats().unwrap().cards
+            ),
+            (2, 2)
+        );
         assert!(learner.due_counts().unwrap().0 >= 2);
         learner.grade_next_card(3).unwrap().unwrap();
         assert_eq!(learner.collection_stats().unwrap().review_events, 1);
@@ -2430,11 +2436,14 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
 
         let mut shared = AnkiBackend::create_managed_profile(root.path(), "shared").unwrap();
         shared.import_apkg(&shareable).unwrap();
-        assert_eq!(shared.collection_stats().unwrap(), CollectionStats {
-            notes: 2,
-            cards: 2,
-            review_events: 0,
-        });
+        assert_eq!(
+            shared.collection_stats().unwrap(),
+            CollectionStats {
+                notes: 2,
+                cards: 2,
+                review_events: 0,
+            }
+        );
         for (expected_fields, tag) in [
             (["生", "vida"], life.source_tag()),
             (["生", "vivir"], live.source_tag()),
@@ -2453,13 +2462,19 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         assert_eq!(no_import.collection_stats().unwrap().review_events, 0);
         no_import.close().unwrap();
 
-        let mut restored = AnkiBackend::create_managed_profile(root.path(), "private-history").unwrap();
-        restored.import_apkg_with_scheduling(&private, true).unwrap();
-        assert_eq!(restored.collection_stats().unwrap(), CollectionStats {
-            notes: 2,
-            cards: 2,
-            review_events: 1,
-        });
+        let mut restored =
+            AnkiBackend::create_managed_profile(root.path(), "private-history").unwrap();
+        restored
+            .import_apkg_with_scheduling(&private, true)
+            .unwrap();
+        assert_eq!(
+            restored.collection_stats().unwrap(),
+            CollectionStats {
+                notes: 2,
+                cards: 2,
+                review_events: 1,
+            }
+        );
         restored.close().unwrap();
         assert!(AnkiBackend::open_managed_profile(root.path(), "learner").is_ok());
     }
