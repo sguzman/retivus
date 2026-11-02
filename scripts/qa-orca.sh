@@ -25,6 +25,7 @@ cleanup() {
   if (( wm > 0 )); then kill "$wm" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
+trap 'code=$?; echo "Orca QA error at line $LINENO: $BASH_COMMAND (exit $code)" >&2; exit "$code"' ERR
 openbox > "$wm_log" 2>&1 & wm=$!
 orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
 sleep 3
@@ -59,10 +60,20 @@ grep -F "SPEECH DISPATCHER: Speaking 'File'" "$debug" >/dev/null || { echo "Orca
 for label in Appearance Density Format; do
   grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
 done
+echo "PASS: Orca spoke all five required control labels."
 # Trigger a real changing live region through a coordinate discovered from the
 # AT-SPI object tree. No hard-coded screen coordinates or user profile are used.
-address="$(busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress | sed -n 's/^s "\\(.*\\)"$/\\1/p')"
-test -n "$address"
+busctl --user set-property org.a11y.Bus /org/a11y/bus org.a11y.Status IsEnabled b true
+raw_bus="$(busctl --user call org.a11y.Bus /org/a11y/bus org.a11y.Bus GetAddress)" || {
+  echo "Could not obtain Orca's AT-SPI bus address" >&2
+  exit 1
+}
+address="$(printf '%s\n' "$raw_bus" | sed -nE 's/^s "([^"]+)"$/\1/p')"
+[[ -n "$address" ]] || {
+  echo "Unexpected AT-SPI bus response: $raw_bus" >&2
+  exit 1
+}
+echo "PASS: Orca AT-SPI bus is accessible."
 find_action_center() {
   local service="$1" object="$2" depth="$3" name rect tag x y width height children child_service child_path
   (( depth <= 12 )) || return 1
@@ -93,6 +104,7 @@ while IFS=$'\t' read -r service object; do
   fi
 done < <(printf '%s\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
 [[ -n "$center" ]] || { echo "Could not locate visible Validate source bounds on the real AT-SPI tree" >&2; exit 1; }
+echo "PASS: Validate source bounds found through AT-SPI: $center."
 read -r click_x click_y <<< "$center"
 xdotool mousemove "$click_x" "$click_y" click 1
 sleep 4
