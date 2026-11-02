@@ -108,6 +108,51 @@ echo "PASS: Validate source bounds found through AT-SPI: $center."
 read -r click_x click_y <<< "$center"
 xdotool mousemove "$click_x" "$click_y" click 1
 sleep 4
+# Confirm that the button really changed the accessible status node. This
+# prevents a missed click or stale screen from masquerading as a speech bug.
+has_validation_status() {
+  local service="$1" object="$2" depth="$3" name children child_service child_path
+  (( depth <= 12 )) || return 1
+  name="$(busctl --address="$address" get-property "$service" "$object" org.a11y.atspi.Accessible Name 2>/dev/null || true)"
+  if [[ "$name" == *'Could not open source'* ]]; then
+    return 0
+  fi
+  children="$(busctl --address="$address" call "$service" "$object" org.a11y.atspi.Accessible GetChildren 2>/dev/null || true)"
+  while IFS= Verify the new status is actually
+# spoken, rather than merely exposing a passive AccessKit node.
+grep -E 'SPEECH DISPATCHER: Speaking .*Could not open source' "$debug" >/dev/null || {
+  echo "Orca did not speak the changing source-validation status" >&2
+  exit 1
+}
+echo "PASS: Orca announced named controls and changing validation status through native AT-SPI."
+\t' read -r child_service child_path; do
+    [[ -n "$child_service" && -n "$child_path" ]] || continue
+    if has_validation_status "$child_service" "$child_path" "$((depth + 1))"; then
+      return 0
+    fi
+  done < <(printf '%s\n' "$children" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+  return 1
+}
+validation_found=0
+while IFS= Verify the new status is actually
+# spoken, rather than merely exposing a passive AccessKit node.
+grep -E 'SPEECH DISPATCHER: Speaking .*Could not open source' "$debug" >/dev/null || {
+  echo "Orca did not speak the changing source-validation status" >&2
+  exit 1
+}
+echo "PASS: Orca announced named controls and changing validation status through native AT-SPI."
+\t' read -r service object; do
+  [[ -n "$service" && -n "$object" ]] || continue
+  if has_validation_status "$service" "$object" 0; then
+    validation_found=1
+    break
+  fi
+done < <(printf '%s\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+(( validation_found )) || {
+  echo "Source validation was not exposed as an updated AT-SPI status node" >&2
+  exit 1
+}
+echo "PASS: Source-validation status changed in the real AT-SPI tree."
 # Empty source path intentionally fails. Verify the new status is actually
 # spoken, rather than merely exposing a passive AccessKit node.
 grep -E 'SPEECH DISPATCHER: Speaking .*Could not open source' "$debug" >/dev/null || {
