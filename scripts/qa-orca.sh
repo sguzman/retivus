@@ -63,18 +63,36 @@ echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivu
 # Exercise a *dynamic* polite live-region announcement, not only the
 # static accessibility label. Default source path is empty in this disposable
 # profile, so activating validation must report a safe read failure.
-start_bytes="$(wc -c < "$debug")"
+# A historical test searched all recently spoken labels while tabbing in a
+# circle; Orca could speak "Validate source" after focus had ALREADY moved to
+# the Density combobox. Enter then opened Density instead of validating.
+# Establish a known focus location, then make exactly one Tab transition.
+xdotool key --clearmodifiers Escape
+# Coordinates relative to Retivus's default 800x600 content area, inside the
+# unmodified "File" source path text input (not its label or nearby controls).
+xdotool mousemove --window "$window" 130 305 click 1
+sleep 0.5
+focus_start="$(wc -c < "$debug")"
+xdotool key --clearmodifiers Tab
+# Require a fresh actual AT-SPI FOCUS event, not a stale speech line.
 found=0
-for attempt in $(seq 1 120); do
-  xdotool key --clearmodifiers Tab
-  sleep 0.25
-  if tail -c "+$((start_bytes + 1))" "$debug" \
-      | grep -F "SPEECH DISPATCHER: Speaking 'Validate source'" >/dev/null; then
+for attempt in $(seq 1 20); do
+  if tail -c "+$((focus_start + 1))" "$debug" |
+      grep -F "FOCUS MANAGER: Locus of focus is [button: 'Validate source'" >/dev/null; then
     found=1
     break
   fi
+  sleep 0.15
 done
-(( found )) || { echo "Orca did not reacquire the Validate source button" >&2; exit 1; }
+if (( !found )); then
+  echo 'Orca did not focus Validate source after Tab from File entry' >&2
+  scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
+  tail -c "+$((focus_start + 1))" "$debug" |
+    grep -E 'FOCUS MANAGER: Locus of focus|SPEECH DISPATCHER: Speaking' |
+    tail -n 35 >&2 || true
+  exit 1
+fi
+echo 'PASS: actual AT-SPI focus reached Validate source before Return.'
 announce_start="$(wc -c < "$debug")"
 xdotool key --clearmodifiers Return
 sleep 6
