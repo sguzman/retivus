@@ -43,10 +43,15 @@ fi
 # Use a new Cargo home to prove no runner cache or external Git checkout.
 empty_home="$(mktemp -d)"
 trap 'rm -rf "$empty_home"' EXIT
-CARGO_HOME="$empty_home" CARGO_NET_OFFLINE=true \
-  cargo metadata --manifest-path "$out/source/Cargo.toml" \
-  --locked --offline --features anki-backend --format-version 1 \
-  >/dev/null
+# Cargo searches .cargo/config.toml relative to the invocation directory,
+# not a remote --manifest-path. Run inside the copied source tree so its
+# vendored Git and registry replacements are actually loaded.
+(
+  cd "$out/source"
+  CARGO_HOME="$empty_home" CARGO_NET_OFFLINE=true \
+    cargo metadata --locked --offline --features anki-backend \
+    --format-version 1 >/dev/null
+)
 {
   printf 'Root commit: %s\n' "$(git -C "$repo" rev-parse HEAD)"
   printf 'Cargo.lock sha256: %s\n' "$(sha256sum "$repo/Cargo.lock" | cut -d' ' -f1)"
