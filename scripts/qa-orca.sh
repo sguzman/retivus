@@ -92,8 +92,25 @@ fi
 xdotool key --clearmodifiers Escape
 # Coordinates relative to Retivus's default 800x600 content area, inside the
 # unmodified "File" source path text input (not its label or nearby controls).
+file_start="$(wc -c < "$debug")"
 xdotool mousemove --window "$window" 130 305 click 1
-sleep 0.5
+# Orca's AT-SPI event queue may take longer than a fixed sleep to process a
+# newly focused text field. Only tab once the reader has actually observed it.
+file_ready=0
+for attempt in $(seq 1 60); do
+  if tail -c "+$((file_start + 1))" "$debug" |
+      grep -F "FOCUS MANAGER: Locus of focus is [entry: 'File'" >/dev/null; then
+    file_ready=1
+    break
+  fi
+  sleep 0.2
+done
+(( file_ready )) || {
+  echo 'Orca did not acknowledge File entry focus before keyboard navigation' >&2
+  tail -n 45 "$debug" >&2
+  exit 1
+}
+sleep 0.4
 focus_start="$(wc -c < "$debug")"
 xdotool key --clearmodifiers Tab
 # Require a fresh actual AT-SPI FOCUS event, not a stale speech line.
