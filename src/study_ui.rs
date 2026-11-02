@@ -88,6 +88,15 @@ impl Drop for StudyPanel {
     }
 }
 
+/// Present changing status text as a polite native accessibility live region.
+/// This augments normal visual text; it never changes focus or repeats a dialog.
+fn live_status(ui: &mut egui::Ui, text: &str) {
+    let response = ui.label(text);
+    ui.ctx().accesskit_node_builder(response.id, |node| {
+        node.set_live(egui::accesskit::Live::Polite);
+    });
+}
+
 impl StudyPanel {
     fn connect(&mut self, create: bool) {
         if self.backend.is_some() {
@@ -864,7 +873,10 @@ impl StudyPanel {
                     if !self.source_report.is_empty() {
                         if self.source_report.starts_with("Conflict:") {
                             let color = ui.visuals().error_fg_color;
-                            ui.colored_label(color, &self.source_report);
+                            let label = ui.colored_label(color, &self.source_report);
+                            ui.ctx().accesskit_node_builder(label.id, |node| {
+                                node.set_live(egui::accesskit::Live::Polite);
+                            });
                         } else {
                             ui.label(&self.source_report);
                         }
@@ -1025,10 +1037,11 @@ impl StudyPanel {
                 ));
                 ui.heading("Study · Anki scheduler");
                 ui.horizontal_wrapped(|ui| {
-                    ui.label(format!(
+                    let due = format!(
                         "Due: {} new · {} learning · {} review",
                         self.due.0, self.due.1, self.due.2
-                    ));
+                    );
+                    live_status(ui, &due);
                     if ui.button("Refresh due queue").clicked() { self.refresh_review(); }
                     if ui.button("Enable FSRS").clicked() {
                         if let Some(backend) = self.backend.as_mut() {
@@ -1110,7 +1123,7 @@ impl StudyPanel {
                 });
                 ui.weak("Imports never open personal Anki profiles. Exports refuse existing files.");
             }
-            if !self.status.is_empty() { ui.label(&self.status); }
+            if !self.status.is_empty() { live_status(ui, &self.status); }
         });
     }
 }

@@ -481,7 +481,10 @@ impl eframe::App for Retivus {
                 {
                     self.stage_validated_source_to_study();
                 }
-                ui.label(&self.import_status);
+                let import_status = ui.label(&self.import_status);
+                ui.ctx().accesskit_node_builder(import_status.id, |node| {
+                    node.set_live(egui::accesskit::Live::Polite);
+                });
                 if let Some(chosen) = self.selected_sense.clone() {
                     ui.group(|ui| {
                         ui.heading("Selected source meaning");
