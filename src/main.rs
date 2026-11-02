@@ -500,6 +500,9 @@ impl eframe::App for Retivus {
                     // spoken announcement in real Orca/AT-SPI testing. Expose
                     // this changing result as a semantic, atomic status node.
                     node.set_role(egui::accesskit::Role::Status);
+                    // Egui labels expose their text as a value; AT-SPI live
+                    // announcements are triggered by accessible NAME changes.
+                    node.set_label(self.import_status.clone());
                     node.set_live(egui::accesskit::Live::Polite);
                     node.set_live_atomic();
                 });
@@ -840,6 +843,10 @@ mod tests {
         harness.run();
         assert_eq!(harness.state().preview.len(), 1);
         assert!(harness.state().import_status.contains("Valid records: 1"));
+        let status_name = harness.state().import_status.clone();
+        // Actual AccessKit role+name, not only the visual label text:
+        // AT-SPI requires this changing name for a live announcement.
+        let _ = harness.get_by_role_and_label(egui::accesskit::Role::Status, &status_name);
         harness.get_by_label("Select sense").scroll_to_me();
         harness.run();
         harness.get_by_label("Select sense").click();

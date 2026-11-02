@@ -101,7 +101,10 @@ fn inert_review_answer(html: &str) -> &str {
 fn live_status(ui: &mut egui::Ui, text: &str) {
     let response = ui.label(text);
     ui.ctx().accesskit_node_builder(response.id, |node| {
+        node.set_role(egui::accesskit::Role::Status);
+        node.set_label(text.to_owned());
         node.set_live(egui::accesskit::Live::Polite);
+        node.set_live_atomic();
     });
 }
 
@@ -937,7 +940,10 @@ impl StudyPanel {
                             let color = ui.visuals().error_fg_color;
                             let label = ui.colored_label(color, &self.source_report);
                             ui.ctx().accesskit_node_builder(label.id, |node| {
+                                node.set_role(egui::accesskit::Role::Status);
+                                node.set_label(self.source_report.clone());
                                 node.set_live(egui::accesskit::Live::Polite);
+                                node.set_live_atomic();
                             });
                         } else {
                             ui.label(&self.source_report);
