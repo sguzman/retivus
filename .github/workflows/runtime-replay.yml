@@ -1,0 +1,90 @@
+name: Linux runtime replay diagnostics
+on:
+  push:
+    paths:
+      - .github/workflows/runtime-replay.yml
+  workflow_dispatch:
+    inputs:
+      release_run:
+        description: Existing release run ID with a retained candidate artifact
+        required: false
+        default: '41492039710'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  replay:
+    runs-on: ubuntu-24.04
+    container: ubuntu:24.04
+    timeout-minutes: 15
+    steps:
+      - name: Install runtime and diagnostic utilities (no Rust)
+        shell: bash
+        run: |
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+            bash coreutils findutils grep sed tar zstd xvfb xdotool x11-utils openbox \
+            dbus-x11 mesa-utils strace procps fonts-dejavu-core \
+            libgl1-mesa-dri libxkbcommon-x11-0 libx11-6 ca-certificates
+      - name: Download previously built candidate archive
+        uses: actions/download-artifact@v4
+        with:
+          name: retivus-linux-candidate-evidence
+          run-id: ${{ inputs.release_run || '41492039710' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: /tmp/replay-artifact
+      - name: Verify actual X11 window mapping under isolated session
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$(find /tmp/replay-artifact -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
+          test -n "$archive"
+          tar --zstd -xf "$archive" -C /tmp
+          bin="$(find /tmp -path '*/retivus-*-linux-x86_64/bin/retivus' -type f -print -quit)"
+          test -x "$bin"
+          export HOME="$(mktemp -d)"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_RUNTIME_DIR="$HOME/runtime"
+          mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
+          chmod 700 "$XDG_RUNTIME_DIR"
+          dbus-run-session -- xvfb-run -a bash -c '
+            set -euo pipefail
+            openbox > /tmp/replay-wm.log 2>&1 & wm=$!
+            trap "kill $wm 2>/dev/null || true" EXIT
+            echo "Display: $DISPLAY"
+            glxinfo -B | sed -n "1,30p" || true
+            LIBGL_ALWAYS_SOFTWARE=1 GALLIUM_DRIVER=llvmpipe \
+              MESA_LOADER_DRIVER_OVERRIDE=llvmpipe LIBGL_DEBUG=verbose \
+              "$1" > /tmp/replay-app.log 2>&1 & app=$!
+            trap "kill $app $wm 2>/dev/null || true" EXIT
+            for tick in $(seq 1 35); do
+              for id in $(xdotool search --name Retivus 2>/dev/null || true); do
+                state="$(xwininfo -id "$id" 2>/dev/null | grep "Map State:" || true)"
+                if [[ "$state" == *IsViewable* ]]; then
+                  echo "PASS: mapped Retivus window $id after $tick ticks: $state"
+                  exit 0
+                fi
+              done
+              if ! kill -0 "$app" 2>/dev/null; then
+                echo "App exited during startup"
+                cat /tmp/replay-app.log || true
+                exit 1
+              fi
+              sleep 1
+            done
+            echo "FAIL: Retivus window never visibly mapped"
+            xwininfo -root -tree 2>&1 | tail -n 35 || true
+            for id in $(xdotool search --name Retivus 2>/dev/null || true); do
+              xwininfo -id "$id" | grep -E "Map State|Window id" || true
+            done
+            echo "Application thread waiting channels:"
+            for t in /proc/"$app"/task/*/wchan; do
+              echo "$t: $(cat "$t" 2>/dev/null || true)"
+            done
+            echo "--- Openbox ---"
+            cat /tmp/replay-wm.log || true
+            echo "--- App ---"
+            cat /tmp/replay-app.log || true
+            exit 1
+          ' bash "$bin"
