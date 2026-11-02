@@ -76,24 +76,22 @@ find_action_center() {
     fi
   fi
   children="$(busctl --address="$address" call "$service" "$object" org.a11y.atspi.Accessible GetChildren 2>/dev/null || true)"
-  while IFS=
-\\t' read -r child_service child_path; do
+  while IFS=$'\t' read -r child_service child_path; do
     [[ -n "$child_service" && -n "$child_path" ]] || continue
     if find_action_center "$child_service" "$child_path" "$((depth + 1))"; then
       return 0
     fi
-  done < <(printf '%s\\n' "$children" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+  done < <(printf '%s\n' "$children" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
   return 1
 }
 roots="$(busctl --address="$address" call org.a11y.atspi.Registry /org/a11y/atspi/accessible/root org.a11y.atspi.Accessible GetChildren)"
 center=""
-while IFS=
-\\t' read -r service object; do
+while IFS=$'\t' read -r service object; do
   [[ -n "$service" && -n "$object" ]] || continue
   if center="$(find_action_center "$service" "$object" 0)"; then
     break
   fi
-done < <(printf '%s\\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+done < <(printf '%s\n' "$roots" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
 [[ -n "$center" ]] || { echo "Could not locate visible Validate source bounds on the real AT-SPI tree" >&2; exit 1; }
 read -r click_x click_y <<< "$center"
 xdotool mousemove "$click_x" "$click_y" click 1
