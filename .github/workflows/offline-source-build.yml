@@ -8,7 +8,7 @@ on:
       source_run:
         description: Existing passing source-candidate Actions run
         required: false
-        default: '41504827328'
+        default: '41506288565'
 permissions:
   contents: read
   actions: read
@@ -24,7 +24,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: retivus-locked-source-audit
-          run-id: ${{ inputs.source_run || '41504827328' }}
+          run-id: ${{ inputs.source_run || '41506288565' }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ${{ runner.temp }}/source-artifact
       - name: Independently build archived, checksummed source without network or checkout
