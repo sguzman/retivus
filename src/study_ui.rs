@@ -98,6 +98,61 @@ fn live_status(ui: &mut egui::Ui, text: &str) {
 }
 
 impl StudyPanel {
+    /// Seed only development/CI's disposable learner profile. The returned
+    /// state is rendered by the real native learner UI, not a mock painter.
+    #[cfg(debug_assertions)]
+    pub(super) fn seed_visual_qa(&mut self, scene: &str) -> Result<(), String> {
+        if scene != "review" && scene != "conflict" {
+            return Err("Unknown visual QA scene".into());
+        }
+        let root =
+            std::env::temp_dir().join(format!("retivus-visual-qa-{}", std::process::id()));
+        fs::create_dir(&root).map_err(|error| format!("QA temp root: {error}"))?;
+        self.root = root.to_string_lossy().into_owned();
+        self.profile_id = "retivus-disposable-qa".into();
+        self.connect(true);
+        let backend = self
+            .backend
+            .as_mut()
+            .ok_or_else(|| format!("QA profile unavailable: {}", self.status))?;
+        backend.enable_fsrs().map_err(|error| error.to_string())?;
+        let deck = backend
+            .create_deck("Accessibility fixture")
+            .map_err(|error| error.to_string())?;
+        let note_id = backend
+            .add_basic_note(deck, "¿Qué tal? 日本語", "Hello / hola")
+            .map_err(|error| error.to_string())?;
+        self.deck_id = Some(deck);
+        self.refresh();
+        self.refresh_review();
+        if self.review.is_none() {
+            return Err("Disposable review card is not due".into());
+        }
+        match scene {
+            "review" => {
+                self.revealed = true;
+                self.status = "QA review fixture: answer revealed, grade controls ready.".into();
+            }
+            "conflict" => {
+                let row = self
+                    .notes
+                    .iter_mut()
+                    .find(|row| row.id == note_id)
+                    .ok_or("Disposable QA note missing from browse")?;
+                // Malformed identity is only in the in-memory displayed row:
+                // the Anki collection is never corrupted.
+                row.tags = vec!["retivus::source::not-hex".into()];
+                self.selected_note = Some(note_id);
+                self.front = "¿Qué tal? 日本語".into();
+                self.back = "Hello / hola".into();
+                self.browse_scope = BrowseScope::Conflicts;
+                self.status = "QA conflict fixture: malformed synthetic source identity.".into();
+            }
+            _ => unreachable!(),
+        }
+        Ok(())
+    }
+
     fn connect(&mut self, create: bool) {
         if self.backend.is_some() {
             self.status = "Close the active profile before switching profiles.".into();

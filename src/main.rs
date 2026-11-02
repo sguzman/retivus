@@ -557,6 +557,22 @@ fn main() -> eframe::Result<()> {
             brand::apply_to_context(&cc.egui_ctx);
             let mut app = Retivus::restore(cc.storage);
             app.krypton_font_loaded = typography::install_local_krypton(&cc.egui_ctx);
+            #[cfg(all(debug_assertions, feature = "anki-backend"))]
+            if std::env::var("RETIVUS_VISUAL_QA").ok().as_deref() == Some("isolated-2026") {
+                let scene = std::env::var("RETIVUS_QA_SCENE")
+                    .expect("RETIVUS_QA_SCENE must identify review or conflict");
+                app.study
+                    .seed_visual_qa(&scene)
+                    .expect("Disposable native visual QA fixture must initialize");
+                app.theme = if scene == "review" {
+                    Theme::Light
+                } else {
+                    Theme::Dark
+                };
+                app.high_contrast = true;
+                app.reduced_motion = true;
+                eprintln!("Retivus disposable visual QA scene initialized: {scene}");
+            }
             cc.egui_ctx.set_zoom_factor(app.ui_scale);
             Ok(Box::new(app))
         }),
