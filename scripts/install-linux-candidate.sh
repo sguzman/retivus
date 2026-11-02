@@ -1,16 +1,49 @@
 #!/usr/bin/env bash
+# Install/update Retivus-owned files without overwriting unmanaged content.
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 prefix="$HOME/.local"; if (( $# )); then prefix="$1"; fi
-[[ "$prefix" = /* && "$prefix" != "/" ]] || { echo "Require an absolute non-root prefix" >&2; exit 1; }
-bin="$prefix/bin/retivus"; marker="$prefix/share/retivus/installed-sha256"
-if [[ -e "$bin" && ! -f "$marker" ]]; then
-  echo "Refusing to overwrite unmanaged binary $bin" >&2; exit 1
+[[ "$prefix" = /* && "$prefix" != "/" && ! -L "$prefix" ]] || {
+  echo "Require an absolute non-root, non-symlink install prefix" >&2
+  exit 1
+}
+marker="$prefix/share/retivus/installed-sha256"
+manifest="$prefix/share/retivus/installed-files.sha256"
+if [[ -e "$manifest" || -L "$manifest" ]]; then
+  [[ -f "$manifest" && ! -L "$manifest" ]] || { echo "Invalid install manifest" >&2; exit 1; }
+  (cd "$prefix" && sha256sum --check --status "$manifest") || {
+    echo "Installed Retivus files changed; refusing to overwrite" >&2
+    exit 1
+  }
+elif [[ -e "$marker" || -L "$marker" ]]; then
+  # Previous candidate tracked only the binary; upgrade it conservatively.
+  [[ -f "$marker" && ! -L "$marker" && -f "$prefix/bin/retivus" ]] || exit 1
+  [[ "$(sha256sum "$prefix/bin/retivus" | cut -d' ' -f1)" == "$(cat "$marker")" ]] || {
+    echo "Existing Retivus binary has been modified" >&2; exit 1
+  }
+  cmp -s "$prefix/share/applications/retivus.desktop" "$here/share/applications/retivus.desktop" || {
+    echo "Existing desktop entry has been modified" >&2; exit 1
+  }
+  for rel in share/doc/retivus/LICENSE share/doc/retivus/ANKI-ATTRIBUTION.md share/doc/retivus/MIT-original.txt share/doc/retivus/README.md; do
+    [[ ! -e "$prefix/$rel" && ! -L "$prefix/$rel" ]] || {
+      echo "Refusing to overwrite unmanaged notice: $rel" >&2; exit 1
+    }
+  done
+else
+  for rel in bin/retivus share/applications/retivus.desktop share/doc/retivus/LICENSE share/doc/retivus/ANKI-ATTRIBUTION.md share/doc/retivus/MIT-original.txt share/doc/retivus/README.md; do
+    [[ ! -e "$prefix/$rel" && ! -L "$prefix/$rel" ]] || {
+      echo "Refusing to overwrite unmanaged file: $rel" >&2; exit 1
+    }
+  done
 fi
-mkdir -p "$prefix/bin" "$prefix/share/applications" "$prefix/share/retivus"
-tmp="$bin.$$"; trap 'rm -f "$tmp"' EXIT
+mkdir -p "$prefix/bin" "$prefix/share/applications" "$prefix/share/doc/retivus" "$prefix/share/retivus"
+tmp="$prefix/bin/retivus.$$"; trap 'rm -f "$tmp"' EXIT
 install -m755 "$here/bin/retivus" "$tmp"
-mv -f "$tmp" "$bin"
+mv -f "$tmp" "$prefix/bin/retivus"
 install -m644 "$here/share/applications/retivus.desktop" "$prefix/share/applications/retivus.desktop"
-sha256sum "$bin" | cut -d' ' -f1 > "$marker"
-echo "Installed Retivus to $prefix"
+for item in LICENSE ANKI-ATTRIBUTION.md MIT-original.txt README.md; do
+  install -m644 "$here/share/doc/retivus/$item" "$prefix/share/doc/retivus/$item"
+done
+(cd "$prefix" && sha256sum -- bin/retivus share/applications/retivus.desktop share/doc/retivus/LICENSE share/doc/retivus/ANKI-ATTRIBUTION.md share/doc/retivus/MIT-original.txt share/doc/retivus/README.md) > "$manifest"
+sha256sum "$prefix/bin/retivus" | cut -d' ' -f1 > "$marker"
+echo "Installed Retivus binary and license notices to $prefix"

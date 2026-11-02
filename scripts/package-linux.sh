@@ -33,7 +33,7 @@ cat > "$root/RELEASE-CANDIDATE.txt" <<'NOTICE'
 UNRELEASED TEST CANDIDATE — NOT AN ACCEPTED OR PUBLISHED RETIVUS RELEASE.
 Includes Retivus source and resolved Cargo.lock. Linked Anki rslib source is
 pinned by Cargo.toml; see upstream attribution. Corresponding-source/license
-review, actual Desktop interoperability and release compatibility remain open.
+review and release compatibility remain open. Official Anki Desktop GUI package\ninteroperability passed separately in CI; AnkiWeb sync remains unverified.
 No Anki user profiles or private study records are packaged.
 NOTICE
 stamp="$(git log -1 --format=%ct)"

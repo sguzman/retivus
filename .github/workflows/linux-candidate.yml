@@ -45,6 +45,12 @@ jobs:
           "$root/install.sh" "$prefix"
           test -x "$prefix/bin/retivus"
           test -f "$prefix/share/applications/retivus.desktop"
+          for item in LICENSE ANKI-ATTRIBUTION.md MIT-original.txt README.md; do
+            test -s "$prefix/share/doc/retivus/$item"
+          done
+          grep -q '136bd42bfbd356fc756b6d3e28cc77b02da11ea7' "$prefix/share/doc/retivus/ANKI-ATTRIBUTION.md"
+          test -s "$root/share/doc/retivus/source/Cargo.lock"
+          test -s "$prefix/share/retivus/installed-files.sha256"
           "$root/install.sh" "$prefix"
           xvfb-run -a bash -c '
             set -euo pipefail
@@ -62,6 +68,24 @@ jobs:
           "$root/uninstall.sh" "$prefix"
           test ! -e "$prefix/bin/retivus"
           test ! -e "$prefix/share/applications/retivus.desktop"
+          test ! -e "$prefix/share/doc/retivus/ANKI-ATTRIBUTION.md"
+          test ! -e "$prefix/share/retivus/installed-files.sha256"
+          outsider="$sandbox/outsider"
+          mkdir -p "$outsider/bin"
+          printf 'unmanaged executable\n' > "$outsider/bin/retivus"
+          if "$root/install.sh" "$outsider"; then
+            echo "Installer overwrote unmanaged binary" >&2
+            exit 1
+          fi
+          grep -q 'unmanaged executable' "$outsider/bin/retivus"
+          notice_owner="$sandbox/unmanaged-notice"
+          mkdir -p "$notice_owner/share/doc/retivus"
+          printf 'protected notice\n' > "$notice_owner/share/doc/retivus/LICENSE"
+          if "$root/install.sh" "$notice_owner"; then
+            echo "Installer overwrote unmanaged license" >&2
+            exit 1
+          fi
+          grep -q 'protected notice' "$notice_owner/share/doc/retivus/LICENSE"
       - name: Retain candidate and dependency lock
         if: always()
         uses: actions/upload-artifact@v4
