@@ -1,0 +1,35 @@
+name: Orca screen reader debug acceptance
+on:
+  push:
+    paths:
+      - .github/workflows/accessibility-orca.yml
+      - scripts/qa-orca.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  orca:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install Orca screen reader and virtual desktop
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0
+      - name: Build native AccessKit-enabled Retivus
+        run: cargo build --locked --bin retivus
+      - name: Exercise real Orca keyboard focus and speech dispatcher
+        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus"
+      - name: Retain screen reader diagnostic excerpt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-orca-debug-evidence
+          path: |
+            ${{ runner.temp }}/retivus-orca-speech.txt
+            ${{ runner.temp }}/retivus-orca-startup.log
+            ${{ runner.temp }}/retivus-orca-app.log
+          if-no-files-found: ignore
+          retention-days: 7

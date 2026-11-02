@@ -11,6 +11,7 @@ Retivus disables eframe default features to control its native build. Its explic
 | Contract | Test/evidence | Status |
 | --- | --- | --- |
 | AccessKit platform accessibility implementation compiled into native app | Explicit `eframe/accesskit`, [foundation CI 41370243289](https://github.com/sguzman/retivus/actions/runs/41370243289) | **Verified build, not screen-reader usability** |
+| Test-only Orca speech-debug and keyboard focus | [Official Orca CI](../.github/workflows/accessibility-orca.yml) checks real speech-dispatch activity and named controls without user data | **Pending CI; not audible usability acceptance** |
 | Real native Linux AT-SPI widget registration | [AT-SPI CI 41371103522](https://github.com/sguzman/retivus/actions/runs/41371103522) used an external client to discover `File` and `Validate source` among 23 accessible objects | **Verified native registration** |
 | Keyboard focus follows Tab and Shift+Tab | Native egui_kittest source-file focus and reversal test in src/main.rs | Verified in feature CI 41347374839 |
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
