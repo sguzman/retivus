@@ -729,6 +729,7 @@ impl StudyPanel {
                 ui.heading("Decks and notes");
                 ui.horizontal_wrapped(|ui| {
                     let previous_deck = self.deck_id;
+                    let active_deck_label = ui.label("Active deck");
                     egui::ComboBox::from_id_salt("retivus-active-deck")
                         .selected_text(self.decks.iter().find(|(id, _)| Some(*id) == self.deck_id)
                             .map_or("Select deck", |(_, name)| name.as_str()))
@@ -736,7 +737,9 @@ impl StudyPanel {
                             for (id, name) in &self.decks {
                                 ui.selectable_value(&mut self.deck_id, Some(*id), name);
                             }
-                        });
+                        })
+                        .response
+                        .labelled_by(active_deck_label.id);
                     if self.deck_id != previous_deck {
                         self.refresh_review();
                     }
@@ -768,7 +771,7 @@ impl StudyPanel {
                     ui.weak("Up to 50 matching notes; queries use Anki's own search parser.");
                 });
                 ui.horizontal_wrapped(|ui| {
-                    ui.label("Browse filter");
+                    let browse_label = ui.label("Browse filter");
                     egui::ComboBox::from_id_salt("retivus-browse-scope")
                         .selected_text(self.browse_scope.label())
                         .show_ui(ui, |ui| {
@@ -780,7 +783,9 @@ impl StudyPanel {
                             ] {
                                 ui.selectable_value(&mut self.browse_scope, scope, scope.label());
                             }
-                        });
+                        })
+                        .response
+                        .labelled_by(browse_label.id);
                     let matching = self
                         .notes
                         .iter()
@@ -1591,6 +1596,112 @@ mod tests {
         drop(harness);
         let reopened = AnkiBackend::open_managed_profile(root.path(), "qa").unwrap();
         assert_eq!(reopened.note_fields(note_id).unwrap(), ["mar", "sea"]);
+        assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
+        reopened.close().unwrap();
+    }
+
+    #[test]
+    fn populated_native_review_and_conflict_remain_accessible_across_zoom_and_themes() {
+        use egui_kittest::{kittest::Queryable as _, Harness};
+
+        let root = tempfile::tempdir().unwrap();
+        let mut harness = Harness::new_eframe(|_| crate::Retivus::default());
+        let (note_id, card_id) = {
+            let app = harness.state_mut();
+            app.study.root = root.path().to_string_lossy().into_owned();
+            app.study.profile_id = "populated-accessibility".into();
+            app.study.connect(true);
+            assert!(app.study.backend.is_some(), "{}", app.study.status);
+            let backend = app.study.backend.as_mut().unwrap();
+            backend.enable_fsrs().unwrap();
+            let deck = backend.create_deck("Accessible study").unwrap();
+            let note = backend.add_basic_note(deck, "生", "life").unwrap();
+            app.study.deck_id = Some(deck);
+            app.study.refresh();
+            app.study.refresh_review();
+            let card = app.study.review.as_ref().unwrap().card_id;
+            app.theme = crate::Theme::Light;
+            app.high_contrast = true;
+            app.reduced_motion = true;
+            (note, card)
+        };
+
+        // A real Anki queue and note are present, not only empty form controls.
+        harness.set_size(egui::vec2(1080.0, 800.0));
+        harness.set_pixels_per_point(1.0);
+        harness.run();
+        harness.get_by_label("Active deck").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Browse filter").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Show answer").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Show answer").click();
+        harness.run();
+        assert!(harness.state().study.revealed);
+        harness.get_by_label("Good").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Good").focus();
+        harness.run();
+        assert!(harness.get_by_label("Good").is_focused());
+        harness.key_press(egui::Key::Enter);
+        harness.run();
+        assert!(harness.state().study.status.contains("Recorded rating 3"));
+        assert_eq!(
+            harness
+                .state()
+                .study
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
+            1
+        );
+
+        // Surface a deliberately malformed source tag in the populated browse
+        // UI and make its conflict announcement visible under narrow scaling.
+        let conflict_label = {
+            let app = harness.state_mut();
+            app.theme = crate::Theme::Dark;
+            app.density = crate::Density::Compact;
+            app.study.notes[0].tags = vec!["retivus::source::not-hex".into()];
+            app.study.selected_note = Some(note_id);
+            app.study.front = "生".into();
+            app.study.back = "life".into();
+            app.study.browse_scope = BrowseScope::Conflicts;
+            let error = StudyPanel::source_provenance(&app.study.notes[0].tags).unwrap_err();
+            format!("Source identity conflict: {error}")
+        };
+        harness.set_size(egui::vec2(720.0, 650.0));
+        harness.set_pixels_per_point(1.5);
+        harness.run();
+        assert_eq!(
+            harness
+                .state()
+                .study
+                .notes
+                .iter()
+                .filter(|note| BrowseScope::Conflicts.matches(note))
+                .count(),
+            1
+        );
+        harness.get_by_label("Browse filter").scroll_to_me();
+        harness.run();
+        harness.get_by_label(&conflict_label).scroll_to_me();
+        harness.run();
+        harness.get_by_label("Front").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Front").focus();
+        harness.run();
+        assert!(harness.get_by_label("Front").is_focused());
+        drop(harness);
+
+        // Keyboard navigation and conflict rendering never mutate the actual
+        // note; the one intentional review grade remains durable on disk.
+        let reopened =
+            AnkiBackend::open_managed_profile(root.path(), "populated-accessibility").unwrap();
+        assert_eq!(reopened.note_fields(note_id).unwrap(), ["生", "life"]);
         assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
         reopened.close().unwrap();
     }
