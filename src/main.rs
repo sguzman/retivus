@@ -496,7 +496,12 @@ impl eframe::App for Retivus {
                 }
                 let import_status = ui.label(&self.import_status);
                 ui.ctx().accesskit_node_builder(import_status.id, |node| {
+                    // A live property on a generic label did not trigger a
+                    // spoken announcement in real Orca/AT-SPI testing. Expose
+                    // this changing result as a semantic, atomic status node.
+                    node.set_role(egui::accesskit::Role::Status);
                     node.set_live(egui::accesskit::Live::Polite);
+                    node.set_live_atomic();
                 });
                 if let Some(chosen) = self.selected_sense.clone() {
                     ui.group(|ui| {
