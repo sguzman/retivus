@@ -387,7 +387,9 @@ impl eframe::App for Retivus {
                     ctx.set_zoom_factor(self.ui_scale);
                 }
                 ui.checkbox(&mut self.high_contrast, "High contrast")
-                    .on_hover_text("Use high-contrast text and backgrounds in either color scheme.");
+                    .on_hover_text(
+                        "Use high-contrast text and backgrounds in either color scheme.",
+                    );
                 ui.checkbox(&mut self.reduced_motion, "Reduce motion")
                     .on_hover_text("Disable standard widget transitions in Retivus.");
             });
@@ -663,8 +665,16 @@ mod tests {
 
         let ctx = egui::Context::default();
         for (theme, fg, bg) in [
-            (egui::Theme::Dark, egui::Color32::WHITE, egui::Color32::BLACK),
-            (egui::Theme::Light, egui::Color32::BLACK, egui::Color32::WHITE),
+            (
+                egui::Theme::Dark,
+                egui::Color32::WHITE,
+                egui::Color32::BLACK,
+            ),
+            (
+                egui::Theme::Light,
+                egui::Color32::BLACK,
+                egui::Color32::WHITE,
+            ),
         ] {
             ctx.set_theme(if theme == egui::Theme::Dark {
                 egui::ThemePreference::Dark
@@ -680,11 +690,14 @@ mod tests {
             let reset = ctx.style();
             assert_eq!(reset.visuals.override_text_color, None);
             assert_eq!(reset.animation_time, egui::Style::default().animation_time);
-            assert_eq!(reset.visuals.panel_fill, if theme == egui::Theme::Dark {
-                egui::Visuals::dark().panel_fill
-            } else {
-                egui::Visuals::light().panel_fill
-            });
+            assert_eq!(
+                reset.visuals.panel_fill,
+                if theme == egui::Theme::Dark {
+                    egui::Visuals::dark().panel_fill
+                } else {
+                    egui::Visuals::light().panel_fill
+                }
+            );
         }
         eframe::Storage::set_string(&mut storage, HIGH_CONTRAST_STORAGE_KEY, "invalid".into());
         eframe::Storage::set_string(&mut storage, REDUCED_MOTION_STORAGE_KEY, "invalid".into());
