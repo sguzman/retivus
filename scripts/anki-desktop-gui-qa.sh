@@ -67,13 +67,15 @@ xdotool windowactivate --sync "$dialog" || true
 xdotool mousemove --window "$dialog" 220 50 click 1 || true
 xdotool key --clearmodifiers Home Return
 sleep 1
-capture desktop-apkg-selected
-xdotool key --clearmodifiers Return
-sleep 2
+# Selecting the first (.apkg) format opens the Qt Save As chooser already.
+# The filename field is selected; a second Return would save All Decks.apkg
+# to the runner working directory instead of our isolated acceptance path.
 capture desktop-save-chooser
 xdotool key --clearmodifiers ctrl+a
 xdotool type --clearmodifiers --delay 5 "$root/anki-desktop-reexport.apkg"
 xdotool key --clearmodifiers Return
+sleep 2
+capture desktop-export-complete
 for i in $(seq 1 50); do
   [[ -s "$root/anki-desktop-reexport.apkg" ]] && exit 0
   sleep 1
