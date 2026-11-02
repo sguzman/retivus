@@ -1,0 +1,54 @@
+name: Offline archived-source compilation
+on:
+  push:
+    paths:
+      - .github/workflows/offline-source-build.yml
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: Existing passing source-candidate Actions run
+        required: false
+        default: '41502323150'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compile-offline:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install source build dependencies
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq protobuf-compiler zstd
+      - name: Download previously audited source archive
+        uses: actions/download-artifact@v4
+        with:
+          name: retivus-locked-source-audit
+          run-id: ${{ inputs.source_run || '41502323150' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ${{ runner.temp }}/source-artifact
+      - name: Independently build archived, checksummed source without network or checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact="$RUNNER_TEMP/source-artifact"
+          archive="$(find "$artifact" -name 'retivus-source-*.tar.zst' -type f -print -quit)"
+          test -n "$archive"
+          (cd "$artifact" && sha256sum --check "$(basename "$archive").sha256")
+          expected_commit="$(basename "$archive" | sed -E 's/^retivus-source-([[:xdigit:]]{40})\.tar\.zst$/\1/')"
+          [[ "$expected_commit" =~ ^[a-f0-9]{40}$ ]] || exit 1
+          grep -Fx "Root commit: $expected_commit" "$artifact/SOURCE-AUDIT.txt"
+          grep -Fx 'Offline Cargo metadata: PASS' "$artifact/SOURCE-AUDIT.txt"
+          workspace="$(mktemp -d)"
+          trap 'rm -rf "$workspace"' EXIT
+          tar --zstd -xf "$archive" -C "$workspace"
+          test -s "$workspace/source/.cargo/config.toml"
+          test -s "$workspace/source/vendor/anki-0.0.0/Cargo.toml"
+          cd "$workspace/source"
+          export CARGO_HOME="$workspace/empty-cargo-home"
+          mkdir -p "$CARGO_HOME"
+          export CARGO_NET_OFFLINE=true
+          export PROTOC=/usr/bin/protoc
+          cargo metadata --offline --locked --features anki-backend --format-version 1 > /dev/null
+          cargo check --offline --locked --features anki-backend --bin retivus
+          echo "PASS: retivus source archive independently compiles offline, including pinned Anki backend."
