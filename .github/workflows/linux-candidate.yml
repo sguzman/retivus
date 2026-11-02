@@ -6,6 +6,7 @@ on:
       - scripts/package-linux.sh
       - scripts/install-linux-candidate.sh
       - scripts/uninstall-linux-candidate.sh
+      - src/main.rs
   workflow_dispatch:
 permissions:
   contents: read

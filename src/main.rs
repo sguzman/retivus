@@ -565,7 +565,14 @@ impl eframe::App for Retivus {
 fn main() -> eframe::Result<()> {
     eframe::run_native(
         "Retivus",
-        eframe::NativeOptions::default(),
+        eframe::NativeOptions {
+            // The initial eframe X11 viewport otherwise stays unmapped under
+            // clean minimal desktops until an unrelated MapNotify event.
+            // Reveal it explicitly so startup never depends on a compositor
+            // or an external window-mapping command.
+            viewport: egui::ViewportBuilder::default().with_visible(true),
+            ..Default::default()
+        },
         Box::new(|cc| {
             brand::apply_to_context(&cc.egui_ctx);
             let mut app = Retivus::restore(cc.storage);

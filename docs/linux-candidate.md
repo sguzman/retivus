@@ -13,3 +13,7 @@ After the release build uploads its candidate archive, CI downloads that artifac
 ## Runtime glibc baseline
 
 Build the Linux x86_64 candidate on the fixed `ubuntu-24.04` host rather than the rolling `ubuntu-latest` image: a prior archive linked against GLIBC_2.43 and failed to launch on Debian 13 even though it passed its same-host GUI test. A separate `ubuntu:24.04` runtime container now requires the packaged binary to launch on the older glibc baseline, without a Rust compiler. The portable-runtime check must pass before considering M7.2 complete; this still does not guarantee compatibility with older Linux systems or other architectures.
+
+## X11 initial viewport visibility
+
+An isolated Ubuntu 24.04 runtime showed an alive Retivus process with a fully created but **unmapped** initial X11 window. A diagnostic X11 `MapWindow` request caused the real egui UI to render, proving the problem was startup visibility rather than missing GLX or glibc compatibility. The native launch now explicitly requests a visible initial viewport; the release CI clean-container smoke must confirm mapping without external intervention before this gate can be accepted.
