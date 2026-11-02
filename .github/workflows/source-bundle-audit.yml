@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - scripts/audit-offline-source.sh
+      - scripts/audit-license-files.sh
       - .github/workflows/source-bundle-audit.yml
   workflow_dispatch:
   workflow_call:
@@ -19,7 +20,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify audit script shell syntax
-        run: bash -n scripts/audit-offline-source.sh
+        run: |
+          bash -n scripts/audit-offline-source.sh
+          bash -n scripts/audit-license-files.sh
       - name: Vendor all locked Cargo sources and verify offline dependency graph
         run: bash scripts/audit-offline-source.sh "$RUNNER_TEMP/retivus-source-audit"
       - name: Build checksummed source-distribution candidate
@@ -36,6 +39,8 @@ jobs:
           (cd "$root" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
           tar --zstd -tf "$archive" > "$root/archive-index.txt"
           grep -Fx 'source/Cargo.lock' "$root/archive-index.txt"
+          grep -Fx 'source/THIRD-PARTY-SOURCES.tsv' "$root/archive-index.txt"
+          grep -Fx 'source/LICENSE-FILE-AUDIT.tsv' "$root/archive-index.txt"
           grep -Fx 'source/.cargo/config.toml' "$root/archive-index.txt"
           grep -Fx 'source/vendor/anki-0.0.0/Cargo.toml' "$root/archive-index.txt"
           grep -Fx 'source/vendor/percent-encoding-iri-2.2.0/Cargo.toml' "$root/archive-index.txt"
@@ -49,6 +54,7 @@ jobs:
             ${{ runner.temp }}/retivus-source-audit/retivus-source-*.tar.zst
             ${{ runner.temp }}/retivus-source-audit/retivus-source-*.tar.zst.sha256
             ${{ runner.temp }}/retivus-source-audit/THIRD-PARTY-SOURCES.tsv
+            ${{ runner.temp }}/retivus-source-audit/LICENSE-FILE-AUDIT.tsv
             ${{ runner.temp }}/retivus-source-audit/SOURCE-AUDIT.txt
           if-no-files-found: error
           retention-days: 7
