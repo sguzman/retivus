@@ -235,3 +235,14 @@
 - ⏳ **No release acceptance claimed:** M4.5 authenticated AnkiWeb sync (2%), M6.4 full Wayland/Orca accessibility acceptance (3%), and M7 final licensing, release and handoff (8%) remain open. No tag or production release published.
 
 **Progress:** 87% → **87%**, **+0 percentage points** this continuation. The fixed roadmap awards no partial completion percentages for supporting CI work.
+
+
+## Release source and accessibility continuation — 2026-11-02 (87%, +0 pp)
+
+- ✅ **Binary and source pairing:** [combined release candidate 41502323150](https://github.com/sguzman/retivus/actions/runs/41502323150) passed all four jobs, including separate Ubuntu runtime installation and same-commit SHA256/Cargo.lock parity between the executable and fully vendored-source archives.
+- ✅ **True offline compilation:** [archived-source build 41506514829](https://github.com/sguzman/retivus/actions/runs/41506514829) checked the extracted archive without a source checkout, with a fresh Cargo home and offline mode, including the pinned Anki backend. The source audit includes the exact pinned Anki proto definitions, Fluent core/Qt templates, exact Gitlink revisions of the two translation submodules, and tracked Anki workspace version.
+- ✅ **License-file evidence inventory:** [source audit 41502322783](https://github.com/sguzman/retivus/actions/runs/41502322783) counted 603 vendored crates, of which 531 had recognized top-level license/notice evidence and 72 require parent/upstream/nested-file review. These are investigation targets, not confirmed legal violations. Full notices/source-distribution review is **not** certified.
+- ⏳ **M6.4 real Orca live speech:** Static Orca named-control acceptance passed previously; new keyboard-triggered changing-status speech acceptance has failed on generic and semantic status nodes. A named AT-SPI status-node fix and separate full-event/GUI diagnostic workflow are under investigation; automated dynamic speech is **not** verified. Physical Wayland/contrast/motion final checklist remains unfinished.
+- ⏳ **Milestone accounting unchanged:** M4.5 2%, M6.4 3%, M7.1–M7.4 8% still pending; M7.2 depends on M6. No tag or production release.
+
+**Progress: 87% → 87%, Δ +0 percentage points.** Passing CI subchecks does not award partial milestone weight.
