@@ -1,6 +1,6 @@
 # Anki Desktop GUI round-trip QA — M4.2
 
-**Status:** not accepted. This workflow creates a test fixture with Retivus, then requires a real human/GUI or independently automated Anki Desktop importer and exporter. A Retivus-only round-trip does **not** prove Desktop compatibility.
+**Status:** **accepted for M4.2**, via [official Desktop GUI CI 41368266062](https://github.com/sguzman/retivus/actions/runs/41368266062) and [inspected evidence artifact](https://github.com/sguzman/retivus/actions/runs/41368266062/artifacts/13108466264). This workflow uses official Anki Desktop's real GUI importer/exporter; a Retivus-only round-trip would not prove compatibility.
 
 ## Fixture contract
 
@@ -10,7 +10,7 @@ The reproducible offline fixture contains a dedicated deck, four notes with mult
 cargo run --features anki-backend --bin desktop-interop-fixture -- generate /absolute/empty/test-directory
 ```
 
-## Real Anki Desktop acceptance steps (still pending)
+## Real Anki Desktop acceptance steps (completed in isolated CI)
 
 1. Open an isolated disposable profile in the **official Anki Desktop GUI**. Do not use an ordinary study profile.
 2. Import `retivus-desktop-interop.apkg` using **File → Import**. Inspect the deck, four exact notes, five cards, Unicode fields, HTML bold markup and reverse-card note type.
@@ -21,6 +21,6 @@ cargo run --features anki-backend --bin desktop-interop-fixture -- generate /abs
 cargo run --features anki-backend --bin desktop-interop-fixture -- verify /absolute/path/from/anki-desktop.apkg
 ```
 
-5. Record the official Anki Desktop version, OS, date, screenshot evidence and the exact CLI verification result. Only then consider M4.2 acceptance.
+5. Record official Anki Desktop 26.09.3, Linux x86_64, 2026-11-02 UTC, [GUI screenshots](https://github.com/sguzman/retivus/actions/runs/41368266062/artifacts/13108466264) and CI output: `Verified Desktop-exported fixture: 4 notes, 5 cards, preserved fields/deck/template`. The automated GUI sequence passed; the exported archive was independently reimported and verified.
 
-A CI self-check runs `generate` followed by `verify` to ensure the fixture tool itself is correct. That self-check is **not** a replacement for steps 1–5. M4.5 AnkiWeb sync is separately scoped and is not demonstrated by local Desktop import/export.
+A separate CI self-check still runs `generate` followed by `verify` to ensure the fixture tool itself is correct; the actual Desktop import/reexport test above provides independent acceptance. The fixture has no private review history, so the GUI test does not independently demonstrate selective scheduling-history export. M4.5 AnkiWeb sync is separately scoped and is not demonstrated by local Desktop import/export.

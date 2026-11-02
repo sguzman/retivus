@@ -5,9 +5,10 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Verified real official Anki Desktop 26.09.3 GUI import and reexport of Retivus's multilingual four-note/five-card fixture; a **Desktop-produced** `.apkg` passed independent exact field, deck, note-type and count verification in [CI 41368266062](https://github.com/sguzman/retivus/actions/runs/41368266062). Authenticated AnkiWeb sync is still pending.
 - Introduced source-accompanied Linux release-candidate packaging and safe, checksum-guarded local installation; green isolated build, GUI, update and uninstall CI 41356859751. The exact generated Cargo.lock is pinned for future builds. No production release has been published.
 - Verified adversarial archive and profile privacy regression coverage in [Anki CI 41354009838](https://github.com/sguzman/retivus/actions/runs/41354009838); raw nested traversal components are rejected before ZIP path normalization. The feature fixture build also reuses the existing Cargo target directory to avoid duplicate compilation.
-- Verified independent AnkiDroid/third-party `.apkg` source SQLite note/card counts, rich cloze/HTML/CSS/media package parity, and copy-only offline Anki collection migration. Actual Anki Desktop GUI reexport and AnkiWeb sync are still pending.
+- Verified independent AnkiDroid/third-party `.apkg` source SQLite note/card counts, rich cloze/HTML/CSS/media package parity, and copy-only offline Anki collection migration. Authenticated AnkiWeb sync is still pending.
 - Added independently measured full Mexilex preview, catalog import and 1,000 indexed lookup benchmarks on the pinned 124,444-entry release; memory bounds passed [provider CI 41342157443](https://github.com/sguzman/retivus/actions/runs/41342157443).
 - Added `.apkg` preflight guards for traversal paths, unsafe filenames, archive symlinks and suspicious compression; malicious-path/compression and public-package regressions passed [Anki CI 41344339776](https://github.com/sguzman/retivus/actions/runs/41344339776).
 - Added explicit scheduling-history import and export toggles, both off by default; opt-in round-trip passed [Anki CI 41347374839](https://github.com/sguzman/retivus/actions/runs/41347374839). Four-way isolation and independent source-SQLite package baselines are pending.
@@ -16,7 +17,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - Verified source validation → exact sense selection → real native Anki card → grading → restart using actual egui pointer actions and keyboard focus, plus immutable active-profile identity for source isolation.
 - Verified native selected-deck scheduling, reveal, guarded grading, undo, due counts and review history across restart in [Anki CI 41329550912](https://github.com/sguzman/retivus/actions/runs/41329550912).
 - Verified opt-in managed source-catalog staging and exact selected-sense learner note creation, refusing forged meanings and unverified raw Mexilex imports.
-- Added managed-only `.apkg` import/export with media, template, tag and card round trips; pinned third-party AnkiDroid and MIT sample packages passed independent checks (Anki Desktop GUI interoperability still pending).
+- Added managed-only `.apkg` import/export with media, template, tag and card round trips; pinned third-party AnkiDroid and MIT sample packages passed independent checks (official Anki Desktop GUI package interchange verified separately).
 - Added cloze/HTML/CSS/SVG render parity tests across full `.apkg` export/import and reopen.
 - Added offline `.anki2` copy-only migration with schema-checking, source-byte preservation, active WAL refusal, and official upstream Anki Desktop fixture verification.
 - Verified native System/Light/Dark presentation, keyboard controls, X11 smoke and real Sway Wayland screenshots at 1080×800 and 720×650; broader accessibility QA remains separate.

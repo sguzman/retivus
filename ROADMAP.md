@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **80%** of 100% (previous verified checkpoint 77%, this continuation **+3 percentage points**). Source-independent public package counts, rich-card rendering round-trips, and guarded offline collection-copy migration are verified. Anki Desktop GUI reexport, authenticated AnkiWeb sync, remaining security and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
+**Verified progress:** **84%** of 100% (previous verified checkpoint 80%, this continuation **+4 percentage points**). Source-independent public package counts, rich-card parity, safe offline collection-copy migration, and official Anki Desktop GUI reexport are verified. Authenticated AnkiWeb sync, accessibility and remaining release acceptance are pending. Milestone weights distribute work across all eight milestones.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -12,7 +12,7 @@
 | 🔬 M1 Anki Rust backend feasibility and licensing gate | 12% | 12% | ✅ |
 | 🗃️ M2 Local collection engine and learner-safe core | 15% | 15% | ✅ |
 | 🌍 M3 Generic external-source provider engine | 14% | 14% | ✅ |
-| 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 11% | 🟡 |
+| 🃏 M4 Anki ecosystem round-trip compatibility | 17% | 15% | 🟡 |
 | 🎨 M5 Complete native egui study experience | 14% | 14% | ✅ |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 6% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
@@ -52,7 +52,7 @@
 ### 🃏 M4: Anki ecosystem round-trip compatibility (17% of project)
 
 - ✅ **M4.1 📥 Import .apkg notes/decks/templates/tags/media safely** — **4%**. Acceptance: Official representative shared decks open and counts compare. Depends on: M1.5,M2.1. **verified complete.**
-- ⏳ **M4.2 📤 Export .apkg with media and round-trip reimport** — **4%**. Acceptance: Anki desktop imports and reexports equivalent notes/cards. Depends on: M4.1. **pending.**
+- ✅ **M4.2 📤 Export .apkg with media and round-trip reimport** — **4%**. Acceptance: Anki desktop imports and reexports equivalent notes/cards. Depends on: M4.1. **verified complete.**
 - ✅ **M4.3 🧠 Preserve cloze, image/media, HTML card templates and CSS** — **4%**. Acceptance: Cloze and media rich fixture render parity passes. Depends on: M4.1. **verified complete.**
 - ✅ **M4.4 🔄 Safely open/migrate copy of real Anki collection** — **3%**. Acceptance: Copy-only migration, backup and version mismatch tests. Depends on: M2.3,M4.1. **verified complete.**
 - ⏳ **M4.5 🌐 AnkiWeb sync compatibility or explicit separately agreed post-v1 classification** — **2%**. Acceptance: Authenticated test sync with conflicts, media and credential safety OR approved scope decision. Depends on: M4.4. **pending.**
@@ -205,3 +205,11 @@
 - ✅ **M6.3 🛡️ (+3 pp):** [Anki feature CI 41354009838](https://github.com/sguzman/retivus/actions/runs/41354009838) passed 47 Anki-backed library tests and 24 native application tests, independent Desktop fixture self-verification, official collection-copy checks, third-party public package checks, and actual X11/Wayland launch. Adversarial regressions reject ZIP traversal (including nested `..` segments), Windows paths, malformed archives, suspicious compression and unsafe symlinks without altering existing learner notes; safe Unicode paths remain supported. Public export omits synthetic profile-local credential canaries, and the separately opted-in import/export scheduling-history combinations passed. This is concrete fixture coverage, not a universal security proof or an AnkiWeb credential/sync implementation.
 - 🟡 **CI environment:** [Rust foundation CI 41354009790](https://github.com/sguzman/retivus/actions/runs/41354009790) passed formatting, Clippy, provider tests and compilation, but the X11 window-smoke step did not find a visible window. Existing earlier foundation/X11 runs passed; enhanced diagnostics and a wider startup window are introduced for follow-up. This is not a source-test regression and earns no additional percentage.
 - ⏳ **Next:** M4.2 official Anki Desktop GUI import/reexport remains unverified; M4.5 authenticated AnkiWeb safety and the remaining M6/M7 release work remain open. Desktop fixture CI now reuses its existing Anki build target instead of recompiling in a second target directory.
+
+## Verified continuation checkpoint — 2026-11-01 (84%)
+
+**Progress: 80% → 84% (+4 percentage points).** M0: 8/8; M1: 12/12; M2: 15/15; M3: 14/14; **M4: 15/17**; M5: 14/14; M6: 6/12; M7: 0/8.
+
+- ✅ **M4.2 📤 (+4 pp):** [Official Anki Desktop GUI CI 41368266062](https://github.com/sguzman/retivus/actions/runs/41368266062) downloaded the checksum-pinned official Anki Desktop **26.09.3** Linux x86_64 release, launched an isolated disposable GUI profile in Xvfb, imported Retivus's own four-note/five-card `.apkg` using the actual official Import button, and exported through the official Desktop Export and Save dialogs to a fresh `.apkg` path. Desktop screenshots show four imported/exported notes and the dedicated deck's five new cards. The independent Retivus verification command then reimported the **Desktop-produced** archive and passed its exact four-note/five-card counts, multilingual/HTML field contents, deck name and two-template note-type checks. [Retained GUI evidence](https://github.com/sguzman/retivus/actions/runs/41368266062/artifacts/13108466264) was inspected, including the successful export screen. No ordinary user profile or AnkiWeb account was accessed. This does **not** prove authenticated AnkiWeb sync, Anki add-on parity, every Desktop release, or byte-identical package exports.
+- ✅ **Foundation:** [Rust CI 41368266039](https://github.com/sguzman/retivus/actions/runs/41368266039) passed the current code's formatting, Clippy, provider acceptance, build and X11 native smoke checks.
+- ⏳ **Next:** M4.5 authenticated AnkiWeb sync or separately approved post-v1 classification remains open; M6.1/M6.4 integration/accessibility and M7 final release gates remain separately pending. The verified source-accompanied Linux candidate is not a published release.

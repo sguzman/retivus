@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Active development; **77% of the weighted acceptance roadmap is verified**. M0–M3 and M5 are complete. M4 has verified real third-party/AnkiDroid package counts, cloze/media/CSS round-trips, and safe offline collection-copy migration, but **not** a full Anki Desktop GUI import/reexport or AnkiWeb sync. The native learner has verified keyboard/pointer workflows, FSRS reviews, source-conflict guards and X11/Wayland rendering. The 124,444-entry Mexilex release passed bounded-memory and indexed-search benchmarks. Security hardening, accessibility and release acceptance remain in progress. [ROADMAP.md](ROADMAP.md) is authoritative for verified completion.
+Active development; **84% of the weighted acceptance roadmap is verified**. M0–M3 and M5 are complete. M4 has verified third-party/AnkiDroid packages, cloze/media/CSS round-trips, safe offline collection-copy migration and a real official Anki Desktop GUI import/reexport, but **not authenticated AnkiWeb sync**. The native learner has verified keyboard/pointer workflows, FSRS reviews, source-conflict guards and X11/Wayland rendering. The 124,444-entry Mexilex release passed bounded-memory and indexed-search benchmarks. Security hardening, accessibility and release acceptance remain in progress. [ROADMAP.md](ROADMAP.md) is authoritative for verified completion.
 
 ## Architecture
 
@@ -18,7 +18,7 @@ External providers supply *content*; the trainer stores learner-owned decks, car
 
 The project identity is **berry-rose** (`oklch(69% 0.16 350)`, `#E26DA9`), with contrast-adjusted light and dark accents; see [branding](docs/branding.md). 
 
-See [ROADMAP.md](ROADMAP.md) for phases and measured completion, [docs/product.md](docs/product.md) for scope, [docs/providers.md](docs/providers.md) for the data contract, [Anki Desktop round-trip QA](docs/anki-desktop-qa.md) for the pending independent GUI acceptance, [AGENTS.md](AGENTS.md) for contributor protocol, and [CHANGELOG.md](CHANGELOG.md) for changes.
+See [ROADMAP.md](ROADMAP.md) for phases and measured completion, [docs/product.md](docs/product.md) for scope, [docs/providers.md](docs/providers.md) for the data contract, [Anki Desktop round-trip QA](docs/anki-desktop-qa.md) for the verified independent GUI acceptance, [AGENTS.md](AGENTS.md) for contributor protocol, and [CHANGELOG.md](CHANGELOG.md) for changes.
 
 ## Build (development)
 
