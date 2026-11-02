@@ -11,6 +11,7 @@ Retivus disables eframe default features to control its native build. Its explic
 | Contract | Test/evidence | Status |
 | --- | --- | --- |
 | AccessKit platform accessibility implementation compiled into release profile | Explicit `eframe/accesskit` Cargo feature, plus native build CI | **Pending CI; no assistive-technology QA claim** |
+| Real native Linux AT-SPI widget registration | [Isolated D-Bus/X11 workflow](../.github/workflows/accessibility-atspi.yml) verifies the `File` and `Validate source` accessible widget names on the live bus | **Pending native smoke CI** |
 | Keyboard focus follows Tab and Shift+Tab | Native egui_kittest source-file focus and reversal test in src/main.rs | Verified in feature CI 41347374839 |
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
 | Note edit/search controls respond to keyboard/mouse | Native editor and search end-to-end regression in src/study_ui.rs | Verified in feature CI 41347374839 |

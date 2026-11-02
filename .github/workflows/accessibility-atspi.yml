@@ -1,0 +1,35 @@
+name: Native Linux AT-SPI accessibility smoke
+on:
+  push:
+    paths:
+      - .github/workflows/accessibility-atspi.yml
+      - scripts/qa-atspi.sh
+      - Cargo.toml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  native-accessibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install native display and accessibility bus
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0
+      - name: Compile native Retivus with explicit AccessKit
+        run: cargo build --locked --bin retivus
+      - name: Require named widget tree on actual AT-SPI bus
+        run: dbus-run-session -- xvfb-run -a bash scripts/qa-atspi.sh "$PWD/target/debug/retivus"
+      - name: Archive app and window-manager logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-native-atspi-diagnostics
+          path: |
+            ${{ runner.temp }}/retivus-atspi-app.log
+            ${{ runner.temp }}/retivus-atspi-wm.log
+          if-no-files-found: ignore
+          retention-days: 7
