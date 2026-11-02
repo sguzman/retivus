@@ -11,7 +11,7 @@ Retivus disables eframe default features to control its native build. Its explic
 | Contract | Test/evidence | Status |
 | --- | --- | --- |
 | AccessKit platform accessibility implementation compiled into native app | Explicit `eframe/accesskit`, [foundation CI 41370243289](https://github.com/sguzman/retivus/actions/runs/41370243289) | **Verified build, not screen-reader usability** |
-| Test-only Orca speech-debug and keyboard focus | [Orca CI 41371580320](https://github.com/sguzman/retivus/actions/runs/41371580320) confirmed spoken `File` and `Validate source`; new regression also requires Appearance/Density/Format labels | **Core labels verified; enhanced combo-label CI pending** |
+| Test-only Orca speech-debug and keyboard focus | [Orca CI 41371981361](https://github.com/sguzman/retivus/actions/runs/41371981361) verified spoken `Appearance`, `Density`, `Format`, `File` and `Validate source` during real keyboard navigation | **Verified named-control announcements; not full assistive-technology usability** |
 | Real native Linux AT-SPI widget registration | [AT-SPI CI 41371103522](https://github.com/sguzman/retivus/actions/runs/41371103522) used an external client to discover `File` and `Validate source` among 23 accessible objects | **Verified native registration** |
 | Keyboard focus follows Tab and Shift+Tab | Native egui_kittest source-file focus and reversal test in src/main.rs | Verified in feature CI 41347374839 |
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
@@ -28,4 +28,4 @@ Retivus disables eframe default features to control its native build. Its explic
 - [ ] Verify screen-reader announcements of form labels, deck choices, status updates and due-card transitions with an actual screen reader
 - [ ] Validate high-contrast mode and any reduced-motion platform preference against user testing
 
-**Scope:** Native AT-SPI registration and keyboard/scale/theme focus regression have passed CI. **M6.4 remains pending (0/3 points)** because actual screen-reader announcements, populated real Wayland states, high contrast and reduced motion have not been independently accepted. AT-SPI tree visibility alone is not proof of usable screen-reader navigation or announcements.
+**Scope:** Native AT-SPI registration, keyboard/scale/theme focus regression, and **Orca announcements for the named core controls** have passed CI. **M6.4 remains pending (0/3 points)** because populated browse/reviewer/conflict states in a physical Wayland session, broader screen-reader status/due-card announcements, and high-contrast/reduced-motion preferences have not been independently accepted. The tests do not claim universal assistive-technology usability.

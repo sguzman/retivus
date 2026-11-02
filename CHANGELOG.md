@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Associated the Appearance, Density and Format combo boxes with their visible labels for native screen readers. [Orca CI 41371981361](https://github.com/sguzman/retivus/actions/runs/41371981361) verified actual speech-dispatch logs naming all three, plus File and Validate source; broad accessibility acceptance remains pending.
 - Enabled native Linux AccessKit accessibility in the feature-constrained eframe build, and verified actual AT-SPI bus exposure of 23 accessible nodes (including labelled `File` and `Validate source` controls) in [CI 41371103522](https://github.com/sguzman/retivus/actions/runs/41371103522). Keyboard activation after layout/theme scaling passed [foundation CI 41371103471](https://github.com/sguzman/retivus/actions/runs/41371103471). Broader screen-reader/accessibility acceptance remains open.
 - Verified real official Anki Desktop 26.09.3 GUI import and reexport of Retivus's multilingual four-note/five-card fixture; a **Desktop-produced** `.apkg` passed independent exact field, deck, note-type and count verification in [CI 41368266062](https://github.com/sguzman/retivus/actions/runs/41368266062). Authenticated AnkiWeb sync is still pending.
 - Introduced source-accompanied Linux release-candidate packaging and safe, checksum-guarded local installation; green isolated build, GUI, update and uninstall CI 41356859751. The exact generated Cargo.lock is pinned for future builds. No production release has been published.
