@@ -14,6 +14,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+      - name: Validate Orca QA script syntax
+        run: bash -n scripts/qa-orca.sh
       - name: Install Orca screen reader and virtual desktop
         run: |
           sudo apt-get update -qq

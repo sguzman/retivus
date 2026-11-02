@@ -496,10 +496,7 @@ impl eframe::App for Retivus {
                 }
                 let import_status = ui.label(&self.import_status);
                 ui.ctx().accesskit_node_builder(import_status.id, |node| {
-                    node.set_role(egui::accesskit::Role::Status);
-                    node.set_label(self.import_status.clone());
                     node.set_live(egui::accesskit::Live::Polite);
-                    node.set_live_atomic();
                 });
                 if let Some(chosen) = self.selected_sense.clone() {
                     ui.group(|ui| {

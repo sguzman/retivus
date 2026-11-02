@@ -101,10 +101,7 @@ fn inert_review_answer(html: &str) -> &str {
 fn live_status(ui: &mut egui::Ui, text: &str) {
     let response = ui.label(text);
     ui.ctx().accesskit_node_builder(response.id, |node| {
-        node.set_role(egui::accesskit::Role::Status);
-        node.set_label(text.to_owned());
         node.set_live(egui::accesskit::Live::Polite);
-        node.set_live_atomic();
     });
 }
 
