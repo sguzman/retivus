@@ -24,21 +24,18 @@ jobs:
           sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0 scrot
       - name: Build native AccessKit-enabled Retivus
         run: cargo build --locked --bin retivus
-      - name: Exercise Orca named controls (fresh GUI/DBus session)
-        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus" static
-      - name: Exercise Orca dynamic live status after button activation (independent session)
-        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus" dynamic
+      - name: Exercise named controls and changed-status speech in one session
+        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus"
       - name: Retain screen reader diagnostic excerpt
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: retivus-orca-debug-evidence
           path: |
-            ${{ runner.temp }}/retivus-orca-static-debug.log
-            ${{ runner.temp }}/retivus-orca-dynamic-debug.log
+            ${{ runner.temp }}/retivus-orca-debug.log
             ${{ runner.temp }}/retivus-orca-speech.txt
             ${{ runner.temp }}/retivus-orca-after-validation.png
-            ${{ runner.temp }}/retivus-orca-*-startup.log
-            ${{ runner.temp }}/retivus-orca-*-app.log
+            ${{ runner.temp }}/retivus-orca-startup.log
+            ${{ runner.temp }}/retivus-orca-app.log
           if-no-files-found: ignore
           retention-days: 2
