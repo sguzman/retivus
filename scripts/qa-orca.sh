@@ -83,9 +83,13 @@ xdotool mousemove --window "$window" 70 331 click 1
 sleep 6
 # Preserve the visual result to establish that the keyboard action did run.
 scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
-if ! tail -c "+$((announce_start + 1))" "$debug" \
-    | grep -F 'SPEECH DISPATCHER: Speaking' \
-    | grep -F 'Could not open source' >/dev/null; then
+# This fresh home contains exactly one validation activation. Require both
+# the emitted AT-SPI announcement AND its observed Orca speech-dispatch call.
+# Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
+# the previous offset assertion missed an event that the retained log proves
+# was spoken and incorrectly failed an otherwise successful run.
+if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
+   ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
   echo 'Orca did not speak updated validation status after direct button activation' >&2
   tail -c "+$((announce_start + 1))" "$debug" \
     | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
