@@ -71,7 +71,7 @@ for rel in bin/retivus share/applications/retivus.desktop share/doc/retivus/LICE
   install -m "$mode" -- "$source" "$stage/$rel"
 done
 mkdir -p "$prefix/bin" "$prefix/share/applications" "$prefix/share/doc/retivus" "$prefix/share/retivus"
-tmp="$prefix/bin/retivus.$"
+tmp="$(mktemp "$prefix/bin/.retivus.XXXXXXXXXX")"
 install -m755 "$stage/bin/retivus" "$tmp"
 mv -f "$tmp" "$prefix/bin/retivus"
 tmp=""

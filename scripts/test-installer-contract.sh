@@ -28,6 +28,8 @@ printf 'PERSONAL COLLECTION - MUST SURVIVE\n' > "$prefix/learner.sqlite3"
 sha="$(sha256sum "$prefix/learner.sqlite3" | cut -d' ' -f1)"
 "$bundle/install.sh" "$prefix"
 test -x "$prefix/bin/retivus"
+test -z "$(find "$prefix/bin" -maxdepth 1 -type f -name '.retivus.*' -print -quit)"
+test ! -e "$prefix/bin/retivus.$"
 for item in LICENSE ANKI-ATTRIBUTION.md MIT-original.txt README.md; do
   cmp "$bundle/share/doc/retivus/$item" "$prefix/share/doc/retivus/$item"
 done
