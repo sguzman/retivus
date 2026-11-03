@@ -395,7 +395,9 @@ impl eframe::App for Retivus {
                     ctx.set_zoom_factor(self.ui_scale);
                 }
                 ui.checkbox(&mut self.high_contrast, "High contrast")
-                    .on_hover_text("Use high-contrast text and backgrounds in either color scheme.");
+                    .on_hover_text(
+                        "Use high-contrast text and backgrounds in either color scheme.",
+                    );
                 ui.checkbox(&mut self.reduced_motion, "Reduce motion")
                     .on_hover_text("Disable standard widget transitions in Retivus.");
             });
@@ -864,8 +866,7 @@ mod tests {
             harness.run();
 
             for label in ["High contrast", "Reduce motion"] {
-                let widget =
-                    harness.get_by_role_and_label(egui::accesskit::Role::CheckBox, label);
+                let widget = harness.get_by_role_and_label(egui::accesskit::Role::CheckBox, label);
                 let rect = widget.rect();
                 assert!(
                     rect.min.x >= -1.0
