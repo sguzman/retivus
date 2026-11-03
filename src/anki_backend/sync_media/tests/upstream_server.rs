@@ -49,16 +49,19 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
     let sender_backup = root.path().join("sender-before-real-server.zip");
 
     runtime
-        .block_on(tokio::time::timeout(
-            Duration::from_secs(40),
-            sender.sync_ankiweb_media_with_client(
+        .block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(40),
+                sender.sync_ankiweb_media_with_client(
                 username,
                 password,
                 &sender_backup,
                 client.clone(),
                 Some(endpoint.clone()),
-            ),
-        ))
+                ),
+            )
+            .await
+        })
         .expect("upstream upload timed out")
         .expect("upstream upload failed");
     assert!(sender_backup.is_file());
@@ -79,22 +82,29 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
     let receiver_before = receiver.collection_stats().unwrap();
     let receiver_backup = root.path().join("receiver-before-real-server.zip");
     runtime
-        .block_on(tokio::time::timeout(
-            Duration::from_secs(40),
-            receiver.sync_ankiweb_media_with_client(
+        .block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(40),
+                receiver.sync_ankiweb_media_with_client(
                 username,
                 password,
                 &receiver_backup,
                 client,
                 Some(endpoint),
-            ),
-        ))
+                ),
+            )
+            .await
+        })
         .expect("upstream download timed out")
         .expect("upstream download failed");
     assert!(receiver_backup.is_file());
     assert_eq!(receiver.collection_stats().unwrap(), receiver_before);
     assert_eq!(
-        std::fs::read(root.path().join("receiver/collection.media/transferred.txt")).unwrap(),
+        std::fs::read(
+            root.path()
+                .join("receiver/collection.media/transferred.txt")
+        )
+        .unwrap(),
         b"real upstream server media"
     );
     let receiver_index =
