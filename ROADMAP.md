@@ -313,3 +313,12 @@
 - ⏳ **Acceptance boundary unchanged:** M4.5 (2%) needs authenticated AnkiWeb conflict/media/credential safety and real remote round trips or an expressly approved post-v1 classification. M6.4 (3%) requires real physical Wayland/Orca dynamic speech. M7 (8%) remains legally and release gated. Recovery ZIPs are private, exclude media sync index, and are not a substitute for full sync validation.
 
 **Whole-project progress: 87% → 87%; Δ +0 percentage points.** M4 15/17, M6 9/12, M7 0/8.
+
+
+## 2026-11-03 media-tree consistency continuation (87%, Δ +0 pp)
+
+- 🟡 **M4.5 offline safety follow-up, not sync acceptance:** [`622d451`](https://github.com/sguzman/retivus/commit/622d451e48cb103dad236e07e51a558ec10fe524) now snapshots raw media metadata before preparing the recovery exports and compares the whole tree before publishing the ZIP. The guard detects additions, removals, renames, changed file size/mtime, and Unix inode/change-time differences; it still cannot promise a transactionally atomic snapshot against all concurrent media writers. The regression covers additions/removals/renames and rejection of non-UTF8 media directory names. The prior symlink/special-file refusal remains.
+- ⏳ **Verification is pending for this revision:** Initial [`a96433f`](https://github.com/sguzman/retivus/commit/a96433f1a2c63b2cfba99af9544596aa5babbb62) foundation CI failed only the rustfmt gate; [`a4b0817`](https://github.com/sguzman/retivus/commit/a4b0817648de5f7a1229224f068de2d79870f135) fixed that gate. On `622d451`, [foundation 41690950953](https://github.com/sguzman/retivus/actions/runs/41690950953), [full end-to-end 41690950986](https://github.com/sguzman/retivus/actions/runs/41690950986), [Anki backend 41690951107](https://github.com/sguzman/retivus/actions/runs/41690951107), and [Linux candidate 41690951466](https://github.com/sguzman/retivus/actions/runs/41690951466) had not finished at this checkpoint. Never infer successful results from a queued or running check.
+- ⏳ **No milestone change:** M4.5 still requires real authenticated AnkiWeb conflict/media/credential safety or owner-approved post-v1 classification (2%); M6.4 requires real screen-reader/physical Wayland acceptance (3%); M7 remains final legal and production-release gated (8%). No account accessed, release published, or tag created.
+
+**Verified overall: 87% → 87%; Δ +0 percentage points.**
