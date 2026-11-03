@@ -53,11 +53,11 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
             tokio::time::timeout(
                 Duration::from_secs(40),
                 sender.sync_ankiweb_media_with_client(
-                username,
-                password,
-                &sender_backup,
-                client.clone(),
-                Some(endpoint.clone()),
+                    username,
+                    password,
+                    &sender_backup,
+                    client.clone(),
+                    Some(endpoint.clone()),
                 ),
             )
             .await
@@ -86,11 +86,11 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
             tokio::time::timeout(
                 Duration::from_secs(40),
                 receiver.sync_ankiweb_media_with_client(
-                username,
-                password,
-                &receiver_backup,
-                client,
-                Some(endpoint),
+                    username,
+                    password,
+                    &receiver_backup,
+                    client,
+                    Some(endpoint),
                 ),
             )
             .await
