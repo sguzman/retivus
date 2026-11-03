@@ -15,11 +15,11 @@ use zip::write::SimpleFileOptions;
 
 const BUNDLE_NOTE: &str = "RETIVUS PRE-SYNC RECOVERY BUNDLE\n\
 Contains a consistent SQLite collection snapshot, an Anki export with review\n\
-history and referenced media, and independently copied raw media files.\n\
+history and referenced media, independently copied raw media files, and\n\
+an existing media-sync database snapshot when one is present.\n\
 Contains PRIVATE study history and possibly PRIVATE media. Do not share.\n\
-This is NOT proof of AnkiWeb compatibility or a complete media-sync-state\n\
-backup; the media sync index is not included. Never overwrite a learner\n\
-profile when recovering. Concurrent media writes can still produce an\n\
+This is NOT proof of AnkiWeb compatibility or transactionally atomic\n\
+collection/media sync state. Never overwrite a learner profile when recovering. Concurrent media writes can still produce an\n\
 inconsistent snapshot; close other media writers before taking a backup.\n";
 
 impl AnkiBackend {
@@ -39,7 +39,7 @@ impl AnkiBackend {
             .clone();
         check_regular(&managed, true)?;
         check_regular(&managed.join("collection.anki2"), false)?;
-        let (media, _) = check_managed_media(&managed)?;
+        let (media, media_database) = check_managed_media(&managed)?;
         // Refuse symlinked/special media recursively BEFORE asking upstream
         // Anki to produce the history-preserving package.
         let media_before = snapshot_media_tree(&media, &media)?;
@@ -73,6 +73,11 @@ impl AnkiBackend {
         // .apkg export deliberately omits personal review records.
         self.export_apkg_to_with_scheduling(&apkg, true)?;
         verify_embedded_anki_package(&apkg)?;
+        let saved_media_database = staging.path().join("collection.mdb");
+        // Snapshot a live WAL-backed index using SQLite, never a raw file copy.
+        if fs::symlink_metadata(&media_database).is_ok() {
+            snapshot_media_database(&media_database, &saved_media_database)?;
+        }
 
         let mut output_file = NamedTempFile::new_in(&parent)?;
         {
@@ -80,6 +85,9 @@ impl AnkiBackend {
             write_text(&mut zip, "RECOVERY-README.txt", BUNDLE_NOTE)?;
             copy_file(&mut zip, "collection.anki2", &database)?;
             copy_file(&mut zip, "study-with-history.apkg", &apkg)?;
+            if saved_media_database.exists() {
+                copy_file(&mut zip, "collection.mdb", &saved_media_database)?;
+            }
             if fs::symlink_metadata(&media).is_ok() {
                 append_media(&mut zip, &media, &media)?;
             }
@@ -208,6 +216,9 @@ impl AnkiBackend {
         }
 
         verify_anki_staged_copy(&sqlite)?;
+        if names.contains("collection.mdb") {
+            verify_media_database(&staged.path().join("collection.mdb"))?;
+        }
         verify_embedded_anki_package(&exported)?;
         fs::remove_file(&exported)?;
         File::open(staged.path())?.sync_all()?;
@@ -255,6 +266,48 @@ fn verify_embedded_anki_package(path: &Path) -> BackendResult<()> {
     if !has_collection {
         return Err("Anki history package has no collection member".into());
     }
+    Ok(())
+}
+
+/// Snapshot live WAL-backed media indices without copying incomplete SQLite files.
+fn snapshot_media_database(source: &Path, destination: &Path) -> BackendResult<()> {
+    check_regular(source, false)?;
+    if fs::symlink_metadata(destination).is_ok() {
+        return Err("refusing to overwrite staged media database snapshot".into());
+    }
+    let connection = rusqlite::Connection::open_with_flags(
+        source,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    connection.execute(
+        "VACUUM INTO ?1",
+        [destination
+            .to_str()
+            .ok_or("staged media database path is not UTF-8")?],
+    )?;
+    drop(connection);
+    verify_media_database(destination)?;
+    File::open(destination)?.sync_all()?;
+    Ok(())
+}
+
+/// A corrupt media index must never be published in a recovered profile.
+fn verify_media_database(path: &Path) -> BackendResult<()> {
+    check_regular(path, false)?;
+    let connection = rusqlite::Connection::open_with_flags(
+        path,
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )?;
+    let integrity: String =
+        connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    if integrity != "ok" {
+        return Err("media sync index failed SQLite integrity check".into());
+    }
+    let _: (i64, i64) =
+        connection.query_row("SELECT dirMod, lastUsn FROM meta", [], |row| {
+            Ok((row.get(0)?, row.get(1)?))
+        })?;
+    let _: i64 = connection.query_row("SELECT count(*) FROM media", [], |row| row.get(0))?;
     Ok(())
 }
 
@@ -370,7 +423,7 @@ fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String
 fn valid_recovery_member_name(name: &str) -> bool {
     if matches!(
         name,
-        "RECOVERY-README.txt" | "collection.anki2" | "study-with-history.apkg"
+        "RECOVERY-README.txt" | "collection.anki2" | "collection.mdb" | "study-with-history.apkg"
     ) {
         return true;
     }
@@ -610,6 +663,87 @@ mod tests {
         recovered.close().unwrap();
         let reopened = AnkiBackend::open_managed_profile(dir.path(), "recovered").unwrap();
         assert_eq!(reopened.collection_stats().unwrap(), expected);
+    }
+
+    #[test]
+    fn recovery_bundle_preserves_media_sync_index_and_registered_media() {
+        let dir = tempdir().unwrap();
+        let mut profile = AnkiBackend::create_managed_profile(dir.path(), "source").unwrap();
+        let media = profile.collection.media().unwrap();
+        media.add_file("registered.png", b"registered synthetic media").unwrap();
+        drop(media);
+        let original_index = dir.path().join("source/collection.mdb");
+        verify_media_database(&original_index).unwrap();
+        let expected_count: i64 = rusqlite::Connection::open(&original_index)
+            .unwrap()
+            .query_row("SELECT count(*) FROM media", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(expected_count, 1);
+
+        let archive = dir.path().join("media-index-recovery.zip");
+        profile.create_pre_sync_recovery_bundle(&archive).unwrap();
+        let mut zip = zip::ZipArchive::new(File::open(&archive).unwrap()).unwrap();
+        let mut bytes = Vec::new();
+        zip.by_name("collection.mdb")
+            .unwrap()
+            .read_to_end(&mut bytes)
+            .unwrap();
+        assert!(bytes.starts_with(b"SQLite format 3\0"));
+        drop(zip);
+
+        let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            dir.path(),
+            "restored",
+            &archive,
+        )
+        .unwrap();
+        let recovered_index = dir.path().join("restored/collection.mdb");
+        verify_media_database(&recovered_index).unwrap();
+        let restored_count: i64 = rusqlite::Connection::open(&recovered_index)
+            .unwrap()
+            .query_row("SELECT count(*) FROM media", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(restored_count, expected_count);
+        assert_eq!(
+            fs::read(dir.path().join("restored/collection.media/registered.png")).unwrap(),
+            b"registered synthetic media"
+        );
+        restored.close().unwrap();
+    }
+
+    #[test]
+    fn corrupt_media_sync_index_rejected_before_profile_publication() {
+        use std::io::Write;
+        let dir = tempdir().unwrap();
+        let mut profile = AnkiBackend::create_managed_profile(dir.path(), "source").unwrap();
+        let media = profile.collection.media().unwrap();
+        media.add_file("safe.txt", b"evidence").unwrap();
+        drop(media);
+        let original = dir.path().join("valid-index.zip");
+        profile.create_pre_sync_recovery_bundle(&original).unwrap();
+        let altered = dir.path().join("corrupted-index.zip");
+        let mut reader = zip::ZipArchive::new(File::open(&original).unwrap()).unwrap();
+        let mut writer = zip::ZipWriter::new(File::create(&altered).unwrap());
+        for index in 0..reader.len() {
+            let mut member = reader.by_index(index).unwrap();
+            let name = member.name().unwrap().to_string();
+            writer
+                .start_file(&name, SimpleFileOptions::default())
+                .unwrap();
+            if name == "collection.mdb" {
+                writer.write_all(b"invalid media sync sqlite database").unwrap();
+            } else {
+                io::copy(&mut member, &mut writer).unwrap();
+            }
+        }
+        writer.finish().unwrap();
+        assert!(AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            dir.path(),
+            "must-not-exist",
+            &altered,
+        )
+        .is_err());
+        assert!(!dir.path().join("must-not-exist").exists());
     }
 
     #[test]
