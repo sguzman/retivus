@@ -19,6 +19,8 @@ use tempfile::{Builder, NamedTempFile};
 mod sync_preflight;
 mod sync_safety;
 
+pub use sync_preflight::{RemoteSyncNeed, RemoteSyncPreflight};
+
 type BackendResult<T> = Result<T, Box<dyn Error>>;
 
 /// Bounded, read-only note listing for the native learner browser.

@@ -83,7 +83,6 @@ impl AnkiBackend {
         check_managed_media(managed)?;
         validate_temporary_host_key(temporary_host_key)?;
 
-        let local = self.collection.sync_meta()?;
         let client = reqwest::Client::builder()
             .redirect(reqwest::redirect::Policy::none())
             .https_only(true)
@@ -95,6 +94,15 @@ impl AnkiBackend {
             endpoint: None,
             io_timeout_secs: Some(30),
         };
+        self.query_remote_status_with_auth(auth, client).await
+    }
+
+    async fn query_remote_status_with_auth(
+        &mut self,
+        auth: SyncAuth,
+        client: reqwest::Client,
+    ) -> BackendResult<RemoteSyncPreflight> {
+        let local = self.collection.sync_meta()?;
         let mut upstream = HttpSyncClient::new(auth, client);
         let status = online_sync_status_check(local, &mut upstream).await?;
         Ok(status.into())
@@ -145,6 +153,86 @@ mod tests {
         }
         assert!(validate_temporary_host_key(&"a".repeat(1025)).is_err());
         assert!(validate_temporary_host_key("temporary-host-key").is_ok());
+    }
+
+    #[test]
+    fn synthetic_remote_status_is_read_only_and_preserves_local_study_data() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "local").unwrap();
+        let deck = backend.create_deck("No destructive sync").unwrap();
+        backend.add_basic_note(deck, "pregunta", "answer").unwrap();
+        let before = backend.collection_stats().unwrap();
+
+        // The response uses Anki's own sync-meta serialization and wire
+        // compression. It never connects to AnkiWeb or a user account.
+        let json = serde_json::to_vec(&backend.collection.sync_meta().unwrap()).unwrap();
+        let compressed = zstd::stream::encode_all(json.as_slice(), 1).unwrap();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+            let mut request = Vec::new();
+            let mut buf = [0_u8; 4096];
+            loop {
+                let size = stream.read(&mut buf).unwrap();
+                assert!(size > 0, "incomplete synthetic status request");
+                request.extend_from_slice(&buf[..size]);
+                if let Some(header_end) = request.windows(4).position(|b| b == b"\r\n\r\n") {
+                    let header = String::from_utf8_lossy(&request[..header_end]);
+                    let body = &request[header_end + 4..];
+                    if header.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+                        if body.windows(5).any(|b| b == b"0\r\n\r\n") {
+                            break;
+                        }
+                    } else if let Some(len) = header.lines().find_map(|line| {
+                        line.to_ascii_lowercase()
+                            .strip_prefix("content-length: ")
+                            .and_then(|value| value.trim().parse::<usize>().ok())
+                    }) {
+                        if body.len() >= len {
+                            break;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                assert!(request.len() < 1024 * 1024, "oversized status request");
+            }
+            assert!(
+                String::from_utf8_lossy(&request).starts_with("POST /sync/meta "),
+                "only the metadata endpoint may be called"
+            );
+            let headers = format!(
+                "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nanki-original-size: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                json.len(),
+                compressed.len()
+            );
+            stream.write_all(headers.as_bytes()).unwrap();
+            stream.write_all(&compressed).unwrap();
+            stream.flush().unwrap();
+        });
+
+        let auth = SyncAuth {
+            hkey: "synthetic-test-key".into(),
+            endpoint: Some(reqwest::Url::parse(&endpoint).unwrap()),
+            io_timeout_secs: Some(10),
+        };
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let result = runtime
+            .block_on(backend.query_remote_status_with_auth(auth, client))
+            .unwrap();
+        server.join().unwrap();
+        assert_eq!(result.required, RemoteSyncNeed::NoChanges);
+        assert_eq!(backend.collection_stats().unwrap(), before);
     }
 
     #[test]
