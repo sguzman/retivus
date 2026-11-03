@@ -239,7 +239,17 @@ while IFS=$'\t' read -r name version license status notice; do
         echo "htmlescape source differs from pinned upstream commit: $file" >&2; exit 1;
       }
     done
-    evidence=SOURCE_MATCHED_ONLY:1699b539179798e705ad8464128492a0a0092876
+    # Original upstream has no LICENSE, but Debian's independently reviewed
+    # 0.3.1+dfsg-1 copyright record identifies Viktor Dahl, license choices,
+    # and the complete MIT alternative. This is assembled attribution, NOT
+    # an upstream LICENSE or legal clearance for Retivus.
+    independent_notice="$out/source/LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md"
+    test -s "$independent_notice"
+    test "$(git hash-object "$independent_notice")" = "d2473f58cc2ba68fb8b324280bc471d98a506692" || {
+      echo "Independent htmlescape attribution changed; re-review provenance" >&2; exit 1;
+    }
+    review=DEBIAN_PACKAGING_NOTICE_PRESENT
+    evidence="LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md@debian-rust-htmlescape-0.3.1+dfsg-1,source-matched:1699b539179798e705ad8464128492a0a0092876
   fi
   # Validate exact published crate VCS commits before mapping upstream notices.
   key="$name/$version"

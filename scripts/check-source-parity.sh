@@ -40,6 +40,7 @@ cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" sour
 cmp "$sources/LINUX-TARGET-DEPENDENCIES.tsv" <(tar --zstd -xOf "$source_archive" source/LINUX-TARGET-DEPENDENCIES.tsv)
 cmp "$sources/LINUX-TARGET-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/LINUX-TARGET-NOTICE-REVIEW.tsv)
 cmp "$binary_root/share/doc/retivus/source/docs/release-notice-exceptions.md" <(tar --zstd -xOf "$source_archive" source/docs/release-notice-exceptions.md)
+cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md")
 for notice in LICENSE-MIT LICENSE-APACHE; do
   cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/intl_pluralrules-7.0.2/$notice" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/intl_pluralrules-7.0.2/$notice")
 done
