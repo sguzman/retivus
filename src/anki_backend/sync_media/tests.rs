@@ -1,5 +1,6 @@
 mod conflicts;
 mod deletions;
+mod upstream_server;
 
 use super::*;
 use tempfile::tempdir;
