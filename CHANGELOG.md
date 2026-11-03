@@ -8,6 +8,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - A deterministic regression with two independently edited notes sharing one whole-second modification timestamp confirms divergent client content even after successful upstream normal-sync responses. Independent private recovery ZIPs restore both edits; automatic conflict detection/reconciliation and production AnkiWeb acceptance remain open.
 
 ### Added
+- Added a bounded, read-only pre-network guard that rejects fresh unsynced note edits inside Anki's two-second timestamp collision window. This is a local risk reduction and does not resolve remote equal-timestamp divergence.
 - Added an independent, fail-closed same-second collection conflict-risk acknowledgement for the backend-only live sync entry point; refusing either risk acknowledgement or remote-write permission prevents backup/login/network. Does not resolve upstream divergence.
 - Characterized and preserved equal-timestamp collection note conflicts in a disposable real-Anki-server regression: both clients can report successful sync while remaining divergent; both original edits restore from private pre-sync archives. Does not establish production conflict safety.
 - Added shared disposable upstream Anki Rust sync-server fixtures and tests proving full-sync-direction refusal, normal two-client note transfer, and distinct-second same-note conflict convergence with independent private recovery archives. No real AnkiWeb account was accessed.

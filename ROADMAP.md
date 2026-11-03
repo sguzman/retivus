@@ -421,3 +421,11 @@
 - ⚠️ **Not a conflict fix:** Acknowledgement is not upstream tie-breaking, production server acceptance, or remote rollback. Same-second divergence is still a blocker for M4.5; physical Wayland/Orca acceptance and release/legal signoff also remain pending. No personal account accessed and no release/tag created.
 
 **Verified overall: 87% → 87%; Δ +0 percentage points.**
+
+## 2026-11-03 — conservative recent-pending-note sync preflight (87%, Δ +0 pp)
+
+- 🛑 **Pre-network collision-window mitigation:** The backend-only public AnkiWeb collection-sync entry point checks the active managed Anki collection for unsynced (`usn=-1`) notes whose whole-second modification time is within two seconds of the current clock. It refuses to start before creating a recovery ZIP, attempting login or making HTTP requests. A bounded SQL `EXISTS` query avoids loading learner records. Risk acknowledgement and remote-write permission remain independent requirements.
+- 🧪 **Deterministic verification:** Boundary checks exercise modification-second +0/+1/+2 rejection and +3 acceptance, clean-note pass-through, an empty collection, and end-to-end entry-point rejection preserving an unmodified local private note. The prior disposable-server collection/media success and equal-timestamp divergence regressions remain required.
+- ⚠️ **Known limitation:** This only reduces immediate same-device timestamp collisions. An already existing equal-second conflict on another device can remain divergent regardless of how much local time passes; neither this preflight nor explicit risk consent establishes global convergence or live AnkiWeb acceptance. M4.5 stays open.
+
+**Overall verified completion: 87% → 87%; Δ +0 percentage points.**

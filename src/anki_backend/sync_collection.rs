@@ -12,6 +12,8 @@ use anki::sync::collection::normal::SyncActionRequired;
 use anki::sync::login::SyncAuth;
 use std::path::Path;
 
+mod recent_edits;
+
 /// Separate decision required because the pinned Anki normal-sync protocol
 /// may complete with divergent edits that have an identical note timestamp.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -63,6 +65,9 @@ impl AnkiBackend {
     /// The private recovery ZIP is a local fallback, not remote rollback.
     /// Separate acknowledgement of same-second divergence is mandatory;
     /// declining either permission stops before backup, login or network.
+    /// Recent, unsynced local note edits also fail closed until their coarse
+    /// modification timestamps age past the short collision window. This is
+    /// a best-effort local safeguard, not global conflict detection.
     pub async fn sync_ankiweb_collection_with_recovery(
         &mut self,
         username: &str,
@@ -74,6 +79,10 @@ impl AnkiBackend {
         self.validate_sync_profile()?;
         validate_login_input(username, password)?;
         ensure_collection_sync_approval(approve_remote_changes, conflict_risk)?;
+        // Best-effort additional guard: whole-second Anki note timestamps
+        // cannot reliably distinguish two pending edits made at the same time.
+        // This does NOT detect old simultaneous edits on another client.
+        recent_edits::refuse_fresh_pending_notes(self)?;
         let client = new_ankiweb_http_client()?;
         self.sync_ankiweb_collection_with_client(username, password, recovery_zip, client, None)
             .await
