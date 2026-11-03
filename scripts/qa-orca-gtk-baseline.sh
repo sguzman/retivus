@@ -26,9 +26,9 @@ cleanup() {
 }
 trap cleanup EXIT
 openbox > "$wm_log" 2>&1 & wm=$!
-orca --disable=braille --enable=speech --debug-file="$log" > "$reader_log" 2>&1 & reader=$!
-sleep 3
-kill -0 "$reader" 2>/dev/null || { echo 'Independent Orca reader exited' >&2; exit 1; }
+# In the first controlled run the dialog existed, but Orca reported it had
+# no active-window state. Start the GTK window first, activate it, and only
+# then begin a fresh reader session. Keep the speech assertion unchanged.
 zenity --question --title='Orca GTK reference' \
   --text='Independent screen reader check' \
   --ok-label='Reference OK' --cancel-label='Reference Cancel' > "$gui_log" 2>&1 & gui=$!
@@ -40,6 +40,11 @@ for attempt in $(seq 1 60); do
   sleep 0.5
 done
 [[ -n "$window" ]] || { echo 'No visible GTK reference window' >&2; exit 1; }
+xdotool windowactivate --sync "$window"
+sleep 1
+orca --disable=braille --enable=speech --debug-file="$log" > "$reader_log" 2>&1 & reader=$!
+sleep 3
+kill -0 "$reader" 2>/dev/null || { echo 'Independent Orca reader exited' >&2; exit 1; }
 xdotool windowactivate --sync "$window"
 sleep 2
 for i in $(seq 1 12); do
