@@ -114,7 +114,20 @@ jobs:
             wm=$!
             LIBGL_ALWAYS_SOFTWARE=1 ./upstream-anki/target/debug/retivus > /tmp/retivus-feature.log 2>&1 &
             app=$!
-            trap "kill $app $wm 2>/dev/null || true" EXIT
+            cleanup() {
+              code=$?
+              if test "$code" -ne 0; then
+                echo "Feature-enabled X11 UI diagnostic: status=$code" >&2
+                echo "App process and root window:" >&2
+                ps -p "$app" -o pid,stat,etime,cmd >&2 || true
+                xdotool getdisplaygeometry >&2 || true
+                xdotool search --name Retivus >&2 || true
+                tail -n 70 /tmp/retivus-feature.log >&2 || true
+                tail -n 30 /tmp/retivus-feature-wm.log >&2 || true
+              fi
+              kill "$app" "$wm" 2>/dev/null || true
+            }
+            trap cleanup EXIT
             for attempt in $(seq 1 80); do
               window=$(xdotool search --onlyvisible --name "Retivus" | head -n 1 || true)
               if test -n "$window"; then
@@ -141,12 +154,15 @@ jobs:
             cat /tmp/retivus-feature.log
             exit 1
           '
-      - name: Archive feature-enabled native UI screenshots
+      - name: Archive feature-enabled native UI screenshots and startup diagnostics
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: retivus-anki-feature-window
-          path: /tmp/retivus-feature-*.png
+          path: |
+            /tmp/retivus-feature-*.png
+            /tmp/retivus-feature.log
+            /tmp/retivus-feature-wm.log
           if-no-files-found: ignore
           retention-days: 7
       - name: Smoke feature-enabled native learner window under Wayland
