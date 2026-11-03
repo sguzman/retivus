@@ -770,7 +770,8 @@ mod tests {
             .enumerate()
         {
             let altered = dir.path().join(format!("tampered-{index}.zip"));
-            let mut original_archive = zip::ZipArchive::new(File::open(&original).unwrap()).unwrap();
+            let mut original_archive =
+                zip::ZipArchive::new(File::open(&original).unwrap()).unwrap();
             let mut outer = zip::ZipWriter::new(File::create(&altered).unwrap());
             for entry_index in 0..original_archive.len() {
                 let mut entry = original_archive.by_index(entry_index).unwrap();
