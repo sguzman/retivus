@@ -72,6 +72,7 @@ impl AnkiBackend {
         // Explicitly preserve scheduling/history: the ordinary shareable
         // .apkg export deliberately omits personal review records.
         self.export_apkg_to_with_scheduling(&apkg, true)?;
+        verify_embedded_anki_package(&apkg)?;
 
         let mut output_file = NamedTempFile::new_in(&parent)?;
         {
@@ -207,11 +208,7 @@ impl AnkiBackend {
         }
 
         verify_anki_staged_copy(&sqlite)?;
-        let other_archive = zip::ZipArchive::new(File::open(&exported)?)?;
-        if other_archive.len() == 0 {
-            return Err("Anki history package is empty".into());
-        }
-        drop(other_archive);
+        verify_embedded_anki_package(&exported)?;
         fs::remove_file(&exported)?;
         File::open(staged.path())?.sync_all()?;
         // Reserve the name with create_dir first; this operation fails if a
@@ -224,6 +221,41 @@ impl AnkiBackend {
         File::open(&root)?.sync_all()?;
         Self::open_managed_profile(&root, profile_id)
     }
+}
+
+/// Check both the embedded package's Anki collection member and every ZIP
+/// entry's readable, CRC-valid data before trusting it as a manual fallback.
+/// This is structural integrity checking, not a second Anki import round trip.
+fn verify_embedded_anki_package(path: &Path) -> BackendResult<()> {
+    let mut archive = zip::ZipArchive::new(File::open(path)?)?;
+    if archive.len() == 0 || archive.len() > MAX_RECOVERY_ENTRIES {
+        return Err("invalid Anki history package entry count".into());
+    }
+    let mut has_collection = false;
+    let mut total_size = 0_u64;
+    for index in 0..archive.len() {
+        let mut member = archive.by_index(index)?;
+        if matches!(
+            member.name()?.as_ref(),
+            "collection.anki2" | "collection.anki21" | "collection.anki21b"
+        ) {
+            has_collection = true;
+        }
+        total_size = total_size
+            .checked_add(member.size())
+            .ok_or("Anki history package size overflow")?;
+        if total_size > MAX_RECOVERY_UNCOMPRESSED_BYTES {
+            return Err("Anki history package exceeds safe extraction size".into());
+        }
+        let bytes = io::copy(&mut member, &mut io::sink())?;
+        if bytes != member.size() {
+            return Err("short read from embedded Anki history package".into());
+        }
+    }
+    if !has_collection {
+        return Err("Anki history package has no collection member".into());
+    }
+    Ok(())
 }
 
 const MAX_RECOVERY_ENTRIES: usize = 200_000;
@@ -702,6 +734,66 @@ mod tests {
         fs::create_dir(&media).unwrap();
         fs::create_dir(media.join(OsString::from_vec(vec![0xff]))).unwrap();
         assert!(snapshot_media_tree(&media, &media).is_err());
+    }
+
+    #[test]
+    fn recovery_rejects_invalid_embedded_anki_packages_without_publishing_profiles() {
+        use std::io::{Cursor, Write};
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "source").unwrap();
+        backend.add_basic_note(1, "front", "back").unwrap();
+        let original = dir.path().join("good.zip");
+        backend.create_pre_sync_recovery_bundle(&original).unwrap();
+
+        let make_inner = |member_name: &str, contents: &[u8]| {
+            let mut cursor = Cursor::new(Vec::new());
+            {
+                let mut writer = zip::ZipWriter::new(&mut cursor);
+                writer
+                    .start_file(member_name, SimpleFileOptions::default())
+                    .unwrap();
+                writer.write_all(contents).unwrap();
+                writer.finish().unwrap();
+            }
+            cursor.into_inner()
+        };
+        let mut wrong_member = make_inner("wrong.txt", b"not an Anki collection");
+        let mut bad_crc = make_inner("collection.anki2", b"synthetic-payload");
+        let position = bad_crc
+            .windows(b"synthetic-payload".len())
+            .position(|bytes| bytes == b"synthetic-payload")
+            .unwrap();
+        bad_crc[position] ^= 1;
+
+        for (index, inner) in [wrong_member.as_mut_slice(), bad_crc.as_mut_slice()]
+            .into_iter()
+            .enumerate()
+        {
+            let altered = dir.path().join(format!("tampered-{index}.zip"));
+            let mut original_archive = zip::ZipArchive::new(File::open(&original).unwrap()).unwrap();
+            let mut outer = zip::ZipWriter::new(File::create(&altered).unwrap());
+            for entry_index in 0..original_archive.len() {
+                let mut entry = original_archive.by_index(entry_index).unwrap();
+                let name = entry.name().unwrap().to_string();
+                outer
+                    .start_file(&name, SimpleFileOptions::default())
+                    .unwrap();
+                if name == "study-with-history.apkg" {
+                    outer.write_all(inner).unwrap();
+                } else {
+                    io::copy(&mut entry, &mut outer).unwrap();
+                }
+            }
+            outer.finish().unwrap();
+            let target = format!("must-not-exist-{index}");
+            assert!(AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+                dir.path(),
+                &target,
+                &altered
+            )
+            .is_err());
+            assert!(!dir.path().join(target).exists());
+        }
     }
 
     #[cfg(unix)]
