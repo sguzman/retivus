@@ -1,7 +1,11 @@
 //! An explicit, offline, no-clobber safety snapshot to prepare for eventual
 //! authenticated AnkiWeb sync. This does NOT perform sync or accept credentials.
 //! Deliberately separate from the rest of the collection backend.
-use super::{check_managed_media, check_regular, AnkiBackend, BackendResult};
+use super::{
+    check_managed_media, check_regular, validate_profile_id, verify_anki_staged_copy, AnkiBackend,
+    BackendResult,
+};
+use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -94,6 +98,135 @@ impl AnkiBackend {
         File::open(&parent)?.sync_all()?;
         Ok(())
     }
+    /// Restore a private pre-sync bundle to a NEW Retivus-owned profile.
+    ///
+    /// Validates all archive names and sizes before extraction, and verifies
+    /// the detached SQLite copy with Anki's engine. The entire staged profile
+    /// is published by same-filesystem directory rename only after all checks
+    /// pass. It never changes an existing profile or accesses AnkiWeb.
+    pub fn restore_pre_sync_recovery_as_new_profile(
+        root: &Path,
+        profile_id: &str,
+        bundle: &Path,
+    ) -> BackendResult<Self> {
+        validate_profile_id(profile_id)?;
+        if !bundle.is_absolute()
+            || bundle.extension().and_then(|ext| ext.to_str()) != Some("zip")
+        {
+            return Err("recovery input must be an absolute .zip path".into());
+        }
+        check_regular(bundle, false)?;
+        let root = fs::canonicalize(root)?;
+        check_regular(&root, true)?;
+        let target = root.join(profile_id);
+        if fs::symlink_metadata(&target).is_ok() {
+            return Err("recovery target already exists; refusing overwrite".into());
+        }
+
+        let mut archive = zip::ZipArchive::new(File::open(bundle)?)?;
+        if archive.len() > MAX_RECOVERY_ENTRIES {
+            return Err("recovery archive contains too many entries".into());
+        }
+        let mut names = HashSet::new();
+        let mut total_size = 0_u64;
+        for index in 0..archive.len() {
+            let member = archive.by_index(index)?;
+            let name = member.name();
+            if member.is_dir()
+                || member.unix_mode().is_some_and(|mode| {
+                    let kind = mode & 0o170000;
+                    kind != 0 && kind != 0o100000
+                })
+                || !valid_recovery_member_name(name)
+                || !names.insert(name.to_string())
+            {
+                return Err("invalid, duplicate or unsafe recovery ZIP member".into());
+            }
+            total_size = total_size
+                .checked_add(member.size())
+                .ok_or("recovery archive size overflow")?;
+            if total_size > MAX_RECOVERY_UNCOMPRESSED_BYTES {
+                return Err("recovery archive exceeds safe extraction size".into());
+            }
+        }
+        for required in ["RECOVERY-README.txt", "collection.anki2", "study-with-history.apkg"] {
+            if !names.contains(required) {
+                return Err("recovery archive lacks a required member".into());
+            }
+        }
+
+        let staged = Builder::new().prefix(".retivus-recover-").tempdir_in(&root)?;
+        let sqlite = staged.path().join("collection.anki2");
+        let exported = staged.path().join(".verify-history.apkg");
+        for index in 0..archive.len() {
+            let mut member = archive.by_index(index)?;
+            let name = member.name().to_string();
+            if name == "RECOVERY-README.txt" {
+                // Verify CRC even for an informational member.
+                let bytes = io::copy(&mut member, &mut io::sink())?;
+                if bytes != member.size() {
+                    return Err("short read from recovery note".into());
+                }
+                continue;
+            }
+            let path = match name.as_str() {
+                "collection.anki2" => sqlite.clone(),
+                "study-with-history.apkg" => exported.clone(),
+                _ => staged.path().join(&name),
+            };
+            if let Some(parent) = path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            // TempDir is private (0700); no archive path may escape it.
+            let mut output = File::create_new(&path)?;
+            let bytes = io::copy(&mut member, &mut output)?;
+            if bytes != member.size() {
+                return Err("incomplete recovery ZIP member".into());
+            }
+            output.sync_all()?;
+        }
+
+        verify_anki_staged_copy(&sqlite)?;
+        let other_archive = zip::ZipArchive::new(File::open(&exported)?)?;
+        if other_archive.is_empty() {
+            return Err("Anki history package is empty".into());
+        }
+        drop(other_archive);
+        fs::remove_file(&exported)?;
+        File::open(staged.path())?.sync_all()?;
+        // Reserve the name with create_dir first; this operation fails if a
+        // different profile appeared while we were validating the archive.
+        fs::create_dir(&target)?;
+        if let Err(err) = fs::rename(staged.path(), &target) {
+            let _ = fs::remove_dir(&target); // only if still empty
+            return Err(err.into());
+        }
+        File::open(&root)?.sync_all()?;
+        Self::open_managed_profile(&root, profile_id)
+    }
+}
+
+const MAX_RECOVERY_ENTRIES: usize = 200_000;
+const MAX_RECOVERY_UNCOMPRESSED_BYTES: u64 = 128 * 1024 * 1024 * 1024;
+
+fn valid_recovery_member_name(name: &str) -> bool {
+    if matches!(
+        name,
+        "RECOVERY-README.txt" | "collection.anki2" | "study-with-history.apkg"
+    ) {
+        return true;
+    }
+    let Some(relative) = name.strip_prefix("collection.media/") else {
+        return false;
+    };
+    !relative.is_empty()
+        && relative.split('/').all(|part| {
+            !part.is_empty()
+                && part != "."
+                && part != ".."
+                && !part.contains('\\')
+                && !part.contains('\\0')
+        })
 }
 
 type BundleZip<'a> = zip::ZipWriter<&'a mut File>;
@@ -233,6 +366,96 @@ mod tests {
             .create_pre_sync_recovery_bundle(&dir.path().join("invalid.zip"))
             .is_err());
         assert!(!dir.path().join("invalid.zip").exists());
+    }
+
+    #[test]
+    fn private_recovery_round_trip_preserves_review_history_and_unreferenced_media() {
+        let dir = tempdir().unwrap();
+        let mut profile = AnkiBackend::create_managed_profile(dir.path(), "original").unwrap();
+        let deck = profile.create_deck("Recovery").unwrap();
+        profile.add_basic_note(deck, "luz", "light").unwrap();
+        profile.grade_next_card(4).unwrap().unwrap();
+        let expected = profile.collection_stats().unwrap();
+        assert_eq!(expected.review_events, 1);
+        let media = dir.path().join("original/collection.media/nested");
+        fs::create_dir_all(&media).unwrap();
+        fs::write(media.join("private.dat"), b"raw-only evidence").unwrap();
+
+        let bundle = dir.path().join("pre-sync.zip");
+        profile.create_pre_sync_recovery_bundle(&bundle).unwrap();
+        let mut recovered = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            dir.path(),
+            "recovered",
+            &bundle,
+        )
+        .unwrap();
+        assert_eq!(recovered.collection_stats().unwrap(), expected);
+        assert_eq!(
+            fs::read(dir.path().join("recovered/collection.media/nested/private.dat")).unwrap(),
+            b"raw-only evidence"
+        );
+        assert!(
+            AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+                dir.path(),
+                "recovered",
+                &bundle
+            )
+            .is_err()
+        );
+        assert_eq!(recovered.collection_stats().unwrap(), expected);
+        recovered.close().unwrap();
+        let reopened = AnkiBackend::open_managed_profile(dir.path(), "recovered").unwrap();
+        assert_eq!(reopened.collection_stats().unwrap(), expected);
+    }
+
+    #[test]
+    fn malicious_pre_sync_zip_is_rejected_before_creating_any_profile() {
+        use std::io::Write;
+        let dir = tempdir().unwrap();
+        let mut profile = AnkiBackend::create_managed_profile(dir.path(), "source").unwrap();
+        profile.add_basic_note(1, "a", "b").unwrap();
+        let base = dir.path().join("good.zip");
+        profile.create_pre_sync_recovery_bundle(&base).unwrap();
+
+        for (index, unsafe_name) in [
+            "collection.media/../escape.txt",
+            "collection.media//duplicate.txt",
+            "collection.media/back\\\\slash.txt",
+            "unknown.txt",
+            "collection.media/./dot.txt",
+            "collection.anki2",
+        ]
+        .iter()
+        .enumerate()
+        {
+            let bad = dir.path().join(format!("bad-{index}.zip"));
+            let mut original = zip::ZipArchive::new(File::open(&base).unwrap()).unwrap();
+            let mut writer = zip::ZipWriter::new(File::create(&bad).unwrap());
+            for idx in 0..original.len() {
+                let mut entry = original.by_index(idx).unwrap();
+                writer
+                    .start_file(entry.name(), SimpleFileOptions::default())
+                    .unwrap();
+                io::copy(&mut entry, &mut writer).unwrap();
+            }
+            writer
+                .start_file(*unsafe_name, SimpleFileOptions::default())
+                .unwrap();
+            writer.write_all(b"untrusted data").unwrap();
+            writer.finish().unwrap();
+            let new_name = format!("reject-{index}");
+            assert!(
+                AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+                    dir.path(),
+                    &new_name,
+                    &bad
+                )
+                .is_err(),
+                "rejected unsafe archive member {unsafe_name}"
+            );
+            assert!(!dir.path().join(new_name).exists());
+        }
+        assert!(!dir.path().join("escape.txt").exists());
     }
 
     #[cfg(unix)]
