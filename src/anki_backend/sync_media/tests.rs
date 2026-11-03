@@ -1,4 +1,5 @@
 mod conflicts;
+mod deletions;
 
 use super::*;
 use tempfile::tempdir;
