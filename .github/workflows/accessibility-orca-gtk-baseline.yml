@@ -1,0 +1,36 @@
+name: Orca independent GTK speech baseline
+on:
+  push:
+    paths:
+      - .github/workflows/accessibility-orca-gtk-baseline.yml
+      - scripts/qa-orca-gtk-baseline.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install independent GTK and Orca stack
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng xvfb xdotool openbox zenity scrot
+      - name: Verify baseline script syntax
+        run: bash -n scripts/qa-orca-gtk-baseline.sh
+      - name: Exercise independent named GTK controls in Orca
+        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca-gtk-baseline.sh
+      - name: Retain actual Orca speech and focus evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-gtk-orca-baseline-evidence
+          path: |
+            ${{ runner.temp }}/retivus-gtk-orca.log
+            ${{ runner.temp }}/retivus-gtk-reader.log
+            ${{ runner.temp }}/retivus-gtk-gui.log
+            ${{ runner.temp }}/retivus-gtk-wm.log
+            ${{ runner.temp }}/retivus-gtk-reference.png
+          if-no-files-found: ignore
+          retention-days: 5
