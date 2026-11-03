@@ -18,6 +18,7 @@ use tempfile::{Builder, NamedTempFile};
 
 mod sync_collection;
 mod sync_login;
+mod sync_media;
 mod sync_preflight;
 mod sync_safety;
 
