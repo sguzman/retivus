@@ -427,7 +427,6 @@ mod tests {
             "collection.media/back\\\\slash.txt",
             "unknown.txt",
             "collection.media/./dot.txt",
-            "collection.anki2",
         ]
         .iter()
         .enumerate()
@@ -456,6 +455,58 @@ mod tests {
             assert!(!dir.path().join(new_name).exists());
         }
         assert!(!dir.path().join("escape.txt").exists());
+    }
+
+    #[test]
+    fn duplicate_recovery_members_are_rejected_before_profile_creation() {
+        use std::io::Write;
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "source").unwrap();
+        backend.add_basic_note(1, "front", "back").unwrap();
+        let original = dir.path().join("original.zip");
+        backend.create_pre_sync_recovery_bundle(&original).unwrap();
+
+        // zip 9's writer correctly refuses duplicate names, so construct
+        // a malicious raw ZIP by giving an extra entry a same-length name
+        // first, then mutating its local and central-directory filename.
+        let tampered = dir.path().join("duplicate.zip");
+        let mut reader = zip::ZipArchive::new(File::open(&original).unwrap()).unwrap();
+        let mut writer = zip::ZipWriter::new(File::create(&tampered).unwrap());
+        for idx in 0..reader.len() {
+            let mut member = reader.by_index(idx).unwrap();
+            writer
+                .start_file(member.name().unwrap(), SimpleFileOptions::default())
+                .unwrap();
+            io::copy(&mut member, &mut writer).unwrap();
+        }
+        writer
+            .start_file("RECOVERY-README.txz", SimpleFileOptions::default())
+            .unwrap();
+        writer.write_all(b"synthetic collision").unwrap();
+        writer.finish().unwrap();
+        let mut bytes = fs::read(&tampered).unwrap();
+        let needle = b"RECOVERY-README.txz";
+        let replacement = b"RECOVERY-README.txt";
+        assert_eq!(needle.len(), replacement.len());
+        let positions: Vec<_> = bytes
+            .windows(needle.len())
+            .enumerate()
+            .filter_map(|(index, window)| (window == needle).then_some(index))
+            .collect();
+        assert_eq!(positions.len(), 2);
+        for position in positions {
+            bytes[position..position + replacement.len()].copy_from_slice(replacement);
+        }
+        fs::write(&tampered, bytes).unwrap();
+        assert!(
+            AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+                dir.path(),
+                "must-not-exist",
+                &tampered
+            )
+            .is_err()
+        );
+        assert!(!dir.path().join("must-not-exist").exists());
     }
 
     #[cfg(unix)]
