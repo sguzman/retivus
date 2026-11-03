@@ -272,28 +272,20 @@ fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String
         file.seek(SeekFrom::Start(eocd_offset - 20))?;
         let mut locator = [0_u8; 20];
         file.read_exact(&mut locator)?;
-        if &locator[..4] != b"PK\x06\x07"
-            || u32_le(&locator, 4) != 0
-            || u32_le(&locator, 16) != 1
-        {
+        if &locator[..4] != b"PK\x06\x07" || u32_le(&locator, 4) != 0 || u32_le(&locator, 16) != 1 {
             return Err("invalid or multi-disk ZIP64 locator".into());
         }
         file.seek(SeekFrom::Start(u64_le(&locator, 8)))?;
         let mut zip64 = [0_u8; 56];
         file.read_exact(&mut zip64)?;
-        if &zip64[..4] != b"PK\x06\x06"
-            || u32_le(&zip64, 16) != 0
-            || u32_le(&zip64, 20) != 0
-        {
+        if &zip64[..4] != b"PK\x06\x06" || u32_le(&zip64, 16) != 0 || u32_le(&zip64, 20) != 0 {
             return Err("invalid or multi-disk ZIP64 central directory".into());
         }
         count = u64_le(&zip64, 32);
         central_size = u64_le(&zip64, 40);
         central_start = u64_le(&zip64, 48);
     }
-    if count > MAX_RECOVERY_ENTRIES as u64
-        || central_size > MAX_RECOVERY_CENTRAL_DIRECTORY_BYTES
-    {
+    if count > MAX_RECOVERY_ENTRIES as u64 || central_size > MAX_RECOVERY_CENTRAL_DIRECTORY_BYTES {
         return Err("recovery ZIP central directory exceeds bounded limits".into());
     }
     let end = central_start
@@ -621,14 +613,12 @@ mod tests {
             bytes[position..position + replacement.len()].copy_from_slice(replacement);
         }
         fs::write(&tampered, bytes).unwrap();
-        assert!(
-            AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-                dir.path(),
-                "must-not-exist",
-                &tampered
-            )
-            .is_err()
-        );
+        assert!(AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            dir.path(),
+            "must-not-exist",
+            &tampered
+        )
+        .is_err());
         assert!(!dir.path().join("must-not-exist").exists());
     }
 
