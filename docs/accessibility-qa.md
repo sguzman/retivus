@@ -32,3 +32,16 @@ Retivus disables eframe default features to control its native build. Its explic
 - [ ] Inspect High contrast and Reduce motion controls in light/dark and narrow/wide windows; the new settings persist, but OS-level reduced-motion autodetection and physical Wayland usability have not been verified
 
 **Scope:** Native AT-SPI registration, keyboard/scale/theme focus regression, and **Orca announcements for the named core controls** have passed CI. **M6.4 remains pending (0/3 points)** because populated browse/reviewer/conflict states in a physical Wayland session, broader screen-reader status/due-card announcements, and high-contrast/reduced-motion preferences have not been independently accepted. The tests do not claim universal assistive-technology usability.
+
+
+## 2026-11-03 independent GTK/Orca control (no M6.4 credit)
+
+The disposable Xvfb/Openbox/DBus Orca test was run against **unrelated GTK 4 software**, `zenity --question`, with two explicitly labelled native buttons. The GTK test uses the same Orca + AT-SPI stack as Retivus, but **no Retivus binary, AccessKit source, or learner profile**.
+
+- [GTK baseline 41564407441](https://github.com/sguzman/retivus/actions/runs/41564407441): the dialog opened and AT-SPI observed `Reference OK` and `Reference Cancel` focus transitions. Orca spoke `Screen reader on` and `tab`, but not either button name. The trace said the GTK dialog `lacks active state` and no active window could be found.
+- [Reordered startup 41564579029](https://github.com/sguzman/retivus/actions/runs/41564579029): launching and activating GTK **before** Orca still failed to produce named-control speech. The same missing active-window state appeared, while button focus events were delivered.
+- [Retivus normal-status CI 41562902256](https://github.com/sguzman/retivus/actions/runs/41562902256) and [assertive-alert CI 41563452566](https://github.com/sguzman/retivus/actions/runs/41563452566): status/notification events reached Orca but did not produce required status speech. The alert experiment has been retired; the real production widget remains an atomic, polite `Status`.
+
+**Interpretation:** This reproduces a *similar failure to speak named focused controls outside Retivus*, so the synthetic test environment is not sufficient to identify a Retivus-specific root cause. It does **not** prove the application accessible, and does not allow downgrading the strict Orca acceptance assertion. The independent GTK workflow is a **manual diagnostic only** after these two runs; ordinary CI should not repeatedly run this known-failing environmental control.
+
+**Remaining acceptance:** a populated physical Wayland + Orca session, dynamic status/due-card speech, high contrast, reduced motion, and both viewport sizes. Do not mark M6.4 completed on Xvfb speech-event evidence alone.

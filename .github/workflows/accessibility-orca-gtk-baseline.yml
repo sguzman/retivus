@@ -1,9 +1,7 @@
 name: Orca independent GTK speech baseline
+# Diagnostic only: two virtual-runner attempts could not track an active GTK
+# dialog. Run manually when changing the Orca test environment.
 on:
-  push:
-    paths:
-      - .github/workflows/accessibility-orca-gtk-baseline.yml
-      - scripts/qa-orca-gtk-baseline.sh
   workflow_dispatch:
 permissions:
   contents: read
