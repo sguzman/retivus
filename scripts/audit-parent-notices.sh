@@ -192,6 +192,39 @@ while IFS=$'\t' read -r name version license status notice; do
     review=SOURCE_MATCHED_PARENT_NOTICE_PRESENT
     evidence=LICENSES/upstream/difflib-0.4.0/LICENSE@f035fb8e656f27119e23eca9d5b996df14f3885e
   fi
+  # htmlescape 0.3.1 predates Cargo's VCS metadata. Verify every
+  # published file against immutable upstream source commit 1699b539.
+  # Its declared license is not a substitute for an upstream license file:
+  # leave this row UNRESOLVED even when source matching succeeds.
+  if [[ "$name/$version" == "htmlescape/0.3.1" ]]; then
+    [[ "$vcs_sha" == UNAVAILABLE ]] || {
+      echo "Unexpected htmlescape VCS metadata; recheck provenance" >&2; exit 1;
+    }
+    [[ "$upstream" == "https://github.com/veddan/rust-htmlescape" ]] || {
+      echo "htmlescape upstream changed; review required" >&2; exit 1;
+    }
+    [[ "$license" == "Apache-2.0 / MIT / MPL-2.0" ]] || {
+      echo "htmlescape license declaration changed; review required" >&2; exit 1;
+    }
+    for item in \
+      "Cargo.toml@984837d3f069934a04e4a308e8daf45a9efa4c4c" \
+      "README.md@e0bb73c91d6434787694f88887fbf549dcb4b91d" \
+      ".travis.yml@45e8f4f7df3064e2564373be8f7367a29d2d3c43" \
+      "moonstone-short.txt@93795fe41e4ac1d63d3bbaddf733b2a56e6ec923" \
+      "src/lib.rs@098a9792917c0928d2028e944bb0e8b147b89eea" \
+      "src/encode.rs@242a3cf4e95a1bc22c805ce0df56e3d24aa0fe70" \
+      "src/decode.rs@18478ee274d1c1dc203c9651c3ea18084cfe035a" \
+      "src/entities.rs@3f635c6f2d07a968051c7bf7bc03146c3fe78a24" \
+      "src/io_support.rs@18b7a25fff0d478efa7a9b54d0867afe553d6d3d" \
+      "tests/test.rs@c5d33f491c0d0978080b8819375843d4515d14ea" \
+      "benches/bench.rs@dcdb9f8de9eb9c5b003fdb14c5d5c0b3032730f1"; do
+      file="${item%@*}"; expected="${item##*@}"
+      test "$(git hash-object "$out/source/vendor/$name-$version/$file")" = "$expected" || {
+        echo "htmlescape source differs from pinned upstream commit: $file" >&2; exit 1;
+      }
+    done
+    evidence=SOURCE_MATCHED_ONLY:1699b539179798e705ad8464128492a0a0092876
+  fi
   # Validate exact published crate VCS commits before mapping upstream notices.
   key="$name/$version"
   if [[ -n "${extra_sha[$key]+x}" ]]; then

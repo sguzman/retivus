@@ -92,6 +92,8 @@ All five locked `unic-*` crates are version `0.9.0` from `open-i18n/rust-unic`. 
 
 The `difflib 0.4.0` published crate has no `.cargo_vcs_info.json`. Its original Cargo manifest and all four Rust modules were compared byte-for-byte with upstream `DimaKudosh/difflib` at commit `f035fb8e656f27119e23eca9d5b996df14f3885e`. The accompanying upstream MIT `LICENSE` is now preserved and Git-blob-verified. The audit rechecks these source fingerprints; it does **not** invent an absent published VCS SHA or imply that a single matching file proves a full source release.
 
+The four notice exceptions still lacking an independently sourced standalone upstream notice are documented in [the release-blocker ledger](release-notice-exceptions.md); their source identity and Cargo license fields are evidence, not a waiver of required downstream attribution.
+
 ## Upstream parent-notice review queue
 
 The source audit also generates **`PARENT-NOTICE-REVIEW.tsv`** for dependencies without a recognized crate-local notice. It records each crate name/version, declared SPDX expression, and its Cargo-manifest upstream repository URL (or the known pinned Anki upstream repository for Anki's workspace crates). The report is retained beside and embedded in the checksummed source archive; binary/source parity must compare the two copies exactly. This transforms the unresolved 72 entries into a traceable upstream review queue. **A repository URL is not notice text and does not certify legal compatibility or resolve any entry; each actual corresponding copyright/license notice still requires review.**
