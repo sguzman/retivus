@@ -82,11 +82,7 @@ scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
 # Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
 # the previous offset assertion missed an event that the retained log proves
 # was spoken and incorrectly failed an otherwise successful run.
-expected_role="status bar"
-if [[ "${RETIVUS_QA_ALERT_STATUS:-}" == 1 ]]; then
-  expected_role="alert"
-fi
-if ! grep -F "EVENT MANAGER: object:announcement for [$expected_role: 'Could not open source:" "$debug" >/dev/null ||
+if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
    ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
   echo 'Orca did not speak updated validation status after direct button activation' >&2
   # Capture every Python thread before cleanup. This distinguishes an Orca
