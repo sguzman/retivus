@@ -256,3 +256,13 @@
 - ⏳ **Strict roadmap accounting:** M4.5 2%, M6.4 3%, M7.1–M7.4 8% remain pending. No production release/tag; no unverified partial milestone credit.
 
 **Verified progress: 87% → 87%; Δ +0 percentage points.**
+
+
+## Recovery continuation — 2026-11-03 (87%, +0 pp)
+
+- ✅ **Last verified recovery state:** `main` was recoverable from [`5156c8c`](https://github.com/sguzman/retivus/commit/5156c8c6e27dae42c4c160f33714369e71f2216b), with [Rust foundation 41557606288](https://github.com/sguzman/retivus/actions/runs/41557606288), [source audit 41557606232](https://github.com/sguzman/retivus/actions/runs/41557606232), and [combined Linux candidate 41557606257](https://github.com/sguzman/retivus/actions/runs/41557606257) all green. No released tag or publication.
+- ✅ **M7.1 evidence improved, not completed:** the latest [source audit 41559007678](https://github.com/sguzman/retivus/actions/runs/41559007678) passed on [`ae605ee`](https://github.com/sguzman/retivus/commit/ae605eec969ffcb897a38b2fa43cc47e17bcfa53): 603 vendored crates, 72 without crate-root notices, **69 with pinned parent/nested source evidence, 3 still unresolved**. Actual upstream `intl_pluralrules 7.0.2` MIT/Apache notice texts were recovered from the exact upstream workspace commit; `htmlescape 0.3.1` was fully source-matched against an immutable upstream revision but its license file obligations remain unresolved. The remaining named exceptions are in [release-notice-exceptions.md](docs/release-notice-exceptions.md). These are evidence acquisitions, **not legal clearance**.
+- 🟡 **M6.4 Orca remains blocked:** the focus-readiness experiment [41559272867](https://github.com/sguzman/retivus/actions/runs/41559272867) failed both Ubuntu images before the status test (Orca received a File-focus event but no required spoken File confirmation). [`232dffd`](https://github.com/sguzman/retivus/commit/232dffd7b98dda1417066431c2abe91516c0b1c6) restored the prior status-first, actual-speech acceptance harness. [Issue #1](https://github.com/sguzman/retivus/issues/1) documents the evidence. Do not claim a fixed live announcement or physical Wayland accessibility pass.
+- ⏳ **Pending unchanged:** M4.5 authenticated AnkiWeb sync (2%), M6.4 full accessibility acceptance (3%), M7.1–M7.4 release/attribution/handoff (8%). A combined candidate run at the updated licensing revision was still compiling at this checkpoint; do not count it green until completed. No production release/tag.
+
+**Verified progress: 87% → 87%; Δ +0 percentage points.** M4: 15/17; M6: 9/12; M7: 0/8. No partial milestone credits.
