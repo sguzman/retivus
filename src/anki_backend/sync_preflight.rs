@@ -175,7 +175,9 @@ mod tests {
         let endpoint = format!("http://{}/", listener.local_addr().unwrap());
         let server = thread::spawn(move || {
             let (mut stream, _) = listener.accept().unwrap();
-            stream.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(10)))
+                .unwrap();
             let mut request = Vec::new();
             let mut buf = [0_u8; 4096];
             loop {
@@ -185,7 +187,10 @@ mod tests {
                 if let Some(header_end) = request.windows(4).position(|b| b == b"\r\n\r\n") {
                     let header = String::from_utf8_lossy(&request[..header_end]);
                     let body = &request[header_end + 4..];
-                    if header.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+                    if header
+                        .to_ascii_lowercase()
+                        .contains("transfer-encoding: chunked")
+                    {
                         if body.windows(5).any(|b| b == b"0\r\n\r\n") {
                             break;
                         }
