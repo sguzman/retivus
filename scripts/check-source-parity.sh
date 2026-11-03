@@ -35,6 +35,7 @@ grep -Fx "Cargo.lock sha256: $lock_sha" "$sources/SOURCE-AUDIT.txt"
 cmp "$sources/THIRD-PARTY-SOURCES.tsv" <(tar --zstd -xOf "$source_archive" source/THIRD-PARTY-SOURCES.tsv)
 cmp "$sources/LICENSE-FILE-AUDIT.tsv" <(tar --zstd -xOf "$source_archive" source/LICENSE-FILE-AUDIT.tsv)
 cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/PARENT-NOTICE-REVIEW.tsv)
+cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv")
 # The source candidate must preserve the pinned parent notices, not merely
 # their source URLs. The source-bundle audit checks these against upstream.
 for notice in LICENSE-MIT LICENSE-APACHE; do

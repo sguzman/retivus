@@ -57,6 +57,7 @@ jobs:
           grep -Fx 'source/THIRD-PARTY-SOURCES.tsv' "$root/archive-index.txt"
           grep -Fx 'source/LICENSE-FILE-AUDIT.tsv' "$root/archive-index.txt"
           grep -Fx 'source/PARENT-NOTICE-REVIEW.tsv' "$root/archive-index.txt"
+          grep -Fx 'source/LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/egui-0.33.3/LICENSE-MIT' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/egui-0.33.3/LICENSE-APACHE' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/ANKI-PINNED-LICENSE.txt' "$root/archive-index.txt"

@@ -52,9 +52,31 @@ test "$(git hash-object "$unic_notices/LICENSE-MIT")" = "31aa79387f27e730e33d871
 anki_notices="$out/source/LICENSES"
 test -s "$anki_notices/ANKI-PINNED-LICENSE.txt"
 test -s "$anki_notices/ANKI-PINNED-CONTRIBUTORS.txt"
+# Immutable source-commit-specific mappings for additional upstream notices.
+extra_manifest="$out/source/LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv"
+test -s "$extra_manifest"
+declare -A extra_sha extra_evidence
+extra_count=0
+while IFS=$'\t' read -r crate version published_sha specs; do
+  [[ "$published_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Bad VCS SHA for $crate" >&2; exit 1; }
+  key="$crate/$version"
+  [[ -z "${extra_sha[$key]+x}" ]] || { echo "Duplicate extra notice row: $key" >&2; exit 1; }
+  [[ -n "$specs" ]] || { echo "Missing notice paths: $key" >&2; exit 1; }
+  IFS=',' read -r -a items <<< "$specs"
+  for item in "${items[@]}"; do
+    file="${item%@*}"; sha="${item##*@}"
+    [[ "$file" == LICENSES/upstream/* && "$sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Bad notice mapping: $item" >&2; exit 1; }
+    test -s "$out/source/$file" || { echo "Missing notice: $file" >&2; exit 1; }
+    test "$(git hash-object "$out/source/$file")" = "$sha" || { echo "Notice altered: $file" >&2; exit 1; }
+  done
+  extra_sha["$key"]="$published_sha"
+  extra_evidence["$key"]="$specs"
+  ((extra_count += 1))
+done < "$extra_manifest"
 count=0
 evidenced=0
 pending=0
+extra_matched=0
 while IFS=$'\t' read -r name version license status notice; do
   [[ "$status" == REVIEW_PARENT_OR_UPSTREAM ]] || continue
   manifest="$out/source/vendor/$name-$version/Cargo.toml"
@@ -149,6 +171,14 @@ while IFS=$'\t' read -r name version license status notice; do
     fi
   fi
   # Validate exact published crate VCS commits before mapping upstream notices.
+  key="$name/$version"
+  if [[ -n "${extra_sha[$key]+x}" ]]; then
+    [[ "$review" == REVIEW_PARENT_OR_UPSTREAM ]] || { echo "Overlapping notice mapping: $key" >&2; exit 1; }
+    review=PINNED_PARENT_NOTICES_PRESENT
+    evidence="${extra_evidence[$key]}"
+    expected_sha="${extra_sha[$key]}"
+    ((extra_matched += 1))
+  fi
   # The upstream root notice Git blobs also matched these published commits.
   if [[ -n "$expected_sha" && "$vcs_sha" != "$expected_sha" ]]; then
     echo "VCS source revision changed for reviewed crate $name $version: $vcs_sha, expected $expected_sha" >&2
@@ -161,6 +191,7 @@ while IFS=$'\t' read -r name version license status notice; do
   ((count += 1))
 done < "$out/LICENSE-FILE-AUDIT.tsv"
 test "$count" -gt 0
+(( extra_matched == extra_count )) || { echo "Stale notice manifest: $extra_matched/$extra_count matched" >&2; exit 1; }
 printf 'PARENT NOTICE REVIEW: %s missing crate-local notice files, %s upstream locations declared.\n' \
   "$count" "$(grep -vc $'\tUNDECLARED\t' "$report" || true)"
 printf 'Notice provenance: %s rows have pinned parent/nested evidence; %s still need source acquisition.\n' "$evidenced" "$pending"

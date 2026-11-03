@@ -84,6 +84,10 @@ The eight locked AccessKit-family packages were traced to their exact upstream r
 
 All five locked `unic-*` crates are version `0.9.0` from `open-i18n/rust-unic`. The source candidate now preserves that release tag's exact root `LICENSE-MIT`, `LICENSE-APACHE`, `AUTHORS` and `COPYRIGHT.md` with independent Git blob hash checks. Review status remains evidence-present, not legal clearance.
 
+### Further pinned upstream crate notices
+
+`LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv` records 11 additional dependency entries and their published Cargo VCS commits, source-path notices, and original upstream Git blob hashes (AT-SPI, clipboard-win, Fluent, JNI, NDK, profiling, prost-reflect and valuable). The audit fails on missing, modified, overlapping, stale or version-mismatched evidence. Shared texts are deduplicated only after identical Git blob verification. **Presence is not a legal clearance decision**, and binary notice/distribution obligations remain to be reviewed.
+
 ## Upstream parent-notice review queue
 
 The source audit also generates **`PARENT-NOTICE-REVIEW.tsv`** for dependencies without a recognized crate-local notice. It records each crate name/version, declared SPDX expression, and its Cargo-manifest upstream repository URL (or the known pinned Anki upstream repository for Anki's workspace crates). The report is retained beside and embedded in the checksummed source archive; binary/source parity must compare the two copies exactly. This transforms the unresolved 72 entries into a traceable upstream review queue. **A repository URL is not notice text and does not certify legal compatibility or resolve any entry; each actual corresponding copyright/license notice still requires review.**
