@@ -137,7 +137,10 @@ fn equal_timestamp_note_edits_can_diverge_but_both_are_recoverable() {
         &receiver_archive,
     )
     .unwrap();
-    assert_eq!(restored_sender.note_fields(note_id).unwrap()[1], sender_edit);
+    assert_eq!(
+        restored_sender.note_fields(note_id).unwrap()[1],
+        sender_edit
+    );
     assert_eq!(
         restored_receiver.note_fields(note_id).unwrap()[1],
         receiver_edit
