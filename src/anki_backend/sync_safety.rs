@@ -8,8 +8,8 @@ use super::{
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom};
-use std::time::SystemTime;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 use tempfile::{Builder, NamedTempFile};
 use zip::write::SimpleFileOptions;
 
@@ -387,7 +387,6 @@ fn media_entries(dir: &Path) -> BackendResult<Vec<PathBuf>> {
     children.sort();
     Ok(children)
 }
-
 
 #[derive(Debug, PartialEq, Eq)]
 struct MediaStamp {
