@@ -44,6 +44,16 @@ cmp "$bundle/bin/retivus" "$prefix/bin/retivus"
 # A malformed upgrade bundle must fail before replacing a verified install.
 binary_before="$(sha256sum "$prefix/bin/retivus" | cut -d' ' -f1)"
 manifest_before="$(sha256sum "$prefix/share/retivus/installed-files.sha256" | cut -d' ' -f1)"
+# A failure AFTER the executable is replaced must not strand a mismatched
+# checksum manifest or damage the previous working update.
+printf '#!/bin/sh\\nexit 19\\n' > "$bundle/bin/retivus"
+chmod 755 "$bundle/bin/retivus"
+reject env RETIVUS_TEST_FAIL_AFTER_BINARY=1 "$bundle/install.sh" "$prefix"
+test "$(sha256sum "$prefix/bin/retivus" | cut -d' ' -f1)" = "$binary_before"
+test "$(sha256sum "$prefix/share/retivus/installed-files.sha256" | cut -d' ' -f1)" = "$manifest_before"
+(cd "$prefix" && sha256sum --check --status share/retivus/installed-files.sha256)
+printf '#!/bin/sh\\nexit 7\\n' > "$bundle/bin/retivus"
+chmod 755 "$bundle/bin/retivus"
 mv "$bundle/share/doc/retivus/README.md" "$sandbox/README.saved"
 reject "$bundle/install.sh" "$prefix"
 mv "$sandbox/README.saved" "$bundle/share/doc/retivus/README.md"
