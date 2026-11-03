@@ -16,6 +16,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 
+mod sync_login;
 mod sync_preflight;
 mod sync_safety;
 

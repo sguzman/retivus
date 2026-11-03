@@ -63,7 +63,29 @@ fn validate_temporary_host_key(key: &str) -> BackendResult<()> {
     Ok(())
 }
 
+/// Enforce HTTPS, disable proxy and redirects, and bound all AnkiWeb requests.
+pub(super) fn new_ankiweb_http_client() -> BackendResult<reqwest::Client> {
+    Ok(reqwest::Client::builder()
+        .redirect(reqwest::redirect::Policy::none())
+        .https_only(true)
+        .no_proxy()
+        .timeout(Duration::from_secs(30))
+        .build()?)
+}
+
 impl AnkiBackend {
+    /// Check ownership and media safety before contacting any remote server.
+    pub(super) fn validate_sync_profile(&self) -> BackendResult<()> {
+        let managed = self
+            .managed_dir
+            .as_ref()
+            .ok_or("remote sync requires a Retivus-managed disk profile")?;
+        check_regular(managed, true)?;
+        check_regular(&managed.join("collection.anki2"), false)?;
+        check_managed_media(managed)?;
+        Ok(())
+    }
+
     /// Query the upstream collection-sync status without exchanging any cards.
     ///
     /// A preflight may report FullSync; it NEVER chooses upload/download or
@@ -74,21 +96,10 @@ impl AnkiBackend {
         &mut self,
         temporary_host_key: &str,
     ) -> BackendResult<RemoteSyncPreflight> {
-        let managed = self
-            .managed_dir
-            .as_ref()
-            .ok_or("remote sync status requires a Retivus-managed disk profile")?;
-        check_regular(managed, true)?;
-        check_regular(&managed.join("collection.anki2"), false)?;
-        check_managed_media(managed)?;
+        self.validate_sync_profile()?;
         validate_temporary_host_key(temporary_host_key)?;
 
-        let client = reqwest::Client::builder()
-            .redirect(reqwest::redirect::Policy::none())
-            .https_only(true)
-            .no_proxy()
-            .timeout(Duration::from_secs(30))
-            .build()?;
+        let client = new_ankiweb_http_client()?;
         let auth = SyncAuth {
             hkey: temporary_host_key.to_owned(),
             endpoint: None,
