@@ -4,7 +4,11 @@ All meaningful product changes will be recorded here. Detailed implementation st
 
 ## Unreleased
 
+### Known limitations
+- Rapid, same-second concurrent edits to one Anki note produced divergent content in an exploratory upstream-server regression. The accepted test separates note modifications into distinct seconds; production conflict resolution and real AnkiWeb account acceptance remain open.
+
 ### Added
+- Added shared disposable upstream Anki Rust sync-server fixtures and tests proving full-sync-direction refusal, normal two-client note transfer, and distinct-second same-note conflict convergence with independent private recovery archives. No real AnkiWeb account was accessed.
 - Added disposable integration testing against the actual pinned Anki Rust sync server: two independently managed profiles exchange media, confirm clean indexes, and restore private pre-sync backups. Production AnkiWeb service compatibility remains unverified.
 - Added a disposable-server media deletion recovery regression; confirms remote-deleted clean media can be recovered, with its original media-index state, from the pre-sync ZIP. Live-account acceptance remains open.
 - Added a disposable-server same-filename media conflict test verifying upstream remote-wins behavior and private recovery of displaced local bytes. Media integration tests now live in a dedicated module and conflict submodule; live-account acceptance remains pending.

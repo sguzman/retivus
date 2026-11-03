@@ -32,6 +32,9 @@ impl AnkiBackend {
     ///
     /// Never initiates full upload/download. Media sync requires additional
     /// work and this API does not establish full AnkiWeb compatibility.
+    /// Anki note timestamps have one-second resolution; same-second
+    /// independent edits have not passed conflict-convergence acceptance.
+    /// The private recovery ZIP is a local fallback, not remote rollback.
     pub async fn sync_ankiweb_collection_with_recovery(
         &mut self,
         username: &str,
