@@ -86,7 +86,7 @@ All five locked `unic-*` crates are version `0.9.0` from `open-i18n/rust-unic`. 
 
 ### Further pinned upstream crate notices
 
-`LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv` records 11 additional dependency entries and their published Cargo VCS commits, source-path notices, and original upstream Git blob hashes (AT-SPI, clipboard-win, Fluent, JNI, NDK, profiling, prost-reflect and valuable). The audit fails on missing, modified, overlapping, stale or version-mismatched evidence. Shared texts are deduplicated only after identical Git blob verification. **Presence is not a legal clearance decision**, and binary notice/distribution obligations remain to be reviewed.
+`LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv` records 14 additional dependency entries and their published Cargo VCS commits, source-path notices, and original upstream Git blob hashes (AT-SPI, clipboard-win, Fluent, JNI, NDK, profiling, prost-reflect and valuable). The audit fails on missing, modified, overlapping, stale or version-mismatched evidence. Shared texts are deduplicated only after identical Git blob verification. **Presence is not a legal clearance decision**, and binary notice/distribution obligations remain to be reviewed.
 
 ## Upstream parent-notice review queue
 
