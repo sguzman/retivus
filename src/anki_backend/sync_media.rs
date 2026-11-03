@@ -202,14 +202,18 @@ mod tests {
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "source").unwrap();
         let media = backend.collection.media().unwrap();
-        media.add_file("uploaded.txt", b"synthetic media upload").unwrap();
+        media
+            .add_file("uploaded.txt", b"synthetic media upload")
+            .unwrap();
         drop(media);
         let index_path = root.path().join("source/collection.mdb");
         let dirty_before: i64 = rusqlite::Connection::open(&index_path)
             .unwrap()
-            .query_row("SELECT dirty FROM media WHERE fname='uploaded.txt'", [], |row| {
-                row.get(0)
-            })
+            .query_row(
+                "SELECT dirty FROM media WHERE fname='uploaded.txt'",
+                [],
+                |row| row.get(0),
+            )
             .unwrap();
         assert_eq!(dirty_before, 1);
 
@@ -340,6 +344,158 @@ mod tests {
                 )
                 .unwrap();
         assert_eq!(original_dirty, 1);
+        restored.close().unwrap();
+    }
+
+    #[test]
+    fn synthetic_download_adds_remote_media_and_preserves_original_recovery_state() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+        use std::time::{Duration, Instant};
+
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "source").unwrap();
+        let before = backend.collection_stats().unwrap();
+        let recovery = root.path().join("before-synthetic-download.zip");
+        let recovery_at_server = recovery.clone();
+
+        let download_zip = anki::sync::media::zip::zip_files_for_download(vec![(
+            "remote.txt".into(),
+            b"synthetic downloaded media".to_vec(),
+        )])
+        .unwrap();
+        let routes = [
+            (
+                "POST /sync/hostKey ",
+                br#"{"key":"synthetic-download-key"}"#.to_vec(),
+            ),
+            (
+                "POST /msync/begin ",
+                br#"{"data":{"usn":1,"sk":"synthetic-download-key"},"err":""}"#.to_vec(),
+            ),
+            (
+                "POST /msync/mediaChanges ",
+                br#"{"data":[["remote.txt",1,"c04f12bd95da303e5861544933e6eca92861fc38"]],"err":""}"#.to_vec(),
+            ),
+            ("POST /msync/downloadFiles ", download_zip),
+            (
+                "POST /msync/mediaChanges ",
+                br#"{"data":[],"err":""}"#.to_vec(),
+            ),
+            (
+                "POST /msync/mediaSanity ",
+                br#"{"data":"OK","err":""}"#.to_vec(),
+            ),
+        ];
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/", listener.local_addr().unwrap());
+        listener.set_nonblocking(true).unwrap();
+        let server = thread::spawn(move || {
+            for (route, payload) in routes {
+                let deadline = Instant::now() + Duration::from_secs(20);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(err) if err.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline, "missing media-sync request");
+                            thread::sleep(Duration::from_millis(5));
+                        }
+                        Err(err) => panic!("mock accept failed: {err}"),
+                    }
+                };
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(10)))
+                    .unwrap();
+                assert!(recovery_at_server.is_file(), "recovery must precede network I/O");
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 8192];
+                loop {
+                    let len = stream.read(&mut buffer).unwrap();
+                    assert!(len > 0, "incomplete synthetic media-sync request");
+                    request.extend_from_slice(&buffer[..len]);
+                    assert!(request.len() < 2 * 1024 * 1024);
+                    if let Some(end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                        let header = String::from_utf8_lossy(&request[..end]);
+                        let body = &request[end + 4..];
+                        if header
+                            .to_ascii_lowercase()
+                            .contains("transfer-encoding: chunked")
+                        {
+                            if body.windows(5).any(|part| part == b"0\r\n\r\n") {
+                                break;
+                            }
+                        } else if let Some(len) = header.lines().find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("content-length: ")
+                                .and_then(|text| text.trim().parse::<usize>().ok())
+                        }) {
+                            if body.len() >= len {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                assert!(
+                    String::from_utf8_lossy(&request).starts_with(route),
+                    "wrong media-sync request order"
+                );
+                let compressed = zstd::stream::encode_all(payload.as_slice(), 1).unwrap();
+                let headers = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nanki-original-size: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    payload.len(),
+                    compressed.len()
+                );
+                stream.write_all(headers.as_bytes()).unwrap();
+                stream.write_all(&compressed).unwrap();
+                stream.flush().unwrap();
+            }
+        });
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let outcome = runtime.block_on(backend.sync_ankiweb_media_with_client(
+            "user@example.test",
+            "synthetic-password",
+            &recovery,
+            client,
+            Some(endpoint),
+        ));
+        server.join().unwrap();
+        outcome.unwrap();
+        assert_eq!(backend.collection_stats().unwrap(), before);
+        assert_eq!(
+            std::fs::read(root.path().join("source/collection.media/remote.txt")).unwrap(),
+            b"synthetic downloaded media"
+        );
+        let media_index =
+            rusqlite::Connection::open(root.path().join("source/collection.mdb")).unwrap();
+        let (dirty, sync_usn): (i64, i64) = media_index
+            .query_row(
+                "SELECT media.dirty, meta.lastUsn FROM media, meta WHERE media.fname='remote.txt'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!((dirty, sync_usn), (0, 1));
+        drop(media_index);
+
+        let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            root.path(),
+            "restored",
+            &recovery,
+        )
+        .unwrap();
+        assert!(!root.path().join("restored/collection.media/remote.txt").exists());
+        let count: i64 = rusqlite::Connection::open(root.path().join("restored/collection.mdb"))
+            .unwrap()
+            .query_row("SELECT count(*) FROM media", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 0);
         restored.close().unwrap();
     }
 
