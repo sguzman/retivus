@@ -4,6 +4,7 @@ on:
     paths:
       - .github/workflows/e2e-regression.yml
       - src/anki_backend.rs
+      - src/anki_backend/**
       - src/study_ui.rs
       - src/source_adapter.rs
       - src/source_store.rs

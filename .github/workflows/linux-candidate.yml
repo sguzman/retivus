@@ -16,6 +16,8 @@ on:
       - scripts/test-clean-linux-candidate.sh
       - scripts/uninstall-linux-candidate.sh
       - src/main.rs
+      - src/anki_backend.rs
+      - src/anki_backend/**
   workflow_dispatch:
 permissions:
   contents: read
