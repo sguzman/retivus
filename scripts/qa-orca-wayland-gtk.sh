@@ -17,7 +17,12 @@ export WLR_LIBINPUT_NO_DEVICES=1
 export LIBGL_ALWAYS_SOFTWARE=1
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME" "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
-unset DISPLAY WAYLAND_DISPLAY SWAYSOCK
+# Ubuntu 24.04 Orca 46 consults DISPLAY through xkbcomp even when
+# XDG_SESSION_TYPE=wayland. The workflow supplies a sidecar Xvfb DISPLAY
+# *only* for Orca keyboard-map startup. GTK uses GDK_BACKEND=wayland
+# and Sway disables Xwayland: tested app pixels are native Wayland.
+test -n "${DISPLAY:-}" || { echo 'Missing legacy Orca xkbcomp display' >&2; exit 1; }
+unset WAYLAND_DISPLAY SWAYSOCK
 printf '%s\n' 'output * resolution 1080x800' 'xwayland disable' \
   'default_border pixel 1' > "$RUNNER_TEMP/retivus-orca-sway.conf"
 sway_log="$RUNNER_TEMP/retivus-orca-sway.log"

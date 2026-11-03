@@ -18,12 +18,12 @@ jobs:
       - name: Install native Wayland and Orca reference environment
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq sway wtype grim jq zenity \
+          sudo apt-get install -y -qq sway wtype grim jq zenity xvfb x11-xkb-utils \
             dbus dbus-user-session at-spi2-core orca \
             speech-dispatcher speech-dispatcher-espeak-ng \
             libegl1 libgl1-mesa-dri
       - name: Require native GTK label spoken by real Orca on Sway
-        run: dbus-run-session -- bash scripts/qa-orca-wayland-gtk.sh
+        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca-wayland-gtk.sh
       - name: Retain Wayland GUI and reader evidence
         if: always()
         uses: actions/upload-artifact@v4
