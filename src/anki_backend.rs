@@ -21,6 +21,8 @@ mod sync_login;
 mod sync_media;
 mod sync_preflight;
 mod sync_safety;
+#[cfg(test)]
+mod sync_test_server;
 
 pub use sync_collection::CollectionSyncOutcome;
 pub use sync_preflight::{RemoteSyncNeed, RemoteSyncPreflight};

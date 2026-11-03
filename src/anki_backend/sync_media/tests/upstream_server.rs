@@ -1,42 +1,18 @@
 //! Cross-client media sync against the *actual pinned Anki Rust sync server*.
 //! No AnkiWeb account, external listener, or user profile is involved.
 use super::*;
-use anki::sync::http_server::{default_ip_header, SimpleServer, SyncServerConfig};
-use std::net::{IpAddr, Ipv4Addr};
+use crate::anki_backend::sync_test_server::DisposableAnkiServer;
 use std::time::Duration;
 use tempfile::tempdir;
 
 #[test]
 fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_server() {
     let root = tempdir().unwrap();
-    let username = "retivus-test@example.invalid";
-    let password = "disposable-only-password";
-
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .enable_all()
-        .build()
-        .unwrap();
-    let config = SyncServerConfig {
-        host: IpAddr::V4(Ipv4Addr::LOCALHOST),
-        port: 0,
-        base_folder: root.path().join("upstream-server"),
-        ip_header: default_ip_header(),
-    };
-
-    // The pinned server reads SYNC_USER1 only during construction. Restore the
-    // process environment immediately so other tests cannot inherit our user.
-    let previous = std::env::var_os("SYNC_USER1");
-    std::env::set_var("SYNC_USER1", format!("{username}:{password}"));
-    let result = runtime.block_on(SimpleServer::make_server(config));
-    match previous {
-        Some(value) => std::env::set_var("SYNC_USER1", value),
-        None => std::env::remove_var("SYNC_USER1"),
-    }
-    let (address, server) = result.unwrap();
-    assert!(address.ip().is_loopback());
-    let handle = runtime.spawn(server);
-    let endpoint = format!("http://{address}/");
+    let server = DisposableAnkiServer::start(root.path());
+    let username = server.username;
+    let password = server.password;
+    let runtime = &server.runtime;
+    let endpoint = server.endpoint.clone();
 
     let client = reqwest::Client::builder().no_proxy().build().unwrap();
     let mut sender = AnkiBackend::create_managed_profile(root.path(), "sender").unwrap();
@@ -132,6 +108,4 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
         .exists());
     restored.close().unwrap();
 
-    handle.abort();
-    let _ = runtime.block_on(handle);
 }
