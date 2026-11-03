@@ -851,6 +851,10 @@ mod tests {
         harness.run();
         assert_eq!(harness.state().source_path, file.to_string_lossy().as_ref());
 
+        // The full learner UI may place validation outside the viewport.
+        // Scroll to the real button before the mouse activation.
+        harness.get_by_label("Validate source").scroll_to_me();
+        harness.run();
         harness.get_by_label("Validate source").click();
         harness.run();
         assert_eq!(harness.state().preview.len(), 1);
