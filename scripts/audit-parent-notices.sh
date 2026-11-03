@@ -16,6 +16,18 @@ test -s "$egui_notices/LICENSE-MIT"
 test -s "$egui_notices/LICENSE-APACHE"
 test "$(git hash-object "$egui_notices/LICENSE-MIT")" = "673ea5f0505d6fa65c6a2b6a753c93b8e19d11b9"
 test "$(git hash-object "$egui_notices/LICENSE-APACHE")" = "11069edd79019f7dafbe3138841cf289209270dd"
+# objc2 workspace license texts are identical at these exact upstream tags:
+# pre-transition: block2-0.5.1, objc-sys-0.3.5, objc2-0.5.3,
+#                 frameworks-0.2.2
+# newer:          dispatch2-0.3.1, objc2-0.6.5,
+#                 objc2-encode-4.1.0, frameworks-0.3.2
+# Each tag's upstream root file was inspected and has the Git blob hash
+# checked below. These are notice evidence, not OS X SDK legal clearance.
+objc_notices="$out/source/LICENSES/upstream/objc2"
+test -s "$objc_notices/LICENSE.txt"
+test -s "$objc_notices/LICENSE.md"
+test "$(git hash-object "$objc_notices/LICENSE.txt")" = "e9ab3babc0d8602b83dccde8a462f8f3dc1e52ad"
+test "$(git hash-object "$objc_notices/LICENSE.md")" = "540ae4c81adb5f64a9f61e222b688880da24300e"
 # The pinned Anki source checkout was verified upstream before this step.
 anki_notices="$out/source/LICENSES"
 test -s "$anki_notices/ANKI-PINNED-LICENSE.txt"
@@ -51,6 +63,24 @@ while IFS=$'\t' read -r name version license status notice; do
         }
       done
       evidence="$evidence,source/vendor/$name-$version/fonts/{Hack-Regular.txt,OFL.txt,UFL.txt,emoji-icon-font-mit-license.txt}"
+    fi
+  fi
+  if [[ "$upstream" == "https://github.com/madsmtm/objc2" ]]; then
+    objc_tag=
+    objc_file=
+    case "$name/$version" in
+      block2/0.5.1) objc_tag=block2-0.5.1; objc_file=LICENSE.txt ;;
+      objc-sys/0.3.5) objc_tag=objc-sys-0.3.5; objc_file=LICENSE.txt ;;
+      objc2/0.5.3) objc_tag=objc2-0.5.3; objc_file=LICENSE.txt ;;
+      objc2-*/0.2.2) objc_tag=frameworks-0.2.2; objc_file=LICENSE.txt ;;
+      dispatch2/0.3.1) objc_tag=dispatch2-0.3.1; objc_file=LICENSE.md ;;
+      objc2/0.6.5) objc_tag=objc2-0.6.5; objc_file=LICENSE.md ;;
+      objc2-encode/4.1.0) objc_tag=objc2-encode-4.1.0; objc_file=LICENSE.md ;;
+      objc2-*/0.3.2) objc_tag=frameworks-0.3.2; objc_file=LICENSE.md ;;
+    esac
+    if [[ -n "$objc_tag" ]]; then
+      review=PINNED_PARENT_NOTICES_PRESENT
+      evidence="LICENSES/upstream/objc2/$objc_file@${objc_tag}"
     fi
   fi
   # Evidence presence is NOT a legal clearance decision; retain every row
