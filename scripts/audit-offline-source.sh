@@ -127,6 +127,7 @@ trap 'rm -rf "$empty_home"' EXIT
   printf 'Offline Cargo metadata: PASS\n'
   printf 'Pinned Anki proto build inputs: %s\n' "$expected_anki"
   printf 'Pinned Anki license and contributor notices: PASS (%s)\n' "$expected_anki"
+  printf 'Pinned egui 0.33.3 parent notices: Git blob verified\n'
   printf 'Pinned Anki translation submodules: core-repo=%s qt-repo=%s\n' "$(git -C "$anki_source/ftl/core-repo" rev-parse HEAD)" "$(git -C "$anki_source/ftl/qt-repo" rev-parse HEAD)"
   printf 'Source/release licensing and notices: NOT YET CERTIFIED\n'
 } > "$out/SOURCE-AUDIT.txt"

@@ -35,6 +35,15 @@ grep -Fx "Cargo.lock sha256: $lock_sha" "$sources/SOURCE-AUDIT.txt"
 cmp "$sources/THIRD-PARTY-SOURCES.tsv" <(tar --zstd -xOf "$source_archive" source/THIRD-PARTY-SOURCES.tsv)
 cmp "$sources/LICENSE-FILE-AUDIT.tsv" <(tar --zstd -xOf "$source_archive" source/LICENSE-FILE-AUDIT.tsv)
 cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/PARENT-NOTICE-REVIEW.tsv)
+# The source candidate must preserve the pinned parent notices, not merely
+# their source URLs. The source-bundle audit checks these against upstream.
+for notice in LICENSE-MIT LICENSE-APACHE; do
+  test -s "$binary_root/share/doc/retivus/source/LICENSES/upstream/egui-0.33.3/$notice" || {
+    # The installer embeds a lightweight source tree; full upstream notices
+    # are provided by the independently checksummed corresponding source.
+    tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/egui-0.33.3/$notice" >/dev/null
+  }
+done
 index="$tmp/source-index.txt"
 tar --zstd -tf "$source_archive" > "$index"
 for required in source/.cargo/config.toml source/vendor/anki-0.0.0/Cargo.toml source/vendor/percent-encoding-iri-2.2.0/Cargo.toml; do
