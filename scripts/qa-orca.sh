@@ -7,6 +7,18 @@ export HOME="$RUNNER_TEMP/retivus-orca-home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_DATA_HOME="$HOME/.local/share"
 mkdir -p "$XDG_CONFIG_HOME" "$XDG_DATA_HOME"
+# Orca is Python-based. Register a test-only, nonfatal thread dump
+# on SIGUSR2 so a stalled AT-SPI event can be diagnosed from CI evidence.
+# This path is scoped to the screen-reader process, never to Retivus.
+diagnostics="$RUNNER_TEMP/retivus-orca-python-diagnostics"
+mkdir -p "$diagnostics"
+cat > "$diagnostics/sitecustomize.py" <<'PY'
+import faulthandler
+import signal
+import sys
+
+faulthandler.register(signal.SIGUSR2, file=sys.stderr, all_threads=True)
+PY
 debug="$RUNNER_TEMP/retivus-orca-debug.log"
 app_log="$RUNNER_TEMP/retivus-orca-app.log"
 reader_log="$RUNNER_TEMP/retivus-orca-startup.log"
@@ -31,7 +43,7 @@ cleanup() {
 }
 trap cleanup EXIT
 openbox > "$wm_log" 2>&1 & wm=$!
-orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
+PYTHONPATH="$diagnostics${PYTHONPATH:+:$PYTHONPATH}" orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
 sleep 3
 if ! kill -0 "$reader" 2>/dev/null; then
   echo 'Orca launcher failed before Retivus started' >&2
@@ -74,6 +86,14 @@ scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
 if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
    ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
   echo 'Orca did not speak updated validation status after direct button activation' >&2
+  # Capture every Python thread before cleanup. This distinguishes an Orca
+  # event-loop stall from a healthy loop that deliberately drops the event.
+  # If the process has exited, leave the original failure and logs intact.
+  if kill -0 "$reader" 2>/dev/null; then
+    echo 'Requesting Orca Python thread dump (SIGUSR2)' >&2
+    kill -USR2 "$reader" 2>/dev/null || true
+    sleep 1
+  fi
   tail -c "+$((announce_start + 1))" "$debug" \
     | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
     | tail -n 65 >&2 || true
