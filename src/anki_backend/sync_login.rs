@@ -9,7 +9,7 @@ use anki::sync::login::sync_login;
 
 /// Basic input validation; allow international usernames/passwords, but refuse
 /// empty, oversized and control-character-bearing inputs before any network I/O.
-fn validate_login_input(username: &str, password: &str) -> BackendResult<()> {
+pub(super) fn validate_login_input(username: &str, password: &str) -> BackendResult<()> {
     if username.trim().is_empty()
         || username.len() > 1024
         || username.chars().any(char::is_control)
@@ -22,7 +22,7 @@ fn validate_login_input(username: &str, password: &str) -> BackendResult<()> {
     Ok(())
 }
 
-async fn obtain_temporary_host_key(
+pub(super) async fn obtain_temporary_host_key(
     username: &str,
     password: &str,
     endpoint: Option<String>,

@@ -16,10 +16,12 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 
+mod sync_collection;
 mod sync_login;
 mod sync_preflight;
 mod sync_safety;
 
+pub use sync_collection::CollectionSyncOutcome;
 pub use sync_preflight::{RemoteSyncNeed, RemoteSyncPreflight};
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;
