@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **87%** of 100% (previous verified checkpoint 84%, this continuation **+3 percentage points**). Verified package interoperability, source-neutral provider integration, FSRS persistence, archive privacy, and cross-layer end-to-end regressions are green. Authenticated AnkiWeb sync, broader accessibility and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
+**Verified progress:** **87%** of 100% (previous 87%, current 87%, **Δ +0 percentage points** this continuation). Verified package interoperability, source-neutral provider integration, FSRS persistence, archive privacy, and cross-layer end-to-end regressions are green. Authenticated AnkiWeb sync, broader accessibility and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -16,6 +16,11 @@
 | 🎨 M5 Complete native egui study experience | 14% | 14% | ✅ |
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 9% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
+
+## Current continuation — 2026-11-03 (87%, Δ +0 percentage points)
+
+- 🟡 **M4.5 🌐 (still 0/2 points):** commit [0955e53](https://github.com/sguzman/retivus/commit/0955e5351c80bf7d734b24c4379682e3047a5a5f) adds a fail-closed preflight for pending notes whose time-based IDs predate the recorded last sync. It supplements the recent-edit guard and may conservatively block some legitimate older unsent/imported notes. The tests cover time boundaries, clean/new-note allowance, and public-path refusal before backup or login. [Foundation CI 41742123481](https://github.com/sguzman/retivus/actions/runs/41742123481) and [end-to-end CI 41742123319](https://github.com/sguzman/retivus/actions/runs/41742123319) are the code-verification records. Even green results would only verify the guard, not remote convergence.
+- **Outstanding blockers remain:** production AnkiWeb/account safety and unresolved equal-timestamp/nonchronological-ID conflicts; physical Wayland/Orca acceptance (M6.4); license, release, and publication approvals (M7). No real AnkiWeb account was accessed and no release was authorized.
 
 ## Milestones, phases and objective criteria
 
