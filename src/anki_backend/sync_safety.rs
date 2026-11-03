@@ -759,11 +759,13 @@ mod tests {
         };
         let mut wrong_member = make_inner("wrong.txt", b"not an Anki collection");
         let mut bad_crc = make_inner("collection.anki2", b"synthetic-payload");
+        // The writer may deflate the payload. Corrupt the stored CRC in
+        // the central header instead of searching for uncompressed bytes.
         let position = bad_crc
-            .windows(b"synthetic-payload".len())
-            .position(|bytes| bytes == b"synthetic-payload")
+            .windows(4)
+            .position(|bytes| bytes == b"PK\x01\x02")
             .unwrap();
-        bad_crc[position] ^= 1;
+        bad_crc[position + 16] ^= 1;
 
         for (index, inner) in [wrong_member.as_mut_slice(), bad_crc.as_mut_slice()]
             .into_iter()
