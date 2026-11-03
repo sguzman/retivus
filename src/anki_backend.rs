@@ -24,7 +24,7 @@ mod sync_safety;
 #[cfg(test)]
 mod sync_test_server;
 
-pub use sync_collection::CollectionSyncOutcome;
+pub use sync_collection::{CollectionSyncConflictRisk, CollectionSyncOutcome};
 pub use sync_preflight::{RemoteSyncNeed, RemoteSyncPreflight};
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;

@@ -12,6 +12,17 @@ use anki::sync::collection::normal::SyncActionRequired;
 use anki::sync::login::SyncAuth;
 use std::path::Path;
 
+/// Separate decision required because the pinned Anki normal-sync protocol
+/// may complete with divergent edits that have an identical note timestamp.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CollectionSyncConflictRisk {
+    /// Refuse unverified convergence even if generic remote writes are approved.
+    RefuseUnverifiedConvergence,
+    /// The caller separately explained and explicitly accepted the risk that
+    /// same-second note edits may remain divergent after successful sync.
+    ExplicitlyAcceptPossibleSameSecondDivergence,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CollectionSyncOutcome {
     /// The pinned upstream normal-sync engine found no changes or completed
@@ -25,6 +36,21 @@ pub enum CollectionSyncOutcome {
     },
 }
 
+fn ensure_collection_sync_approval(
+    approve_remote_changes: bool,
+    conflict_risk: CollectionSyncConflictRisk,
+) -> BackendResult<()> {
+    if !approve_remote_changes {
+        return Err("remote collection writes require explicit approval".into());
+    }
+    if conflict_risk != CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence {
+        return Err(
+            "collection sync refused: same-second note conflicts can diverge despite a successful sync; separate explicit acknowledgement is required".into(),
+        );
+    }
+    Ok(())
+}
+
 impl AnkiBackend {
     /// After the caller has explicitly approved potential remote writes,
     /// create a private offline recovery archive and run Anki's collection
@@ -35,18 +61,19 @@ impl AnkiBackend {
     /// Anki note timestamps have one-second resolution; same-second
     /// independent edits have not passed conflict-convergence acceptance.
     /// The private recovery ZIP is a local fallback, not remote rollback.
+    /// Separate acknowledgement of same-second divergence is mandatory;
+    /// declining either permission stops before backup, login or network.
     pub async fn sync_ankiweb_collection_with_recovery(
         &mut self,
         username: &str,
         password: &str,
         recovery_zip: &Path,
         approve_remote_changes: bool,
+        conflict_risk: CollectionSyncConflictRisk,
     ) -> BackendResult<CollectionSyncOutcome> {
         self.validate_sync_profile()?;
         validate_login_input(username, password)?;
-        if !approve_remote_changes {
-            return Err("remote collection writes require explicit approval".into());
-        }
+        ensure_collection_sync_approval(approve_remote_changes, conflict_risk)?;
         let client = new_ankiweb_http_client()?;
         self.sync_ankiweb_collection_with_client(username, password, recovery_zip, client, None)
             .await
@@ -119,11 +146,73 @@ mod tests {
                 "user@example.test",
                 "password",
                 &destination,
-                false
+                false,
+                CollectionSyncConflictRisk::RefuseUnverifiedConvergence,
             ))
             .is_err());
         assert!(!destination.exists());
         assert_eq!(before, backend.collection_stats().unwrap());
+    }
+
+    #[test]
+    fn same_second_conflict_risk_requires_separate_approval_before_backup_or_network() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "local").unwrap();
+        let deck = backend.create_deck("Keep local notes").unwrap();
+        let note_id = backend
+            .add_basic_note(deck, "private question", "private answer")
+            .unwrap();
+        let before = backend.collection_stats().unwrap();
+        let recovery = root.path().join("must-not-exist.zip");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let denied = runtime.block_on(backend.sync_ankiweb_collection_with_recovery(
+            "valid@example.test",
+            "synthetic-password",
+            &recovery,
+            true,
+            CollectionSyncConflictRisk::RefuseUnverifiedConvergence,
+        ));
+        assert!(denied
+            .unwrap_err()
+            .to_string()
+            .contains("same-second note conflicts"));
+        assert!(!recovery.exists());
+        assert_eq!(backend.collection_stats().unwrap(), before);
+        assert_eq!(
+            backend.note_fields(note_id).unwrap()[1],
+            "private answer"
+        );
+    }
+
+    #[test]
+    fn acknowledged_conflict_risk_does_not_replace_remote_write_permission() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "local").unwrap();
+        let recovery = root.path().join("must-not-exist.zip");
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let denied = runtime.block_on(backend.sync_ankiweb_collection_with_recovery(
+            "valid@example.test",
+            "synthetic-password",
+            &recovery,
+            false,
+            CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+        ));
+        assert!(denied
+            .unwrap_err()
+            .to_string()
+            .contains("remote collection writes require explicit approval"));
+        assert!(!recovery.exists());
+        assert!(ensure_collection_sync_approval(
+            true,
+            CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence
+        )
+        .is_ok());
     }
 
     #[test]

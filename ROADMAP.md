@@ -413,3 +413,11 @@
 - ⏳ **Unchanged weighted acceptance:** M4.5 0/2 points; physical Wayland/Orca M6.4 0/3 points; final legal/release M7 0/8 points. No personal account contacted; no production release or tag created.
 
 **Overall verified completion: 87% → 87%; Δ +0 percentage points.**
+
+## 2026-11-03 — fail-closed collection conflict risk consent (87%, Δ +0 pp)
+
+- 🛑 **Backend-only production safeguard:** `sync_ankiweb_collection_with_recovery` now requires generic remote-write approval **and** a separate `CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence` decision. The default-safe `RefuseUnverifiedConvergence` rejects before recovery ZIP creation, login, network requests or local changes.
+- 🧪 **Safety tests:** Two disposable-profile regressions verify that generic approval does not silently accept nonconvergent note risk, and the separate risk acknowledgement does not bypass remote-write approval. Each refusal leaves the private profile untouched and creates no archive.
+- ⚠️ **Not a conflict fix:** Acknowledgement is not upstream tie-breaking, production server acceptance, or remote rollback. Same-second divergence is still a blocker for M4.5; physical Wayland/Orca acceptance and release/legal signoff also remain pending. No personal account accessed and no release/tag created.
+
+**Verified overall: 87% → 87%; Δ +0 percentage points.**
