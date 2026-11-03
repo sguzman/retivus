@@ -110,9 +110,7 @@ impl AnkiBackend {
         bundle: &Path,
     ) -> BackendResult<Self> {
         validate_profile_id(profile_id)?;
-        if !bundle.is_absolute()
-            || bundle.extension().and_then(|ext| ext.to_str()) != Some("zip")
-        {
+        if !bundle.is_absolute() || bundle.extension().and_then(|ext| ext.to_str()) != Some("zip") {
             return Err("recovery input must be an absolute .zip path".into());
         }
         check_regular(bundle, false)?;
@@ -149,13 +147,19 @@ impl AnkiBackend {
                 return Err("recovery archive exceeds safe extraction size".into());
             }
         }
-        for required in ["RECOVERY-README.txt", "collection.anki2", "study-with-history.apkg"] {
+        for required in [
+            "RECOVERY-README.txt",
+            "collection.anki2",
+            "study-with-history.apkg",
+        ] {
             if !names.contains(required) {
                 return Err("recovery archive lacks a required member".into());
             }
         }
 
-        let staged = Builder::new().prefix(".retivus-recover-").tempdir_in(&root)?;
+        let staged = Builder::new()
+            .prefix(".retivus-recover-")
+            .tempdir_in(&root)?;
         let sqlite = staged.path().join("collection.anki2");
         let exported = staged.path().join(".verify-history.apkg");
         for index in 0..archive.len() {
@@ -188,7 +192,7 @@ impl AnkiBackend {
 
         verify_anki_staged_copy(&sqlite)?;
         let other_archive = zip::ZipArchive::new(File::open(&exported)?)?;
-        if other_archive.is_empty() {
+        if other_archive.len() == 0 {
             return Err("Anki history package is empty".into());
         }
         drop(other_archive);
@@ -384,25 +388,24 @@ mod tests {
 
         let bundle = dir.path().join("pre-sync.zip");
         profile.create_pre_sync_recovery_bundle(&bundle).unwrap();
-        let mut recovered = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-            dir.path(),
-            "recovered",
-            &bundle,
-        )
-        .unwrap();
+        let mut recovered =
+            AnkiBackend::restore_pre_sync_recovery_as_new_profile(dir.path(), "recovered", &bundle)
+                .unwrap();
         assert_eq!(recovered.collection_stats().unwrap(), expected);
         assert_eq!(
-            fs::read(dir.path().join("recovered/collection.media/nested/private.dat")).unwrap(),
+            fs::read(
+                dir.path()
+                    .join("recovered/collection.media/nested/private.dat")
+            )
+            .unwrap(),
             b"raw-only evidence"
         );
-        assert!(
-            AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-                dir.path(),
-                "recovered",
-                &bundle
-            )
-            .is_err()
-        );
+        assert!(AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            dir.path(),
+            "recovered",
+            &bundle
+        )
+        .is_err());
         assert_eq!(recovered.collection_stats().unwrap(), expected);
         recovered.close().unwrap();
         let reopened = AnkiBackend::open_managed_profile(dir.path(), "recovered").unwrap();
@@ -446,12 +449,8 @@ mod tests {
             writer.finish().unwrap();
             let new_name = format!("reject-{index}");
             assert!(
-                AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-                    dir.path(),
-                    &new_name,
-                    &bad
-                )
-                .is_err(),
+                AnkiBackend::restore_pre_sync_recovery_as_new_profile(dir.path(), &new_name, &bad)
+                    .is_err(),
                 "rejected unsafe archive member {unsafe_name}"
             );
             assert!(!dir.path().join(new_name).exists());
