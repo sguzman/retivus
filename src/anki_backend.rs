@@ -16,6 +16,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 
+mod sync_safety;
+
 type BackendResult<T> = Result<T, Box<dyn Error>>;
 
 /// Bounded, read-only note listing for the native learner browser.
