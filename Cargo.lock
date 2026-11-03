@@ -3961,6 +3961,7 @@ dependencies = [
  "anki",
  "eframe",
  "egui_kittest",
+ "reqwest",
  "rusqlite",
  "serde_json",
  "tempfile",
