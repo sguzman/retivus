@@ -9,6 +9,8 @@ use std::path::Path;
 impl AnkiBackend {
     /// May upload, download or delete media. Requires distinct explicit approval
     /// and a fresh private recovery ZIP before contacting AnkiWeb.
+    /// The pinned Anki engine favors remote content on same-name media conflicts;
+    /// the displaced local content is preserved only in the recovery ZIP.
     pub async fn sync_ankiweb_media_with_recovery(
         &mut self,
         username: &str,

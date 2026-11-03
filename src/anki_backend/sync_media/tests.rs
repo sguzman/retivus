@@ -114,12 +114,9 @@ fn failed_media_request_preserves_recoverable_private_index_and_files() {
     assert_eq!(backend.collection_stats().unwrap(), before);
     assert!(archive.is_file());
 
-    let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-        root.path(),
-        "recovered",
-        &archive,
-    )
-    .unwrap();
+    let restored =
+        AnkiBackend::restore_pre_sync_recovery_as_new_profile(root.path(), "recovered", &archive)
+            .unwrap();
     assert_eq!(restored.collection_stats().unwrap(), before);
     assert_eq!(
         std::fs::read(root.path().join("recovered/collection.media/original.png")).unwrap(),
@@ -268,12 +265,9 @@ fn synthetic_media_upload_marks_index_clean_only_after_server_acknowledgment() {
     // A new profile restored from the PRE-sync bundle has the original
     // pending-media state, not the server-acknowledged state.
     drop(after);
-    let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-        root.path(),
-        "restored",
-        &recovery,
-    )
-    .unwrap();
+    let restored =
+        AnkiBackend::restore_pre_sync_recovery_as_new_profile(root.path(), "restored", &recovery)
+            .unwrap();
     let original_dirty: i64 =
         rusqlite::Connection::open(root.path().join("restored/collection.mdb"))
             .unwrap()
@@ -316,7 +310,8 @@ fn synthetic_download_adds_remote_media_and_preserves_original_recovery_state() 
         ),
         (
             "POST /msync/mediaChanges ",
-            br#"{"data":[["remote.txt",1,"c04f12bd95da303e5861544933e6eca92861fc38"]],"err":""}"#.to_vec(),
+            br#"{"data":[["remote.txt",1,"c04f12bd95da303e5861544933e6eca92861fc38"]],"err":""}"#
+                .to_vec(),
         ),
         ("POST /msync/downloadFiles ", download_zip),
         (
@@ -427,12 +422,9 @@ fn synthetic_download_adds_remote_media_and_preserves_original_recovery_state() 
     assert_eq!((dirty, sync_usn), (0, 1));
     drop(media_index);
 
-    let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-        root.path(),
-        "restored",
-        &recovery,
-    )
-    .unwrap();
+    let restored =
+        AnkiBackend::restore_pre_sync_recovery_as_new_profile(root.path(), "restored", &recovery)
+            .unwrap();
     assert!(!root
         .path()
         .join("restored/collection.media/remote.txt")

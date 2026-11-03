@@ -36,9 +36,7 @@ fn remote_wins_pending_local_media_conflict_but_private_recovery_keeps_local_byt
     )])
     .unwrap();
     const REMOTE_SHA1: &str = "c8266894f3e5ce613e6a54defebd1bd8f1538482";
-    let changes = format!(
-        r#"{{"data":[["conflict.txt",1,"{REMOTE_SHA1}"]],"err":""}}"#
-    );
+    let changes = format!(r#"{{"data":[["conflict.txt",1,"{REMOTE_SHA1}"]],"err":""}}"#);
     let exchanges: Vec<(&str, Vec<u8>)> = vec![
         (
             "POST /sync/hostKey ",
@@ -160,12 +158,9 @@ fn remote_wins_pending_local_media_conflict_but_private_recovery_keeps_local_byt
         .unwrap();
     assert_eq!((dirty_after, last_usn), (0, 1));
 
-    let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-        root.path(),
-        "recovered",
-        &recovery,
-    )
-    .unwrap();
+    let restored =
+        AnkiBackend::restore_pre_sync_recovery_as_new_profile(root.path(), "recovered", &recovery)
+            .unwrap();
     assert_eq!(
         std::fs::read(root.path().join("recovered/collection.media/conflict.txt")).unwrap(),
         b"local unsynced payload"
