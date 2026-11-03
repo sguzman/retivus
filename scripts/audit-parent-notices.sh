@@ -231,7 +231,7 @@ while IFS=$'\t' read -r name version license status notice; do
       "src/encode.rs@242a3cf4e95a1bc22c805ce0df56e3d24aa0fe70" \
       "src/decode.rs@18478ee274d1c1dc203c9651c3ea18084cfe035a" \
       "src/entities.rs@3f635c6f2d07a968051c7bf7bc03146c3fe78a24" \
-      "src/io_support.rs@18b7a25fff0d478efa7a9b54d0867afe553d6d3d" \
+      "src/io_support.rs@18b7a25fff0d478efa7a9b54d0867afe553d6e3d" \
       "tests/test.rs@c5d33f491c0d0978080b8819375843d4515d14ea" \
       "benches/bench.rs@dcdb9f8de9eb9c5b003fdb14c5d5c0b3032730f1"; do
       file="${item%@*}"; expected="${item##*@}"
