@@ -42,6 +42,12 @@ test -z "$(find "$prefix/bin" -maxdepth 1 -type f -name '.retivus.*' -print -qui
 xvfb-run -a bash -c '
   set -euo pipefail
   openbox >/tmp/retivus-container-wm.log 2>&1 & wm=$!
+  trap "kill $wm 2>/dev/null || true" EXIT
+  # The script is read from this same checksummed archive, not the runner.
+  bash "$2" "$wm" || {
+    tail -n 45 /tmp/retivus-container-wm.log >&2 || true
+    exit 1
+  }
   LIBGL_ALWAYS_SOFTWARE=1 "$1" >/tmp/retivus-container-app.log 2>&1 & app=$!
   trap "kill $app $wm 2>/dev/null || true" EXIT
   for i in $(seq 1 90); do
@@ -68,7 +74,7 @@ xvfb-run -a bash -c '
   echo "--- Retivus log ---"
   cat /tmp/retivus-container-app.log || true
   exit 1
-' bash "$prefix/bin/retivus"
+' bash "$prefix/bin/retivus" "$root/share/doc/retivus/source/scripts/wait-for-openbox.sh"
 "$root/uninstall.sh" "$prefix"
 test ! -e "$prefix/bin/retivus"
 test ! -e "$prefix/share/applications/retivus.desktop"
