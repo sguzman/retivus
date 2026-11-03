@@ -354,7 +354,9 @@ impl eframe::App for Retivus {
         ctx.set_theme(self.theme.preference());
         apply_accessibility_style(ctx, self.density, self.high_contrast, self.reduced_motion);
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
-            let narrow_toolbar = ui.available_width() < 860.0;
+            // Keep all accessibility controls in the SAME wrapping layout.
+            // A separate second UI row was reserved but not painted on the
+            // 720px Sway viewport, making both settings effectively invisible.
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new("Retivus")
@@ -392,25 +394,11 @@ impl eframe::App for Retivus {
                 {
                     ctx.set_zoom_factor(self.ui_scale);
                 }
-                if !narrow_toolbar {
-                    ui.checkbox(&mut self.high_contrast, "High contrast")
-                        .on_hover_text(
-                            "Use high-contrast text and backgrounds in either color scheme.",
-                        );
-                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
-                        .on_hover_text("Disable standard widget transitions in Retivus.");
-                }
+                ui.checkbox(&mut self.high_contrast, "High contrast")
+                    .on_hover_text("Use high-contrast text and backgrounds in either color scheme.");
+                ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                    .on_hover_text("Disable standard widget transitions in Retivus.");
             });
-            if narrow_toolbar {
-                ui.horizontal_wrapped(|ui| {
-                    ui.checkbox(&mut self.high_contrast, "High contrast")
-                        .on_hover_text(
-                            "Use high-contrast text and backgrounds in either color scheme.",
-                        );
-                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
-                        .on_hover_text("Disable standard widget transitions in Retivus.");
-                });
-            }
         });
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Learn from any source.");
@@ -862,6 +850,45 @@ mod tests {
         harness.set_size(egui::vec2(720.0, 650.0));
         harness.run();
         assert!(harness.state().selected_sense.is_some());
+    }
+
+    #[test]
+    fn accessibility_toolbar_settings_remain_visible_and_usable_on_narrow_viewports() {
+        use egui_kittest::{kittest::Queryable as _, Harness};
+
+        let mut harness = Harness::new_eframe(|_| Retivus::default());
+        for viewport in [egui::vec2(720.0, 650.0), egui::vec2(1080.0, 800.0)] {
+            harness.set_size(viewport);
+            harness.state_mut().high_contrast = false;
+            harness.state_mut().reduced_motion = false;
+            harness.run();
+
+            for label in ["High contrast", "Reduce motion"] {
+                let widget =
+                    harness.get_by_role_and_label(egui::accesskit::Role::CheckBox, label);
+                let rect = widget.rect();
+                assert!(
+                    rect.min.x >= -1.0
+                        && rect.max.x <= viewport.x + 1.0
+                        && rect.min.y >= -1.0
+                        && rect.max.y <= viewport.y.min(95.0),
+                    "{label} must fit within the visible toolbar at {viewport:?}: {rect:?}"
+                );
+            }
+
+            harness.get_by_label("High contrast").click();
+            harness.run();
+            assert!(
+                harness.state().high_contrast,
+                "narrow-window contrast control must be clickable"
+            );
+            harness.get_by_label("Reduce motion").click();
+            harness.run();
+            assert!(
+                harness.state().reduced_motion,
+                "narrow-window motion control must be clickable"
+            );
+        }
     }
 
     #[test]
