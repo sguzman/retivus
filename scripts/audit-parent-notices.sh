@@ -170,6 +170,28 @@ while IFS=$'\t' read -r name version license status notice; do
       expected_sha=5878605364af97a3358368a6eaef02104af2e016
     fi
   fi
+  # difflib 0.4.0 predates Cargo's VCS provenance metadata. Reconcile
+  # its original published Cargo.toml and all four Rust source modules
+  # byte-for-byte with upstream commit f035fb8 rather than inventing SHA1.
+  if [[ "$name/$version" == "difflib/0.4.0" && "$vcs_sha" == UNAVAILABLE ]]; then
+    for item in \
+      "src/lib.rs@ca6b1cc38b974d95769240c63f47a043083c9d02" \
+      "src/differ.rs@5caef9a7a8d34c7a2c2f8cdb737ded2ed7a9f1d6" \
+      "src/sequencematcher.rs@4157808631acc62605fd6b446d17523ae8a86152" \
+      "src/utils.rs@b711bf82ba0e14439d80806afb70722e60195e03" \
+      "Cargo.toml.orig@2edf6df6a6fc159647a10691c025786ca594cdf8"; do
+      file="${item%@*}"
+      sha="${item##*@}"
+      test "$(git hash-object "$out/source/vendor/$name-$version/$file")" = "$sha" || {
+        echo "diff-lib source no longer matches pinned upstream: $file" >&2; exit 1;
+      }
+    done
+    notice_path="$out/source/LICENSES/upstream/difflib-0.4.0/LICENSE"
+    test -s "$notice_path"
+    test "$(git hash-object "$notice_path")" = "5acedf0412212a99997b78bd36da90c8a91111a7"
+    review=SOURCE_MATCHED_PARENT_NOTICE_PRESENT
+    evidence=LICENSES/upstream/difflib-0.4.0/LICENSE@f035fb8e656f27119e23eca9d5b996df14f3885e
+  fi
   # Validate exact published crate VCS commits before mapping upstream notices.
   key="$name/$version"
   if [[ -n "${extra_sha[$key]+x}" ]]; then
