@@ -107,11 +107,33 @@ jobs:
           CARGO_TARGET_DIR: ${{ github.workspace }}/upstream-anki/target
         run: |
           set -euo pipefail
-          sudo apt-get install -y -qq xvfb xdotool scrot openbox libgl1-mesa-dri libxkbcommon-x11-0
+          sudo apt-get install -y -qq xvfb xdotool wmctrl scrot openbox libgl1-mesa-dri libxkbcommon-x11-0
           cargo build --features anki-backend --bin retivus
           xvfb-run -a bash -euo pipefail -c '
             openbox > /tmp/retivus-feature-wm.log 2>&1 &
             wm=$!
+            # The minimal X11 test can start the egui process before Openbox
+            # has claimed the root window, leaving the app unmapped. This
+            # waits for actual EWMH readiness, without forcibly mapping an
+            # otherwise hidden Retivus window or weakening the smoke check.
+            wm_ready=0
+            for attempt in $(seq 1 60); do
+              if wmctrl -m 2>/dev/null | grep -Fq "Name: Openbox"; then
+                wm_ready=1
+                break
+              fi
+              if ! kill -0 "$wm" 2>/dev/null; then
+                echo "Openbox exited before claiming the display" >&2
+                cat /tmp/retivus-feature-wm.log >&2 || true
+                exit 1
+              fi
+              sleep 0.2
+            done
+            if test "$wm_ready" -ne 1; then
+              echo "Openbox did not become ready before app startup" >&2
+              cat /tmp/retivus-feature-wm.log >&2 || true
+              exit 1
+            fi
             LIBGL_ALWAYS_SOFTWARE=1 ./upstream-anki/target/debug/retivus > /tmp/retivus-feature.log 2>&1 &
             app=$!
             cleanup() {
