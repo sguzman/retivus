@@ -276,3 +276,12 @@
 - ⏳ **Remaining:** M4.5 authenticated AnkiWeb sync or owner-approved deferral (2%), M6.4 accessibility (3%), and M7.1–M7.4 licensing/distribution/release (8%). No user account, physical desktop, or production release/tag has been touched. Strict milestone accounting is unchanged.
 
 **Overall 87% → 87% (Δ +0 pp).** M4 15/17, M6 9/12, M7 0/8.
+
+## Verified 2026-11-03 Wayland/Orca environment isolation (87%, Δ +0 pp)
+
+- ✅ **Independent Wayland rendering and focus events:** [Sway+GTK run 41567126705](https://github.com/sguzman/retivus/actions/runs/41567126705) visibly rendered a native GTK 4 window with Xwayland disabled, and Orca 46.1 received real named-button focus events after a legacy-Xvfb keyboard-map startup workaround. Despite that, **no GTK button label speech** occurred and Orca repeatedly reported an absent active window. This confirms a comparable Orca virtual-environment problem without Retivus/AccessKit. [First run 41566851064](https://github.com/sguzman/retivus/actions/runs/41566851064) failed earlier at Orca startup (`KeyError: DISPLAY`), not a valid spoken-control test.
+- ✅ **QA diagnostics contained:** [Wayland GTK diagnostic](.github/workflows/accessibility-orca-wayland-gtk.yml) is manual-only, retaining logs/screenshots. The existing strict Retivus Orca speech gate remains unchanged; [issue #1](https://github.com/sguzman/retivus/issues/1) and [accessibility QA](docs/accessibility-qa.md) preserve the distinction between the virtual-session limitation and the application's unresolved real-user acceptance.
+- ⏳ **Remaining 13% unchanged:** M4.5 (2%), M6.4 (3%), M7.1–M7.4 (8%). No full physical Wayland+Orca assessment, authenticated AnkiWeb sync, legal signoff or published release.
+
+**Verified total: 87% → 87%, Δ +0 pp.**
+

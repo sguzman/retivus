@@ -1,9 +1,7 @@
 name: Orca native Wayland GTK control diagnostic
+# Manual environment diagnostic; cannot be a release gate until actual
+# Orca focused-control speech works for unrelated native GTK under virtual Sway.
 on:
-  push:
-    paths:
-      - .github/workflows/accessibility-orca-wayland-gtk.yml
-      - scripts/qa-orca-wayland-gtk.sh
   workflow_dispatch:
 permissions:
   contents: read
