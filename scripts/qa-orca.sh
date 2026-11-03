@@ -66,10 +66,9 @@ done
 [[ -n "$window" ]] || { echo "Retivus window not found"; exit 1; }
 xdotool windowactivate --sync "$window"
 sleep 2
-# Dynamic check uses the same known-good Orca and DBus session.
-# Wake Orca's focus tracking on the real File input before the status update.
-# There has not yet been any static keyboard-navigation event flood.
-xdotool mousemove --window "$window" 130 305 click 1
+# Dynamic check uses the same Orca and D-Bus session, without
+# introducing an unrelated File-focus transition immediately before the
+# live-status event. The static File/Validate keyboard checks still run below.
 sleep 1
 announce_start="$(wc -c < "$debug")"
 # The 800x600 native content frame places Validate source at x=8..105,
