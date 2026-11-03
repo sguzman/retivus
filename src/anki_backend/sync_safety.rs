@@ -3,7 +3,7 @@
 //! Deliberately separate from the rest of the collection backend.
 use super::{check_managed_media, check_regular, AnkiBackend, BackendResult};
 use std::fs::{self, File};
-use std::io::{self, Read};
+use std::io;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 use zip::write::SimpleFileOptions;
@@ -37,10 +37,14 @@ impl AnkiBackend {
         // Anki to produce the history-preserving package.
         verify_media_tree(&media, &media)?;
 
-        if !destination.is_absolute() || destination.extension().and_then(|x| x.to_str()) != Some("zip") {
+        if !destination.is_absolute()
+            || destination.extension().and_then(|x| x.to_str()) != Some("zip")
+        {
             return Err("recovery destination must be an absolute .zip path".into());
         }
-        let filename = destination.file_name().ok_or("recovery filename is required")?;
+        let filename = destination
+            .file_name()
+            .ok_or("recovery filename is required")?;
         let parent_arg = destination.parent().ok_or("recovery parent is required")?;
         check_regular(parent_arg, true)?;
         let parent = fs::canonicalize(parent_arg)?;
@@ -52,7 +56,9 @@ impl AnkiBackend {
             return Err("recovery file already exists; refusing overwrite".into());
         }
 
-        let staging = Builder::new().prefix(".retivus-pre-sync-").tempdir_in(&parent)?;
+        let staging = Builder::new()
+            .prefix(".retivus-pre-sync-")
+            .tempdir_in(&parent)?;
         let database = staging.path().join("collection.anki2");
         let apkg = staging.path().join("study-with-history.apkg");
         self.backup_to(&database)?;
@@ -94,7 +100,9 @@ fn copy_file(zip: &mut BundleZip<'_>, name: &str, path: &Path) -> BackendResult<
     zip.start_file(name, SimpleFileOptions::default())?;
     let size = io::copy(&mut input, zip)?;
     let after = fs::symlink_metadata(path)?;
-    if !after.file_type().is_file() || before.len() != size || before.len() != after.len()
+    if !after.file_type().is_file()
+        || before.len() != size
+        || before.len() != after.len()
         || before.modified()? != after.modified()?
     {
         return Err("a recovery source file changed while being copied".into());
@@ -151,6 +159,7 @@ fn append_media(zip: &mut BundleZip<'_>, root: &Path, dir: &Path) -> BackendResu
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Read;
     use tempfile::tempdir;
 
     #[test]
@@ -162,28 +171,47 @@ mod tests {
         let initial = profile.collection_stats().unwrap();
         let media = dir.path().join("safe/collection.media/extra");
         fs::create_dir_all(&media).unwrap();
-        fs::write(media.join("private-unreferenced.bin"), b"private synthetic media").unwrap();
+        fs::write(
+            media.join("private-unreferenced.bin"),
+            b"private synthetic media",
+        )
+        .unwrap();
 
         let bundle = dir.path().join("offline-pre-sync.zip");
         profile.create_pre_sync_recovery_bundle(&bundle).unwrap();
         let mut archive = zip::ZipArchive::new(File::open(&bundle).unwrap()).unwrap();
         assert!(archive.by_name("RECOVERY-README.txt").is_ok());
         let mut bytes = Vec::new();
-        archive.by_name("collection.anki2").unwrap().read_to_end(&mut bytes).unwrap();
+        archive
+            .by_name("collection.anki2")
+            .unwrap()
+            .read_to_end(&mut bytes)
+            .unwrap();
         assert!(bytes.starts_with(b"SQLite format 3\0"));
         bytes.clear();
-        archive.by_name("study-with-history.apkg").unwrap().read_to_end(&mut bytes).unwrap();
+        archive
+            .by_name("study-with-history.apkg")
+            .unwrap()
+            .read_to_end(&mut bytes)
+            .unwrap();
         assert!(bytes.starts_with(b"PK"));
         bytes.clear();
-        archive.by_name("collection.media/extra/private-unreferenced.bin")
-            .unwrap().read_to_end(&mut bytes).unwrap();
+        archive
+            .by_name("collection.media/extra/private-unreferenced.bin")
+            .unwrap()
+            .read_to_end(&mut bytes)
+            .unwrap();
         assert_eq!(bytes, b"private synthetic media");
         assert_eq!(profile.collection_stats().unwrap(), initial);
         assert!(profile.create_pre_sync_recovery_bundle(&bundle).is_err());
-        assert!(profile.create_pre_sync_recovery_bundle(Path::new("relative.zip")).is_err());
+        assert!(profile
+            .create_pre_sync_recovery_bundle(Path::new("relative.zip"))
+            .is_err());
 
         let mut transient = AnkiBackend::in_memory().unwrap();
-        assert!(transient.create_pre_sync_recovery_bundle(&dir.path().join("invalid.zip")).is_err());
+        assert!(transient
+            .create_pre_sync_recovery_bundle(&dir.path().join("invalid.zip"))
+            .is_err());
         assert!(!dir.path().join("invalid.zip").exists());
     }
 
