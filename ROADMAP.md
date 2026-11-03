@@ -285,3 +285,12 @@
 
 **Verified total: 87% → 87%, Δ +0 pp.**
 
+
+## 2026-11-03 verified narrow Wayland toolbar fix (87%, Δ +0 pp)
+
+- ✅ **M6.4 visual sub-defect closed, not full milestone:** [feature-enabled Anki CI 41667670187](https://github.com/sguzman/retivus/actions/runs/41667670187) passed the real Sway Wayland smoke and captured populated review and provenance-conflict screenshots at both 1080×800 and 720×650. The earlier 720×650 high-contrast screenshots contained an empty, unpainted toolbar band. The new screenshots were opened and visually inspected: both `High contrast` and `Reduce motion` visibly render, checked, at the narrow size in Light and Dark high-contrast scenes. The final fix [`58a1b91`](https://github.com/sguzman/retivus/commit/58a1b914db59b124a6929164ce77fd3ceda95e57) puts narrow settings inside the central panel outside the toolbar clipping scope. [Foundation 41570073956](https://github.com/sguzman/retivus/actions/runs/41570073956), [end-to-end 41570073728](https://github.com/sguzman/retivus/actions/runs/41570073728), and [complete Linux candidate 41570073802](https://github.com/sguzman/retivus/actions/runs/41570073802) passed on this application code. An independently SHA256-verified candidate binary also launched and rendered narrow High contrast in disposable X11.
+- ✅ **Intermittent X11 smoke hardening:** [`b99b347`](https://github.com/sguzman/retivus/commit/b99b3479335c0bb7705cf7af9b5655050b174d43) added explicit Openbox EWMH readiness before launching the feature-enabled X11 app. This removes a test-harness start-order race observed in disposable Xvfb; its own GitHub workflow verification is separate from the passing application revision.
+- 🟡 **M6.4 remains blocked at 0/3:** no passed physical Wayland+Orca dynamic announcements or full real-assistive-technology acceptance; [issue #1](https://github.com/sguzman/retivus/issues/1) retains the virtual Orca caveat. AnkiWeb authenticated sync and M7 release gates still need independent acceptance.
+
+**Verified whole-project progress remains 87% → 87%; Δ +0 pp.**
+
