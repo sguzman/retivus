@@ -66,14 +66,27 @@ while IFS=$'\t' read -r name version license status notice; do
       *) upstream=UNDECLARED ;;
     esac
   fi
+  vcs_file="$out/source/vendor/$name-$version/.cargo_vcs_info.json"
+  vcs_sha=UNAVAILABLE
+  vcs_path=-
+  if [[ -s "$vcs_file" ]]; then
+    vcs_sha="$(jq -er '.git.sha1 // empty' "$vcs_file")"
+    vcs_path="$(jq -r '.path_in_vcs // ""' "$vcs_file")"
+    [[ "$vcs_sha" =~ ^[0-9a-f]{40}$ ]] || { echo "Invalid VCS provenance for $name $version" >&2; exit 1; }
+  fi
   review=REVIEW_PARENT_OR_UPSTREAM
   evidence=-
+  expected_sha=
   if [[ "$upstream" == "https://github.com/ankitects/anki" && "$version" == 0.0.0 ]]; then
     review=PINNED_PARENT_NOTICES_PRESENT
     evidence=LICENSES/ANKI-PINNED-LICENSE.txt,LICENSES/ANKI-PINNED-CONTRIBUTORS.txt
+    # Anki is a pinned Git dependency; registry .cargo_vcs_info is absent.
+    vcs_sha=136bd42bfbd356fc756b6d3e28cc77b02da11ea7
+    expected_sha="$vcs_sha"
   elif [[ "$upstream" == https://github.com/emilk/egui* && "$version" == 0.33.3 ]]; then
     review=PINNED_PARENT_NOTICES_PRESENT
     evidence=LICENSES/upstream/egui-0.33.3/LICENSE-MIT,LICENSES/upstream/egui-0.33.3/LICENSE-APACHE
+    expected_sha=44cdd653e2317d300fb8a6c9c36b03f23991e803
     if [[ "$name" == epaint_default_fonts ]]; then
       # Embedded font licenses and copyrights are distinct from egui itself.
       # They already travel with the vendored source; verify every known file.
@@ -88,19 +101,21 @@ while IFS=$'\t' read -r name version license status notice; do
   if [[ "$upstream" == "https://github.com/madsmtm/objc2" ]]; then
     objc_tag=
     objc_file=
+    objc_sha=
     case "$name/$version" in
-      block2/0.5.1) objc_tag=block2-0.5.1; objc_file=LICENSE.txt ;;
-      objc-sys/0.3.5) objc_tag=objc-sys-0.3.5; objc_file=LICENSE.txt ;;
-      objc2/0.5.3) objc_tag=objc2-0.5.3; objc_file=LICENSE.txt ;;
-      objc2-*/0.2.2) objc_tag=frameworks-0.2.2; objc_file=LICENSE.txt ;;
-      dispatch2/0.3.1) objc_tag=dispatch2-0.3.1; objc_file=LICENSE.md ;;
-      objc2/0.6.5) objc_tag=objc2-0.6.5; objc_file=LICENSE.md ;;
-      objc2-encode/4.1.0) objc_tag=objc2-encode-4.1.0; objc_file=LICENSE.md ;;
-      objc2-*/0.3.2) objc_tag=frameworks-0.3.2; objc_file=LICENSE.md ;;
+      block2/0.5.1) objc_tag=block2-0.5.1; objc_file=LICENSE.txt; objc_sha=4fc083f1c6d6784577e38b0ee8dbd344481e2fd2 ;;
+      objc-sys/0.3.5) objc_tag=objc-sys-0.3.5; objc_file=LICENSE.txt; objc_sha=4fc083f1c6d6784577e38b0ee8dbd344481e2fd2 ;;
+      objc2/0.5.3) objc_tag=objc2-0.5.3; objc_file=LICENSE.txt; objc_sha=5237cbf081d04ef75a1f6a207b4018e7c1ae7438 ;;
+      objc2-*/0.2.2) objc_tag=frameworks-0.2.2; objc_file=LICENSE.txt; objc_sha=e282618be4c3a3b9542957e0c8540e9588472ce8 ;;
+      dispatch2/0.3.1) objc_tag=dispatch2-0.3.1; objc_file=LICENSE.md; objc_sha=8852b424193ca41602281b3d7540d7c8ed51e49a ;;
+      objc2/0.6.5) objc_tag=objc2-0.6.5; objc_file=LICENSE.md; objc_sha=d7d2fa23ceaa5e6096c923b081040e5d81b3b9df ;;
+      objc2-encode/4.1.0) objc_tag=objc2-encode-4.1.0; objc_file=LICENSE.md; objc_sha=8d214f5477365ffcbcbb7de058c86ed9a518efb7 ;;
+      objc2-*/0.3.2) objc_tag=frameworks-0.3.2; objc_file=LICENSE.md; objc_sha=7b1abfd750a2cacaea71d6a56ecfb83cb7de560b ;;
     esac
     if [[ -n "$objc_tag" ]]; then
       review=PINNED_PARENT_NOTICES_PRESENT
       evidence="LICENSES/upstream/objc2/$objc_file@${objc_tag}"
+      expected_sha="$objc_sha"
     fi
   fi
   if [[ "$upstream" == "https://github.com/AccessKit/accesskit" ]]; then
@@ -118,15 +133,30 @@ while IFS=$'\t' read -r name version license status notice; do
     if [[ -n "$ak_tag" ]]; then
       review=PINNED_PARENT_NOTICES_PRESENT
       evidence="LICENSES/upstream/accesskit/{LICENSE-MIT,LICENSE-APACHE,AUTHORS,LICENSE.chromium}@${ak_tag}"
+      case "$name/$version" in
+        accesskit/0.21.1|accesskit_consumer/0.30.1) expected_sha=0b6901a8c8e6fb1cb5a2dc7c19dc7bee1cc5ad09 ;;
+        *) expected_sha=5801c4a49ff9b2c9ec3f77b3c31272d0da4c5cd3 ;;
+      esac
     fi
   fi
   if [[ "$upstream" == "https://github.com/open-i18n/rust-unic/" && "$version" == "0.9.0" && "$name" == unic-* ]]; then
     review=PINNED_PARENT_NOTICES_PRESENT
     evidence="LICENSES/upstream/rust-unic-0.9.0/{LICENSE-MIT,LICENSE-APACHE,AUTHORS,COPYRIGHT.md}@v0.9.0"
+    if [[ "$name" == unic-ucd-category ]]; then
+      expected_sha=8a6ce83063d90b91ae2ce59eddb803edd393fca9
+    else
+      expected_sha=5878605364af97a3358368a6eaef02104af2e016
+    fi
   fi
-  # Evidence presence is NOT a legal clearance decision; retain every row
-  # for the final M7.1 human/provenance review, including inherited notices.
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$version" "$license" "$upstream" "$review" "$evidence" >> "$report"
+  # Validate exact published crate VCS commits before mapping upstream notices.
+  # The upstream root notice Git blobs also matched these published commits.
+  if [[ -n "$expected_sha" && "$vcs_sha" != "$expected_sha" ]]; then
+    echo "VCS source revision changed for reviewed crate $name $version: $vcs_sha, expected $expected_sha" >&2
+    exit 1
+  fi
+  # Evidence presence is NOT a legal clearance decision. Retain unresolved
+  # and evidenced rows, including the published crate source revision.
+  printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' "$name" "$version" "$license" "$upstream" "$review" "$evidence" "$vcs_sha" "$vcs_path" >> "$report"
   if [[ "$review" == REVIEW_PARENT_OR_UPSTREAM ]]; then ((pending += 1)); else ((evidenced += 1)); fi
   ((count += 1))
 done < "$out/LICENSE-FILE-AUDIT.tsv"
