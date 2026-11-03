@@ -1,0 +1,40 @@
+name: Orca alert semantics isolation
+on:
+  push:
+    paths:
+      - .github/workflows/accessibility-alert-experiment.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  alert:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check strict QA script syntax
+        run: bash -n scripts/qa-orca.sh
+      - name: Install actual Orca, speech service and X11 session
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0 scrot
+      - name: Build debug-only alternative without modifying release semantics
+        run: cargo build --locked --bin retivus
+      - name: Require changed-status speech from assertive alert
+        env:
+          RETIVUS_QA_ALERT_STATUS: '1'
+        run: dbus-run-session -- xvfb-run -a bash scripts/qa-orca.sh "$PWD/target/debug/retivus"
+      - name: Retain actual Orca event and speech evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-orca-alert-isolation-evidence
+          path: |
+            ${{ runner.temp }}/retivus-orca-debug.log
+            ${{ runner.temp }}/retivus-orca-speech.txt
+            ${{ runner.temp }}/retivus-orca-after-validation.png
+            ${{ runner.temp }}/retivus-orca-startup.log
+            ${{ runner.temp }}/retivus-orca-app.log
+          if-no-files-found: ignore
+          retention-days: 2

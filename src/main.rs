@@ -499,15 +499,28 @@ impl eframe::App for Retivus {
                 let import_status = ui
                     .push_id("import-status-live-region", |ui| ui.label(&self.import_status))
                     .inner;
+                // M6.4 isolated QA experiment only: test whether Orca handles
+                // assertive alert semantics differently from a polite status.
+                // Release builds always retain the existing status semantics.
+                #[cfg(debug_assertions)]
+                let qa_alert = std::env::var_os("RETIVUS_QA_ALERT_STATUS")
+                    .is_some_and(|value| value == "1");
+                #[cfg(not(debug_assertions))]
+                let qa_alert = false;
                 ui.ctx().accesskit_node_builder(import_status.id, |node| {
-                    // A live property on a generic label did not trigger a
-                    // spoken announcement in real Orca/AT-SPI testing. Expose
-                    // this changing result as a semantic, atomic status node.
-                    node.set_role(egui::accesskit::Role::Status);
+                    node.set_role(if qa_alert {
+                        egui::accesskit::Role::Alert
+                    } else {
+                        egui::accesskit::Role::Status
+                    });
                     // Egui labels expose their text as a value; AT-SPI live
                     // announcements are triggered by accessible NAME changes.
                     node.set_label(self.import_status.clone());
-                    node.set_live(egui::accesskit::Live::Polite);
+                    node.set_live(if qa_alert {
+                        egui::accesskit::Live::Assertive
+                    } else {
+                        egui::accesskit::Live::Polite
+                    });
                     node.set_live_atomic();
                 });
                 if let Some(chosen) = self.selected_sense.clone() {
