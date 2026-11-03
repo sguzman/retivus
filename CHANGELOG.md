@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added synthetic-server acceptance for successful Anki media upload and download paths, including media-index sequence/state assertions and private pre-sync recovery round trips. Tests do not establish live-account compatibility.
 - Added a separately approved, backend-only AnkiWeb media-sync API using pinned Anki Rust, with private media-index-preserving recovery before remote calls. Synthetic HTTP failure and recoverability tests passed; successful live media synchronization remains unverified.
 - Added consistent media-sync database snapshots and integrity-checked restoration to private pre-sync recovery ZIPs, preserving registered media state as well as files.
 - Added a backend-only, explicitly authorized normal Anki collection-sync path that publishes a validated private recovery archive before login, and refuses automatic full-upload/full-download decisions. Synthetic tests verify consent enforcement and the safe full-sync refusal; real AnkiWeb conflicts/media remain unverified.

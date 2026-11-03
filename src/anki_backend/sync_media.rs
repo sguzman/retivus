@@ -407,7 +407,10 @@ mod tests {
                 stream
                     .set_read_timeout(Some(Duration::from_secs(10)))
                     .unwrap();
-                assert!(recovery_at_server.is_file(), "recovery must precede network I/O");
+                assert!(
+                    recovery_at_server.is_file(),
+                    "recovery must precede network I/O"
+                );
                 let mut request = Vec::new();
                 let mut buffer = [0_u8; 8192];
                 loop {
@@ -490,7 +493,10 @@ mod tests {
             &recovery,
         )
         .unwrap();
-        assert!(!root.path().join("restored/collection.media/remote.txt").exists());
+        assert!(!root
+            .path()
+            .join("restored/collection.media/remote.txt")
+            .exists());
         let count: i64 = rusqlite::Connection::open(root.path().join("restored/collection.mdb"))
             .unwrap()
             .query_row("SELECT count(*) FROM media", [], |row| row.get(0))
