@@ -62,6 +62,8 @@ jobs:
           grep -Fx 'source/LINUX-TARGET-DEPENDENCIES.tsv' "$root/archive-index.txt"
           grep -Fx 'source/LINUX-TARGET-NOTICE-REVIEW.tsv' "$root/archive-index.txt"
           grep -Fx 'source/docs/release-notice-exceptions.md' "$root/archive-index.txt"
+          grep -Fx 'source/LICENSES/upstream/hexf-parse-0.2.1/CC0-1.0-SPDX.txt' "$root/archive-index.txt"
+          grep -Fx 'source/LICENSES/upstream/hexf-parse-0.2.1/DEBIAN-PACKAGING-ATTRIBUTION.md' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/intl_pluralrules-7.0.2/LICENSE-MIT' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/intl_pluralrules-7.0.2/LICENSE-APACHE' "$root/archive-index.txt"

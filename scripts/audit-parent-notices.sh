@@ -175,6 +175,18 @@ while IFS=$'\t' read -r name version license status notice; do
       expected_sha=5878605364af97a3358368a6eaef02104af2e016
     fi
   fi
+  # hexf-parse's upstream publishes its CC0-1.0 declaration but no complete
+  # standalone text. Debian's independent attribution and SPDX canonical CC0
+  # text are bundled as corroboration, not a substituted upstream license.
+  if [[ "$name/$version" == "hexf-parse/0.2.1" ]]; then
+    [[ "$upstream" == "https://github.com/lifthrasiir/hexf" ]] || { echo "hexf-parse upstream changed" >&2; exit 1; }
+    [[ "$license" == "CC0-1.0" ]] || { echo "hexf-parse license changed" >&2; exit 1; }
+    test "$(git hash-object "$out/source/LICENSES/upstream/hexf-parse-0.2.1/CC0-1.0-SPDX.txt")" = "0e259d42c996742e9e3cba14c677129b2c1b6311" || { echo "CC0 canonical text changed" >&2; exit 1; }
+    test "$(git hash-object "$out/source/LICENSES/upstream/hexf-parse-0.2.1/DEBIAN-PACKAGING-ATTRIBUTION.md")" = "ad56f5ed1b8e9f6d1e0508de5b28849e1124be95" || { echo "Debian hexf attribution changed" >&2; exit 1; }
+    expected_sha=4225763d744183d720f575ae96d04161b4d08ea0
+    review=DEBIAN_PACKAGING_NOTICE_PRESENT
+    evidence="LICENSES/upstream/hexf-parse-0.2.1/DEBIAN-PACKAGING-ATTRIBUTION.md,LICENSES/upstream/hexf-parse-0.2.1/CC0-1.0-SPDX.txt"
+  fi
   # difflib 0.4.0 predates Cargo's VCS provenance metadata. Reconcile
   # its original published Cargo.toml and all four Rust source modules
   # byte-for-byte with upstream commit f035fb8 rather than inventing SHA1.
