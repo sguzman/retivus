@@ -275,10 +275,8 @@ fn snapshot_media_database(source: &Path, destination: &Path) -> BackendResult<(
     if fs::symlink_metadata(destination).is_ok() {
         return Err("refusing to overwrite staged media database snapshot".into());
     }
-    let connection = rusqlite::Connection::open_with_flags(
-        source,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
+    let connection =
+        rusqlite::Connection::open_with_flags(source, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
     connection.execute(
         "VACUUM INTO ?1",
         [destination
@@ -294,19 +292,15 @@ fn snapshot_media_database(source: &Path, destination: &Path) -> BackendResult<(
 /// A corrupt media index must never be published in a recovered profile.
 fn verify_media_database(path: &Path) -> BackendResult<()> {
     check_regular(path, false)?;
-    let connection = rusqlite::Connection::open_with_flags(
-        path,
-        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-    )?;
-    let integrity: String =
-        connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
+    let connection =
+        rusqlite::Connection::open_with_flags(path, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)?;
+    let integrity: String = connection.query_row("PRAGMA integrity_check", [], |row| row.get(0))?;
     if integrity != "ok" {
         return Err("media sync index failed SQLite integrity check".into());
     }
-    let _: (i64, i64) =
-        connection.query_row("SELECT dirMod, lastUsn FROM meta", [], |row| {
-            Ok((row.get(0)?, row.get(1)?))
-        })?;
+    let _: (i64, i64) = connection.query_row("SELECT dirMod, lastUsn FROM meta", [], |row| {
+        Ok((row.get(0)?, row.get(1)?))
+    })?;
     let _: i64 = connection.query_row("SELECT count(*) FROM media", [], |row| row.get(0))?;
     Ok(())
 }
@@ -670,7 +664,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let mut profile = AnkiBackend::create_managed_profile(dir.path(), "source").unwrap();
         let media = profile.collection.media().unwrap();
-        media.add_file("registered.png", b"registered synthetic media").unwrap();
+        media
+            .add_file("registered.png", b"registered synthetic media")
+            .unwrap();
         drop(media);
         let original_index = dir.path().join("source/collection.mdb");
         verify_media_database(&original_index).unwrap();
@@ -691,12 +687,9 @@ mod tests {
         assert!(bytes.starts_with(b"SQLite format 3\0"));
         drop(zip);
 
-        let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
-            dir.path(),
-            "restored",
-            &archive,
-        )
-        .unwrap();
+        let restored =
+            AnkiBackend::restore_pre_sync_recovery_as_new_profile(dir.path(), "restored", &archive)
+                .unwrap();
         let recovered_index = dir.path().join("restored/collection.mdb");
         verify_media_database(&recovered_index).unwrap();
         let restored_count: i64 = rusqlite::Connection::open(&recovered_index)
@@ -731,7 +724,9 @@ mod tests {
                 .start_file(&name, SimpleFileOptions::default())
                 .unwrap();
             if name == "collection.mdb" {
-                writer.write_all(b"invalid media sync sqlite database").unwrap();
+                writer
+                    .write_all(b"invalid media sync sqlite database")
+                    .unwrap();
             } else {
                 io::copy(&mut member, &mut writer).unwrap();
             }
