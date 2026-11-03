@@ -20,6 +20,8 @@ grep -Fx 'Offline Cargo metadata: PASS' "$sources/SOURCE-AUDIT.txt"
 test -s "$sources/THIRD-PARTY-SOURCES.tsv"
 test -s "$sources/LICENSE-FILE-AUDIT.tsv"
 test -s "$sources/PARENT-NOTICE-REVIEW.tsv"
+test -s "$sources/LINUX-TARGET-DEPENDENCIES.tsv"
+test -s "$sources/LINUX-TARGET-NOTICE-REVIEW.tsv"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 tar --zstd -xf "$binary" -C "$tmp"
@@ -35,6 +37,8 @@ grep -Fx "Cargo.lock sha256: $lock_sha" "$sources/SOURCE-AUDIT.txt"
 cmp "$sources/THIRD-PARTY-SOURCES.tsv" <(tar --zstd -xOf "$source_archive" source/THIRD-PARTY-SOURCES.tsv)
 cmp "$sources/LICENSE-FILE-AUDIT.tsv" <(tar --zstd -xOf "$source_archive" source/LICENSE-FILE-AUDIT.tsv)
 cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/PARENT-NOTICE-REVIEW.tsv)
+cmp "$sources/LINUX-TARGET-DEPENDENCIES.tsv" <(tar --zstd -xOf "$source_archive" source/LINUX-TARGET-DEPENDENCIES.tsv)
+cmp "$sources/LINUX-TARGET-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/LINUX-TARGET-NOTICE-REVIEW.tsv)
 cmp "$binary_root/share/doc/retivus/source/docs/release-notice-exceptions.md" <(tar --zstd -xOf "$source_archive" source/docs/release-notice-exceptions.md)
 for notice in LICENSE-MIT LICENSE-APACHE; do
   cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/intl_pluralrules-7.0.2/$notice" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/intl_pluralrules-7.0.2/$notice")

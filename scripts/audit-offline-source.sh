@@ -98,9 +98,12 @@ test -s "$out/THIRD-PARTY-SOURCES.tsv"
 # Record concrete license-file evidence, including missing top-level files.
 bash "$repo/scripts/audit-license-files.sh" "$out"
 bash "$repo/scripts/audit-parent-notices.sh" "$out"
+bash "$repo/scripts/audit-linux-notices.sh" "$out"
 install -m644 "$out/THIRD-PARTY-SOURCES.tsv" "$out/source/THIRD-PARTY-SOURCES.tsv"
 install -m644 "$out/LICENSE-FILE-AUDIT.tsv" "$out/source/LICENSE-FILE-AUDIT.tsv"
 install -m644 "$out/PARENT-NOTICE-REVIEW.tsv" "$out/source/PARENT-NOTICE-REVIEW.tsv"
+install -m644 "$out/LINUX-TARGET-DEPENDENCIES.tsv" "$out/source/LINUX-TARGET-DEPENDENCIES.tsv"
+install -m644 "$out/LINUX-TARGET-NOTICE-REVIEW.tsv" "$out/source/LINUX-TARGET-NOTICE-REVIEW.tsv"
 registry_count="$(grep -c '^source = "registry+' "$repo/Cargo.lock")"
 vendored_count="$(find "$out/source/vendor" -mindepth 2 -maxdepth 2 -name '.cargo-checksum.json' -type f | wc -l)"
 if (( vendored_count < registry_count )); then
@@ -125,6 +128,8 @@ trap 'rm -rf "$empty_home"' EXIT
   printf 'Registry packages: %s\n' "$registry_count"
   printf 'Vendored crates: %s\n' "$vendored_count"
   printf 'Offline Cargo metadata: PASS\n'
+  printf 'Linux target normal/build dependency graph: VERIFIED (x86_64-unknown-linux-gnu)\n'
+  printf 'Linux target notice review: scope classification only; NOT CERTIFIED\n'
   printf 'Pinned Anki proto build inputs: %s\n' "$expected_anki"
   printf 'Pinned Anki license and contributor notices: PASS (%s)\n' "$expected_anki"
   printf 'Pinned egui 0.33.3 parent notices: Git blob verified\n'

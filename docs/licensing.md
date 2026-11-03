@@ -94,6 +94,12 @@ The `difflib 0.4.0` published crate has no `.cargo_vcs_info.json`. Its original 
 
 The three remaining notice exceptions lacking an independently sourced standalone upstream notice are documented in [the release-blocker ledger](release-notice-exceptions.md); their source identity and Cargo license fields are evidence, not a waiver of required downstream attribution. The `intl_pluralrules 7.0.2` upstream subdirectory includes **actual** `LICENSE-MIT` and `LICENSE-APACHE` texts at its exact published VCS revision, which are now pinned and checked byte-for-byte even though the crates.io package omitted them.
 
+## Linux target-specific notice scope (release gate)
+
+The independent source audit now produces `LINUX-TARGET-DEPENDENCIES.tsv` from Cargo's offline `x86_64-unknown-linux-gnu` **normal and build** dependency graph, and `LINUX-TARGET-NOTICE-REVIEW.tsv` annotating all rows from the *unchanged* all-platform parent-notice inventory. The report distinguishes dependencies reachable in the Linux release's normal/build graph from those only retained in the full cross-platform Cargo source bundle. These reports are included in the checksummed source distribution and checked byte-for-byte at binary/source parity.
+
+The target graph excludes dev-only dependencies and irrelevant non-Linux target dependencies, but **it is not a proof of which source code was actually linked into a specific executable**. Both present and absent target-graph packages still require the appropriate review for any platforms actually distributed. An upstream `Cargo.toml` license declaration does not substitute for required notice text. M7.1 remains pending.
+
 ## Upstream parent-notice review queue
 
 The source audit also generates **`PARENT-NOTICE-REVIEW.tsv`** for dependencies without a recognized crate-local notice. It records each crate name/version, declared SPDX expression, and its Cargo-manifest upstream repository URL (or the known pinned Anki upstream repository for Anki's workspace crates). The report is retained beside and embedded in the checksummed source archive; binary/source parity must compare the two copies exactly. This transforms the unresolved 72 entries into a traceable upstream review queue. **A repository URL is not notice text and does not certify legal compatibility or resolve any entry; each actual corresponding copyright/license notice still requires review.**

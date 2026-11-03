@@ -5,6 +5,7 @@ on:
       - scripts/audit-offline-source.sh
       - scripts/audit-license-files.sh
       - scripts/audit-parent-notices.sh
+      - scripts/audit-linux-notices.sh
       - .github/workflows/source-bundle-audit.yml
   workflow_dispatch:
   workflow_call:
@@ -34,6 +35,7 @@ jobs:
           bash -n scripts/audit-offline-source.sh
           bash -n scripts/audit-license-files.sh
           bash -n scripts/audit-parent-notices.sh
+          bash -n scripts/audit-linux-notices.sh
       - name: Vendor all locked Cargo sources and verify offline dependency graph
         run: bash scripts/audit-offline-source.sh "$RUNNER_TEMP/retivus-source-audit"
       - name: Build checksummed source-distribution candidate
@@ -57,6 +59,8 @@ jobs:
           grep -Fx 'source/THIRD-PARTY-SOURCES.tsv' "$root/archive-index.txt"
           grep -Fx 'source/LICENSE-FILE-AUDIT.tsv' "$root/archive-index.txt"
           grep -Fx 'source/PARENT-NOTICE-REVIEW.tsv' "$root/archive-index.txt"
+          grep -Fx 'source/LINUX-TARGET-DEPENDENCIES.tsv' "$root/archive-index.txt"
+          grep -Fx 'source/LINUX-TARGET-NOTICE-REVIEW.tsv' "$root/archive-index.txt"
           grep -Fx 'source/docs/release-notice-exceptions.md' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/intl_pluralrules-7.0.2/LICENSE-MIT' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/intl_pluralrules-7.0.2/LICENSE-APACHE' "$root/archive-index.txt"
@@ -89,6 +93,8 @@ jobs:
             ${{ runner.temp }}/retivus-source-audit/THIRD-PARTY-SOURCES.tsv
             ${{ runner.temp }}/retivus-source-audit/LICENSE-FILE-AUDIT.tsv
             ${{ runner.temp }}/retivus-source-audit/PARENT-NOTICE-REVIEW.tsv
+            ${{ runner.temp }}/retivus-source-audit/LINUX-TARGET-DEPENDENCIES.tsv
+            ${{ runner.temp }}/retivus-source-audit/LINUX-TARGET-NOTICE-REVIEW.tsv
             ${{ runner.temp }}/retivus-source-audit/SOURCE-AUDIT.txt
           if-no-files-found: error
           retention-days: 7
