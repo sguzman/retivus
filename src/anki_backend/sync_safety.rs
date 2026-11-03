@@ -129,14 +129,14 @@ impl AnkiBackend {
         let mut total_size = 0_u64;
         for index in 0..archive.len() {
             let member = archive.by_index(index)?;
-            let name = member.name();
+            let name = member.name()?.to_string();
             if member.is_dir()
                 || member.unix_mode().is_some_and(|mode| {
                     let kind = mode & 0o170000;
                     kind != 0 && kind != 0o100000
                 })
-                || !valid_recovery_member_name(name)
-                || !names.insert(name.to_string())
+                || !valid_recovery_member_name(&name)
+                || !names.insert(name)
             {
                 return Err("invalid, duplicate or unsafe recovery ZIP member".into());
             }
@@ -164,7 +164,7 @@ impl AnkiBackend {
         let exported = staged.path().join(".verify-history.apkg");
         for index in 0..archive.len() {
             let mut member = archive.by_index(index)?;
-            let name = member.name().to_string();
+            let name = member.name()?.into_owned();
             if name == "RECOVERY-README.txt" {
                 // Verify CRC even for an informational member.
                 let bytes = io::copy(&mut member, &mut io::sink())?;
@@ -388,7 +388,7 @@ mod tests {
 
         let bundle = dir.path().join("pre-sync.zip");
         profile.create_pre_sync_recovery_bundle(&bundle).unwrap();
-        let mut recovered =
+        let recovered =
             AnkiBackend::restore_pre_sync_recovery_as_new_profile(dir.path(), "recovered", &bundle)
                 .unwrap();
         assert_eq!(recovered.collection_stats().unwrap(), expected);
@@ -438,7 +438,7 @@ mod tests {
             for idx in 0..original.len() {
                 let mut entry = original.by_index(idx).unwrap();
                 writer
-                    .start_file(entry.name(), SimpleFileOptions::default())
+                    .start_file(entry.name().unwrap(), SimpleFileOptions::default())
                     .unwrap();
                 io::copy(&mut entry, &mut writer).unwrap();
             }
