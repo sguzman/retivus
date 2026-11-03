@@ -43,6 +43,17 @@ test -z "$(git -C "$anki_source" status --porcelain --untracked-files=no)" || {
   echo "Refusing modified Anki proto source checkout" >&2
   exit 1
 }
+# Preserve the exact upstream Anki license declaration and contributor
+# attribution from the same pinned revision as the vendored Rust crates.
+# Anki's root LICENSE also identifies separately licensed source portions;
+# Retivus's own AGPL text is not a substitute for that attribution.
+mkdir -p "$out/source/LICENSES"
+git -C "$anki_source" show HEAD:LICENSE > "$out/source/LICENSES/ANKI-PINNED-LICENSE.txt"
+git -C "$anki_source" show HEAD:CONTRIBUTORS > "$out/source/LICENSES/ANKI-PINNED-CONTRIBUTORS.txt"
+test -s "$out/source/LICENSES/ANKI-PINNED-LICENSE.txt"
+test -s "$out/source/LICENSES/ANKI-PINNED-CONTRIBUTORS.txt"
+git -C "$anki_source" show HEAD:LICENSE | cmp - "$out/source/LICENSES/ANKI-PINNED-LICENSE.txt"
+git -C "$anki_source" show HEAD:CONTRIBUTORS | cmp - "$out/source/LICENSES/ANKI-PINNED-CONTRIBUTORS.txt"
 # Include every upstream workspace input referenced by the vendored
 # anki_proto and anki_i18n build scripts, preserving the pinned Git commits.
 git -C "$anki_source" archive --format=tar HEAD proto ftl/core ftl/qt |
@@ -115,6 +126,7 @@ trap 'rm -rf "$empty_home"' EXIT
   printf 'Vendored crates: %s\n' "$vendored_count"
   printf 'Offline Cargo metadata: PASS\n'
   printf 'Pinned Anki proto build inputs: %s\n' "$expected_anki"
+  printf 'Pinned Anki license and contributor notices: PASS (%s)\n' "$expected_anki"
   printf 'Pinned Anki translation submodules: core-repo=%s qt-repo=%s\n' "$(git -C "$anki_source/ftl/core-repo" rev-parse HEAD)" "$(git -C "$anki_source/ftl/qt-repo" rev-parse HEAD)"
   printf 'Source/release licensing and notices: NOT YET CERTIFIED\n'
 } > "$out/SOURCE-AUDIT.txt"

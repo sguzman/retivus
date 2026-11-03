@@ -8,6 +8,8 @@ This notice applies to Retivus builds using the optional `anki-backend` Cargo fe
 - **Upstream license:** **GNU AGPL-3.0-or-later**; see [Anki's full repository LICENSE](https://github.com/ankitects/anki/blob/136bd42bfbd356fc756b6d3e28cc77b02da11ea7/LICENSE) and the [AGPLv3 text](../LICENSE).
 - **Retivus combined-application license:** **AGPL-3.0-or-later**. Original pre-transition Retivus versions were MIT-licensed; see [historical MIT notice](MIT-original.txt).
 
+For source-accompanied release candidates, the source archive also includes byte-exact copies of Anki's pinned upstream `LICENSE` and `CONTRIBUTORS` in `LICENSES/ANKI-PINNED-LICENSE.txt` and `LICENSES/ANKI-PINNED-CONTRIBUTORS.txt`. This does not complete the independent notice-compliance review.
+
 Retivus fetches the upstream Rust crate from its public Git repository using the exact `rev` in the root `Cargo.toml`. It does **not** vendor, rebrand, or claim ownership of upstream Anki code. The current integration does not patch upstream source; a direct Tokio `io-util` feature is requested from Retivus to satisfy the pinned upstream Rust feature requirements. Earlier **research-only** CI experiments used an isolated, temporary upstream manifest adjustment to achieve the same effect; those temporary changes were not submitted to upstream Anki or distributed with Retivus.
 
 ## Before distributing a feature-enabled build
