@@ -80,6 +80,10 @@ The 25 objc2 workspace-related crate entries span two upstream license-note vers
 
 The eight locked AccessKit-family packages were traced to their exact upstream release tags. Two workspace revisions cover the selected crate releases. The upstream root `LICENSE-MIT`, `LICENSE-APACHE`, `AUTHORS`, and `LICENSE.chromium` have identical Git blob hashes at both revisions; copies are retained in `LICENSES/upstream/accesskit/` and hash-verified during packaging. The audit records which exact crate release tag each notice applies to, but retains the final human legal/packaging review requirement.
 
+### Pinned rust-unic notices
+
+All five locked `unic-*` crates are version `0.9.0` from `open-i18n/rust-unic`. The source candidate now preserves that release tag's exact root `LICENSE-MIT`, `LICENSE-APACHE`, `AUTHORS` and `COPYRIGHT.md` with independent Git blob hash checks. Review status remains evidence-present, not legal clearance.
+
 ## Upstream parent-notice review queue
 
 The source audit also generates **`PARENT-NOTICE-REVIEW.tsv`** for dependencies without a recognized crate-local notice. It records each crate name/version, declared SPDX expression, and its Cargo-manifest upstream repository URL (or the known pinned Anki upstream repository for Anki's workspace crates). The report is retained beside and embedded in the checksummed source archive; binary/source parity must compare the two copies exactly. This transforms the unresolved 72 entries into a traceable upstream review queue. **A repository URL is not notice text and does not certify legal compatibility or resolve any entry; each actual corresponding copyright/license notice still requires review.**

@@ -66,6 +66,9 @@ jobs:
           for notice in LICENSE-MIT LICENSE-APACHE AUTHORS LICENSE.chromium; do
             grep -Fx "source/LICENSES/upstream/accesskit/$notice" "$root/archive-index.txt"
           done
+          for notice in LICENSE-MIT LICENSE-APACHE AUTHORS COPYRIGHT.md; do
+            grep -Fx "source/LICENSES/upstream/rust-unic-0.9.0/$notice" "$root/archive-index.txt"
+          done
           grep -Fx 'source/.cargo/config.toml' "$root/archive-index.txt"
           grep -Fx 'source/vendor/anki-0.0.0/Cargo.toml' "$root/archive-index.txt"
           grep -Fx 'source/vendor/percent-encoding-iri-2.2.0/Cargo.toml' "$root/archive-index.txt"

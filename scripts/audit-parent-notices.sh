@@ -41,6 +41,13 @@ test "$(git hash-object "$accesskit_notices/LICENSE-MIT")" = "31aa79387f27e730e3
 test "$(git hash-object "$accesskit_notices/LICENSE-APACHE")" = "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d"
 test "$(git hash-object "$accesskit_notices/LICENSE.chromium")" = "a32e00ce6be3620adca152e53734f7de8fda38cf"
 test "$(git hash-object "$accesskit_notices/AUTHORS")" = "432f1b7bb779a9082fd10a4ef1e4f29c44b512c3"
+# The five unic-* crates at version 0.9.0 share the release-tagged
+# rust-unic workspace root notices (v0.9.0, commit 89f5f55...).
+unic_notices="$out/source/LICENSES/upstream/rust-unic-0.9.0"
+test "$(git hash-object "$unic_notices/AUTHORS")" = "ab3575c1f490363e4957adbc77a3783c48f4492b"
+test "$(git hash-object "$unic_notices/COPYRIGHT.md")" = "0322ceec0b8f15aa2d74a6173c07cc8c6f3764b3"
+test "$(git hash-object "$unic_notices/LICENSE-APACHE")" = "16fe87b06e802f094b3fbb0894b137bca2b16ef1"
+test "$(git hash-object "$unic_notices/LICENSE-MIT")" = "31aa79387f27e730e33d871925e152e35e428031"
 # The pinned Anki source checkout was verified upstream before this step.
 anki_notices="$out/source/LICENSES"
 test -s "$anki_notices/ANKI-PINNED-LICENSE.txt"
@@ -112,6 +119,10 @@ while IFS=$'\t' read -r name version license status notice; do
       review=PINNED_PARENT_NOTICES_PRESENT
       evidence="LICENSES/upstream/accesskit/{LICENSE-MIT,LICENSE-APACHE,AUTHORS,LICENSE.chromium}@${ak_tag}"
     fi
+  fi
+  if [[ "$upstream" == "https://github.com/open-i18n/rust-unic/" && "$version" == "0.9.0" && "$name" == unic-* ]]; then
+    review=PINNED_PARENT_NOTICES_PRESENT
+    evidence="LICENSES/upstream/rust-unic-0.9.0/{LICENSE-MIT,LICENSE-APACHE,AUTHORS,COPYRIGHT.md}@v0.9.0"
   fi
   # Evidence presence is NOT a legal clearance decision; retain every row
   # for the final M7.1 human/provenance review, including inherited notices.
