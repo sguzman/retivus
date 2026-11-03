@@ -94,6 +94,7 @@ impl AnkiBackend {
 mod tests {
     mod concurrent_edit;
     mod normal_merge;
+    mod same_second;
     mod upstream_server;
 
     use super::*;
