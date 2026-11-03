@@ -102,10 +102,7 @@ mod tests {
             .contains("recently edited unsynced notes"));
         assert!(!archive.exists(), "no recovery file before accepted sync");
         assert_eq!(backend.collection_stats().unwrap(), before);
-        assert_eq!(
-            backend.note_fields(note_id).unwrap()[1],
-            "private history"
-        );
+        assert_eq!(backend.note_fields(note_id).unwrap()[1], "private history");
     }
 
     #[test]
