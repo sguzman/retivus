@@ -48,6 +48,11 @@ test "$(git hash-object "$unic_notices/AUTHORS")" = "ab3575c1f490363e4957adbc77a
 test "$(git hash-object "$unic_notices/COPYRIGHT.md")" = "0322ceec0b8f15aa2d74a6173c07cc8c6f3764b3"
 test "$(git hash-object "$unic_notices/LICENSE-APACHE")" = "16fe87b06e802f094b3fbb0894b137bca2b16ef1"
 test "$(git hash-object "$unic_notices/LICENSE-MIT")" = "31aa79387f27e730e33d871925e152e35e428031"
+# These are the actual crate-local license texts in the upstream workspace at
+# the exact published source VCS commit. crates.io omitted them in 7.0.2.
+plural_notices="$out/source/LICENSES/upstream/intl_pluralrules-7.0.2"
+test "$(git hash-object "$plural_notices/LICENSE-MIT")" = "31aa79387f27e730e33d871925e152e35e428031"
+test "$(git hash-object "$plural_notices/LICENSE-APACHE")" = "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d"
 # The pinned Anki source checkout was verified upstream before this step.
 anki_notices="$out/source/LICENSES"
 test -s "$anki_notices/ANKI-PINNED-LICENSE.txt"
@@ -191,6 +196,17 @@ while IFS=$'\t' read -r name version license status notice; do
     test "$(git hash-object "$notice_path")" = "5acedf0412212a99997b78bd36da90c8a91111a7"
     review=SOURCE_MATCHED_PARENT_NOTICE_PRESENT
     evidence=LICENSES/upstream/difflib-0.4.0/LICENSE@f035fb8e656f27119e23eca9d5b996df14f3885e
+  fi
+  if [[ "$name/$version" == "intl_pluralrules/7.0.2" ]]; then
+    [[ "$upstream" == "https://github.com/zbraniecki/pluralrules" ]] || {
+      echo "Intl plural rules source URL changed" >&2; exit 1;
+    }
+    [[ "$license" == "Apache-2.0/MIT" ]] || {
+      echo "Intl plural rules declared license changed" >&2; exit 1;
+    }
+    review=PINNED_PARENT_NOTICES_PRESENT
+    evidence="LICENSES/upstream/intl_pluralrules-7.0.2/LICENSE-MIT,LICENSES/upstream/intl_pluralrules-7.0.2/LICENSE-APACHE"
+    expected_sha=d0715d5b7cca72e228d6e6c4de154bd30dfdd06a
   fi
   # htmlescape 0.3.1 predates Cargo's VCS metadata. Verify every
   # published file against immutable upstream source commit 1699b539.

@@ -36,6 +36,9 @@ cmp "$sources/THIRD-PARTY-SOURCES.tsv" <(tar --zstd -xOf "$source_archive" sourc
 cmp "$sources/LICENSE-FILE-AUDIT.tsv" <(tar --zstd -xOf "$source_archive" source/LICENSE-FILE-AUDIT.tsv)
 cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/PARENT-NOTICE-REVIEW.tsv)
 cmp "$binary_root/share/doc/retivus/source/docs/release-notice-exceptions.md" <(tar --zstd -xOf "$source_archive" source/docs/release-notice-exceptions.md)
+for notice in LICENSE-MIT LICENSE-APACHE; do
+  cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/intl_pluralrules-7.0.2/$notice" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/intl_pluralrules-7.0.2/$notice")
+done
 cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/EXTRA-NOTICE-EVIDENCE.tsv")
 # The source candidate must preserve the pinned parent notices, not merely
 # their source URLs. The source-bundle audit checks these against upstream.

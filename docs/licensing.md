@@ -92,7 +92,7 @@ All five locked `unic-*` crates are version `0.9.0` from `open-i18n/rust-unic`. 
 
 The `difflib 0.4.0` published crate has no `.cargo_vcs_info.json`. Its original Cargo manifest and all four Rust modules were compared byte-for-byte with upstream `DimaKudosh/difflib` at commit `f035fb8e656f27119e23eca9d5b996df14f3885e`. The accompanying upstream MIT `LICENSE` is now preserved and Git-blob-verified. The audit rechecks these source fingerprints; it does **not** invent an absent published VCS SHA or imply that a single matching file proves a full source release.
 
-The four notice exceptions still lacking an independently sourced standalone upstream notice are documented in [the release-blocker ledger](release-notice-exceptions.md); their source identity and Cargo license fields are evidence, not a waiver of required downstream attribution.
+The three remaining notice exceptions lacking an independently sourced standalone upstream notice are documented in [the release-blocker ledger](release-notice-exceptions.md); their source identity and Cargo license fields are evidence, not a waiver of required downstream attribution. The `intl_pluralrules 7.0.2` upstream subdirectory includes **actual** `LICENSE-MIT` and `LICENSE-APACHE` texts at its exact published VCS revision, which are now pinned and checked byte-for-byte even though the crates.io package omitted them.
 
 ## Upstream parent-notice review queue
 
