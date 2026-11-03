@@ -74,7 +74,9 @@ mod tests {
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "source").unwrap();
         backend.add_basic_note(1, "question", "answer").unwrap();
         let media = backend.collection.media().unwrap();
-        media.add_file("original.png", b"synthetic private picture").unwrap();
+        media
+            .add_file("original.png", b"synthetic private picture")
+            .unwrap();
         drop(media);
         let before = backend.collection_stats().unwrap();
         let archive = root.path().join("before-media-sync.zip");
