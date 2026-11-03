@@ -181,10 +181,7 @@ mod tests {
             .contains("same-second note conflicts"));
         assert!(!recovery.exists());
         assert_eq!(backend.collection_stats().unwrap(), before);
-        assert_eq!(
-            backend.note_fields(note_id).unwrap()[1],
-            "private answer"
-        );
+        assert_eq!(backend.note_fields(note_id).unwrap()[1], "private answer");
     }
 
     #[test]
