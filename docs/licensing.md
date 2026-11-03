@@ -76,6 +76,10 @@ The generated `PARENT-NOTICE-REVIEW.tsv` now records both `PINNED_PARENT_NOTICES
 
 The 25 objc2 workspace-related crate entries span two upstream license-note versions. Source candidates now include the **exact Git-blob-verified upstream `LICENSE.txt` and `LICENSE.md` texts**, with per-crate tag selection for `block2-0.5.1`, `objc-sys-0.3.5`, `objc2-0.5.3`, `frameworks-0.2.2`, `dispatch2-0.3.1`, `objc2-0.6.5`, `objc2-encode-4.1.0`, and `frameworks-0.3.2`. The same exact root license blob occurs at four inspected tags in each group. The `LICENSE.md` text explicitly discusses Apple SDK-derived bindings; **this adds attribution evidence, not a legal conclusion about Apple SDKs, source distribution, or macOS binaries**. Linux binary dependency relevance must still be determined separately from locked source-graph membership.
 
+### Pinned AccessKit notices
+
+The eight locked AccessKit-family packages were traced to their exact upstream release tags. Two workspace revisions cover the selected crate releases. The upstream root `LICENSE-MIT`, `LICENSE-APACHE`, `AUTHORS`, and `LICENSE.chromium` have identical Git blob hashes at both revisions; copies are retained in `LICENSES/upstream/accesskit/` and hash-verified during packaging. The audit records which exact crate release tag each notice applies to, but retains the final human legal/packaging review requirement.
+
 ## Upstream parent-notice review queue
 
 The source audit also generates **`PARENT-NOTICE-REVIEW.tsv`** for dependencies without a recognized crate-local notice. It records each crate name/version, declared SPDX expression, and its Cargo-manifest upstream repository URL (or the known pinned Anki upstream repository for Anki's workspace crates). The report is retained beside and embedded in the checksummed source archive; binary/source parity must compare the two copies exactly. This transforms the unresolved 72 entries into a traceable upstream review queue. **A repository URL is not notice text and does not certify legal compatibility or resolve any entry; each actual corresponding copyright/license notice still requires review.**

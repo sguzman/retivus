@@ -28,6 +28,19 @@ test -s "$objc_notices/LICENSE.txt"
 test -s "$objc_notices/LICENSE.md"
 test "$(git hash-object "$objc_notices/LICENSE.txt")" = "e9ab3babc0d8602b83dccde8a462f8f3dc1e52ad"
 test "$(git hash-object "$objc_notices/LICENSE.md")" = "540ae4c81adb5f64a9f61e222b688880da24300e"
+# All eight locked AccessKit packages map to two verified workspace commits:
+# accesskit-v0.21.1 / accesskit_consumer-v0.30.1 = 0b6901a8...
+# remaining packages at their exact version tags = 5801c4a4...
+# These four root blobs are identical in both upstream revisions.
+accesskit_notices="$out/source/LICENSES/upstream/accesskit"
+test -s "$accesskit_notices/LICENSE-MIT"
+test -s "$accesskit_notices/LICENSE-APACHE"
+test -s "$accesskit_notices/LICENSE.chromium"
+test -s "$accesskit_notices/AUTHORS"
+test "$(git hash-object "$accesskit_notices/LICENSE-MIT")" = "31aa79387f27e730e33d871925e152e35e428031"
+test "$(git hash-object "$accesskit_notices/LICENSE-APACHE")" = "1b5ec8b78e237b5c3b3d812a7c0a6589d0f7161d"
+test "$(git hash-object "$accesskit_notices/LICENSE.chromium")" = "a32e00ce6be3620adca152e53734f7de8fda38cf"
+test "$(git hash-object "$accesskit_notices/AUTHORS")" = "432f1b7bb779a9082fd10a4ef1e4f29c44b512c3"
 # The pinned Anki source checkout was verified upstream before this step.
 anki_notices="$out/source/LICENSES"
 test -s "$anki_notices/ANKI-PINNED-LICENSE.txt"
@@ -81,6 +94,23 @@ while IFS=$'\t' read -r name version license status notice; do
     if [[ -n "$objc_tag" ]]; then
       review=PINNED_PARENT_NOTICES_PRESENT
       evidence="LICENSES/upstream/objc2/$objc_file@${objc_tag}"
+    fi
+  fi
+  if [[ "$upstream" == "https://github.com/AccessKit/accesskit" ]]; then
+    ak_tag=
+    case "$name/$version" in
+      accesskit/0.21.1) ak_tag=accesskit-v0.21.1 ;;
+      accesskit_atspi_common/0.14.2) ak_tag=accesskit_atspi_common-v0.14.2 ;;
+      accesskit_consumer/0.30.1) ak_tag=accesskit_consumer-v0.30.1 ;;
+      accesskit_consumer/0.31.0) ak_tag=accesskit_consumer-v0.31.0 ;;
+      accesskit_macos/0.22.2) ak_tag=accesskit_macos-v0.22.2 ;;
+      accesskit_unix/0.17.2) ak_tag=accesskit_unix-v0.17.2 ;;
+      accesskit_windows/0.29.2) ak_tag=accesskit_windows-v0.29.2 ;;
+      accesskit_winit/0.29.2) ak_tag=accesskit_winit-v0.29.2 ;;
+    esac
+    if [[ -n "$ak_tag" ]]; then
+      review=PINNED_PARENT_NOTICES_PRESENT
+      evidence="LICENSES/upstream/accesskit/{LICENSE-MIT,LICENSE-APACHE,AUTHORS,LICENSE.chromium}@${ak_tag}"
     fi
   fi
   # Evidence presence is NOT a legal clearance decision; retain every row

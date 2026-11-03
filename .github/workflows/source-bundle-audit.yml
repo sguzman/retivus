@@ -63,6 +63,9 @@ jobs:
           grep -Fx 'source/LICENSES/ANKI-PINNED-CONTRIBUTORS.txt' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/objc2/LICENSE.txt' "$root/archive-index.txt"
           grep -Fx 'source/LICENSES/upstream/objc2/LICENSE.md' "$root/archive-index.txt"
+          for notice in LICENSE-MIT LICENSE-APACHE AUTHORS LICENSE.chromium; do
+            grep -Fx "source/LICENSES/upstream/accesskit/$notice" "$root/archive-index.txt"
+          done
           grep -Fx 'source/.cargo/config.toml' "$root/archive-index.txt"
           grep -Fx 'source/vendor/anki-0.0.0/Cargo.toml' "$root/archive-index.txt"
           grep -Fx 'source/vendor/percent-encoding-iri-2.2.0/Cargo.toml' "$root/archive-index.txt"
