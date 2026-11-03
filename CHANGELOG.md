@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added an explicit, backend-only, read-only AnkiWeb status preflight using the pinned Anki Rust synchronization engine. Synthetic server tests verify status mapping and unchanged local data; authenticated live sync, media and conflict resolution are still pending.
 - Added optional **local-only Noto Sans CJK** fallback selection for multilingual study screens, preserving the Krypton preference without redistributing fonts; populated Wayland glyph inspection is still required.
 - Removed the standard Anki `<hr id=answer>` separator from the inert, text-only back-side preview. Other card HTML remains unexecuted; full rich-card rendering is not claimed.
 - Included exact Retivus commit, Cargo.lock SHA-256 and pinned Anki revision in release-candidate source provenance, explicitly stating that upstream Anki source is not bundled and corresponding-source compliance remains a release gate.
