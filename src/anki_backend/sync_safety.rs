@@ -423,18 +423,18 @@ fn collect_media_snapshot(
         Ok(_) => {}
     }
     for path in media_entries(dir)? {
+        let relative = path.strip_prefix(root)?;
+        if relative.to_str().is_none() {
+            return Err("non-UTF8 media name needs manual recovery".into());
+        }
         let meta = fs::symlink_metadata(&path)?;
         if meta.file_type().is_dir() {
             collect_media_snapshot(root, &path, snapshot)?;
         } else if meta.file_type().is_file() {
-            let relative = path.strip_prefix(root)?.to_path_buf();
-            if relative.to_str().is_none() {
-                return Err("non-UTF8 media name needs manual recovery".into());
-            }
             #[cfg(unix)]
             use std::os::unix::fs::MetadataExt;
             snapshot.push((
-                relative,
+                relative.to_path_buf(),
                 MediaStamp {
                     size: meta.len(),
                     modified: meta.modified()?,
@@ -690,6 +690,18 @@ mod tests {
         assert_ne!(snapshot_media_tree(&media, &media).unwrap(), original);
         fs::remove_file(media.join("renamed.dat")).unwrap();
         assert_ne!(snapshot_media_tree(&media, &media).unwrap(), original);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn media_inventory_refuses_non_utf8_directory_names() {
+        use std::ffi::OsString;
+        use std::os::unix::ffi::OsStringExt;
+        let dir = tempdir().unwrap();
+        let media = dir.path().join("collection.media");
+        fs::create_dir(&media).unwrap();
+        fs::create_dir(media.join(OsString::from_vec(vec![0xff]))).unwrap();
+        assert!(snapshot_media_tree(&media, &media).is_err());
     }
 
     #[cfg(unix)]
