@@ -7,7 +7,7 @@ use super::{
 };
 use std::collections::HashSet;
 use std::fs::{self, File};
-use std::io;
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 use zip::write::SimpleFileOptions;
@@ -121,7 +121,13 @@ impl AnkiBackend {
             return Err("recovery target already exists; refusing overwrite".into());
         }
 
+        // The zip crate's high-level map may hide raw duplicate filenames.
+        // Inspect every actual central-directory member independently first.
+        let raw_names = audit_recovery_central_directory(bundle)?;
         let mut archive = zip::ZipArchive::new(File::open(bundle)?)?;
+        if archive.len() != raw_names.len() {
+            return Err("ZIP reader omitted or merged recovery members".into());
+        }
         if archive.len() > MAX_RECOVERY_ENTRIES {
             return Err("recovery archive contains too many entries".into());
         }
@@ -146,6 +152,9 @@ impl AnkiBackend {
             if total_size > MAX_RECOVERY_UNCOMPRESSED_BYTES {
                 return Err("recovery archive exceeds safe extraction size".into());
             }
+        }
+        if names != raw_names {
+            return Err("ZIP reader member list disagrees with raw central directory".into());
         }
         for required in [
             "RECOVERY-README.txt",
@@ -212,6 +221,120 @@ impl AnkiBackend {
 
 const MAX_RECOVERY_ENTRIES: usize = 200_000;
 const MAX_RECOVERY_UNCOMPRESSED_BYTES: u64 = 128 * 1024 * 1024 * 1024;
+const MAX_RECOVERY_CENTRAL_DIRECTORY_BYTES: u64 = 256 * 1024 * 1024;
+
+fn u16_le(bytes: &[u8], offset: usize) -> u16 {
+    u16::from_le_bytes(bytes[offset..offset + 2].try_into().unwrap())
+}
+
+fn u32_le(bytes: &[u8], offset: usize) -> u32 {
+    u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap())
+}
+
+fn u64_le(bytes: &[u8], offset: usize) -> u64 {
+    u64::from_le_bytes(bytes[offset..offset + 8].try_into().unwrap())
+}
+
+/// Audit raw central-directory entries instead of trusting a ZIP reader that
+/// can index two raw filenames under one key. Only the canonical, single-disk
+/// ZIP layouts written by the pinned Retivus ZIP writer are accepted, with
+/// ZIP64 supported for large media collections.
+fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String>> {
+    let mut file = File::open(path)?;
+    let total_length = file.metadata()?.len();
+    if total_length < 22 {
+        return Err("recovery ZIP is too short".into());
+    }
+    let tail_length = total_length.min(65_557) as usize;
+    file.seek(SeekFrom::End(-(tail_length as i64)))?;
+    let mut tail = vec![0_u8; tail_length];
+    file.read_exact(&mut tail)?;
+    let eocd_index = (0..=tail_length - 22).rev().find(|&i| {
+        tail[i..].starts_with(b"PK\x05\\x06")
+            && usize::from(u16_le(&tail, i + 20)) == tail_length - i - 22
+    });
+    let index = eocd_index.ok_or("recovery ZIP end-of-central-directory missing")?;
+    let end_record = &tail[index..index + 22];
+    if u16_le(end_record, 4) != 0 || u16_le(end_record, 6) != 0 {
+        return Err("multi-disk recovery ZIP is unsupported".into());
+    }
+    let eocd_offset = total_length - tail_length as u64 + index as u64;
+    let mut count = u16_le(end_record, 10) as u64;
+    let mut central_size = u32_le(end_record, 12) as u64;
+    let mut central_start = u32_le(end_record, 16) as u64;
+    if count == u16::MAX as u64
+        || central_size == u32::MAX as u64
+        || central_start == u32::MAX as u64
+    {
+        if eocd_offset < 20 {
+            return Err("ZIP64 locator is missing".into());
+        }
+        file.seek(SeekFrom::Start(eocd_offset - 20))?;
+        let mut locator = [0_u8; 20];
+        file.read_exact(&mut locator)?;
+        if &locator[..4] != b"PK\x06\\x07"
+            || u32_le(&locator, 4) != 0
+            || u32_le(&locator, 16) != 1
+        {
+            return Err("invalid or multi-disk ZIP64 locator".into());
+        }
+        file.seek(SeekFrom::Start(u64_le(&locator, 8)))?;
+        let mut zip64 = [0_u8; 56];
+        file.read_exact(&mut zip64)?;
+        if &zip64[..4] != b"PK\x06\\x06"
+            || u32_le(&zip64, 16) != 0
+            || u32_le(&zip64, 20) != 0
+        {
+            return Err("invalid or multi-disk ZIP64 central directory".into());
+        }
+        count = u64_le(&zip64, 32);
+        central_size = u64_le(&zip64, 40);
+        central_start = u64_le(&zip64, 48);
+    }
+    if count > MAX_RECOVERY_ENTRIES as u64
+        || central_size > MAX_RECOVERY_CENTRAL_DIRECTORY_BYTES
+    {
+        return Err("recovery ZIP central directory exceeds bounded limits".into());
+    }
+    let end = central_start
+        .checked_add(central_size)
+        .ok_or("invalid central directory length")?;
+    if end > eocd_offset {
+        return Err("recovery ZIP central directory points beyond its end".into());
+    }
+    file.seek(SeekFrom::Start(central_start))?;
+    let mut names = HashSet::new();
+    for _ in 0..count {
+        if file.stream_position()?.saturating_add(46) > end {
+            return Err("truncated recovery ZIP central directory".into());
+        }
+        let mut record = [0_u8; 46];
+        file.read_exact(&mut record)?;
+        if &record[..4] != b"PK\x01\\x02" {
+            return Err("malformed recovery ZIP central entry".into());
+        }
+        let name_length = u16_le(&record, 28) as usize;
+        let skip = u64::from(u16_le(&record, 30)) + u64::from(u16_le(&record, 32));
+        if file
+            .stream_position()?
+            .checked_add(name_length as u64 + skip)
+            .is_none_or(|position| position > end)
+        {
+            return Err("recovery ZIP member metadata crosses central directory".into());
+        }
+        let mut bytes = vec![0_u8; name_length];
+        file.read_exact(&mut bytes)?;
+        let name = String::from_utf8(bytes)?;
+        if !valid_recovery_member_name(&name) || !names.insert(name) {
+            return Err("unsafe or duplicate raw ZIP central filename".into());
+        }
+        file.seek(SeekFrom::Current(skip as i64))?;
+    }
+    if file.stream_position()? != end {
+        return Err("extra or mismatched recovery ZIP central metadata".into());
+    }
+    Ok(names)
+}
 
 fn valid_recovery_member_name(name: &str) -> bool {
     if matches!(
