@@ -89,6 +89,7 @@ impl AnkiBackend {
 
 #[cfg(test)]
 mod tests {
+    mod concurrent_edit;
     mod normal_merge;
     mod upstream_server;
 
