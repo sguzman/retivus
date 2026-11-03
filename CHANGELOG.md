@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added a disposable-server media deletion recovery regression; confirms remote-deleted clean media can be recovered, with its original media-index state, from the pre-sync ZIP. Live-account acceptance remains open.
 - Added a disposable-server same-filename media conflict test verifying upstream remote-wins behavior and private recovery of displaced local bytes. Media integration tests now live in a dedicated module and conflict submodule; live-account acceptance remains pending.
 - Added synthetic-server acceptance for successful Anki media upload and download paths, including media-index sequence/state assertions and private pre-sync recovery round trips. Tests do not establish live-account compatibility.
 - Added a separately approved, backend-only AnkiWeb media-sync API using pinned Anki Rust, with private media-index-preserving recovery before remote calls. Synthetic HTTP failure and recoverability tests passed; successful live media synchronization remains unverified.

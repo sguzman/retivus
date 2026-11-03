@@ -373,3 +373,12 @@
 - ⏳ **M4.5 still not accepted:** A synthetic conflict test does not establish safety of live authenticated AnkiWeb media conflicts, collection merge conflicts, remote rollback or human-visible consent. A production release requires real-account acceptance or explicit owner-approved deferral, plus the outstanding physical Wayland/Orca (M6.4) and licensing/release gates (M7). No personal account accessed and no release published.
 
 **Verified overall: 87% → 87% · Δ +0 percentage points.**
+
+
+## 2026-11-03 — synthetic remote media deletion and recoverability (87%, Δ +0 pp)
+
+- ✅ **M4.5 server-triggered deletion safety, not live acceptance:** [\`963e948\`](https://github.com/sguzman/retivus/commit/963e948ae1d5322e1b803c5b16231f960b9b7dde) adds the independently scoped \`src/anki_backend/sync_media/tests/deletions.rs\` regression. A disposable server returns an upstream \`msync/mediaChanges\` deletion for a clean, previously registered local file. The pinned Anki engine removes the local file without any unexpected upload, advances the media index from USN 0 to 2, and leaves no media record. The recovery ZIP is verified to exist **before network traffic** and is restored into a separate Retivus-managed profile, preserving the original file and clean media index (USN 0).
+- ✅ **Verified test evidence:** [end-to-end run 41722375695](https://github.com/sguzman/retivus/actions/runs/41722375695) passed **74** Anki backend library tests (2 independent external-fixture tests ignored) and **28** native learner tests, including the new deletion recovery. The [foundation run 41722375770](https://github.com/sguzman/retivus/actions/runs/41722375770) failed only two formatting differences in the new test, corrected in the checkpoint commit. The implementation revision's Linux package and pinned-upstream feasibility jobs were running at this checkpoint; do not claim those passes.
+- 🟡 **Unchanged original acceptance:** Synthetic upload, download, same-name remote-wins, and deletion behavior are now covered with recovery regression tests. None touches an actual AnkiWeb account, exercises live server behavior or validates remote rollback. The backend-only media API still requires explicit opt-in; no user-facing live sync UI or safe full-sync-direction workflow is shipped. M4.5's **2 points**, M6.4's **3 points** and M7's **8 points** remain open. No release or tag was published.
+
+**Whole-project verified progress: 87% → 87%; Δ +0 percentage points.**

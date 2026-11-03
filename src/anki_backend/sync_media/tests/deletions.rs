@@ -21,10 +21,7 @@ fn remote_media_deletion_is_recoverable_from_private_pre_sync_bundle() {
     let original = rusqlite::Connection::open(&index).unwrap();
     assert_eq!(
         original
-            .execute(
-                "UPDATE media SET dirty=0 WHERE fname='deleted.txt'",
-                [],
-            )
+            .execute("UPDATE media SET dirty=0 WHERE fname='deleted.txt'", [])
             .unwrap(),
         1
     );
@@ -141,7 +138,10 @@ fn remote_media_deletion_is_recoverable_from_private_pre_sync_bundle() {
     outcome.unwrap();
     assert_eq!(backend.collection_stats().unwrap(), before);
 
-    assert!(!root.path().join("source/collection.media/deleted.txt").exists());
+    assert!(!root
+        .path()
+        .join("source/collection.media/deleted.txt")
+        .exists());
     let resulting = rusqlite::Connection::open(&index).unwrap();
     let (count, last_usn): (i64, i64) = resulting
         .query_row(
