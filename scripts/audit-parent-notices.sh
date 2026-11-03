@@ -210,8 +210,8 @@ while IFS=$'\t' read -r name version license status notice; do
   fi
   # htmlescape 0.3.1 predates Cargo's VCS metadata. Verify every
   # published file against immutable upstream source commit 1699b539.
-  # Its declared license is not a substitute for an upstream license file:
-  # leave this row UNRESOLVED even when source matching succeeds.
+  # The Cargo declaration alone does not substitute for original notice
+  # terms; independent Debian packaging evidence is checked separately.
   if [[ "$name/$version" == "htmlescape/0.3.1" ]]; then
     [[ "$vcs_sha" == UNAVAILABLE ]] || {
       echo "Unexpected htmlescape VCS metadata; recheck provenance" >&2; exit 1;
@@ -249,7 +249,7 @@ while IFS=$'\t' read -r name version license status notice; do
       echo "Independent htmlescape attribution changed; re-review provenance" >&2; exit 1;
     }
     review=DEBIAN_PACKAGING_NOTICE_PRESENT
-    evidence="LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md@debian-rust-htmlescape-0.3.1+dfsg-1,source-matched:1699b539179798e705ad8464128492a0a0092876
+    evidence="LICENSES/upstream/htmlescape-0.3.1/DEBIAN-PACKAGING-ATTRIBUTION.md@debian-rust-htmlescape-0.3.1+dfsg-1,source-matched:1699b539179798e705ad8464128492a0a0092876"
   fi
   # Validate exact published crate VCS commits before mapping upstream notices.
   key="$name/$version"
