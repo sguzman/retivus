@@ -4,8 +4,20 @@
 use super::*;
 use crate::anki_backend::sync_test_server::DisposableAnkiServer;
 use std::fs;
+use std::path::Path;
 use std::time::Duration;
 use tempfile::tempdir;
+
+/// Anki note records use second-resolution modification timestamps; rapid
+/// same-second changes may not be distinguishable by timestamp alone.
+fn note_modified_second(path: &Path, note_id: i64) -> i64 {
+    rusqlite::Connection::open(path)
+        .unwrap()
+        .query_row("SELECT mod FROM notes WHERE id=?1", [note_id], |row| {
+            row.get(0)
+        })
+        .unwrap()
+}
 
 #[test]
 fn simultaneous_note_edits_converge_and_both_original_edits_remain_recoverable() {
@@ -36,15 +48,26 @@ fn simultaneous_note_edits_converge_and_both_original_edits_remain_recoverable()
 
     let mut sender = AnkiBackend::open_managed_profile(root.path(), "sender").unwrap();
     let mut receiver = AnkiBackend::open_managed_profile(root.path(), "receiver").unwrap();
-    std::thread::sleep(Duration::from_millis(25));
+    let baseline_second = note_modified_second(&base, note_id);
+    std::thread::sleep(Duration::from_millis(1_250));
     sender
         .edit_note_fields(note_id, &["shared question", "sender private edit"])
         .unwrap();
-    std::thread::sleep(Duration::from_millis(25));
+    let sender_second = note_modified_second(&base, note_id);
+    assert!(sender_second > baseline_second);
+    std::thread::sleep(Duration::from_millis(1_250));
     receiver
         .edit_note_fields(note_id, &["shared question", "receiver private edit"])
         .unwrap();
-    assert_eq!(sender.note_fields(note_id).unwrap()[1], "sender private edit");
+    let receiver_second = note_modified_second(
+        &root.path().join("receiver/collection.anki2"),
+        note_id,
+    );
+    assert!(receiver_second > sender_second);
+    assert_eq!(
+        sender.note_fields(note_id).unwrap()[1],
+        "sender private edit"
+    );
     assert_eq!(
         receiver.note_fields(note_id).unwrap()[1],
         "receiver private edit"

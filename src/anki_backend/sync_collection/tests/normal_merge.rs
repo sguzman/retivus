@@ -27,7 +27,10 @@ fn normal_collection_merge_transfers_new_note_between_disposable_clients() {
         .join("upstream-server")
         .join(server.username)
         .join("collection.anki2");
-    assert!(!server_col.exists(), "server must not have an existing collection");
+    assert!(
+        !server_col.exists(),
+        "server must not have an existing collection"
+    );
     fs::copy(&seed_path, &server_col).unwrap();
 
     let receiver_initial = AnkiBackend::create_managed_profile(root.path(), "receiver").unwrap();
@@ -94,7 +97,10 @@ fn normal_collection_merge_transfers_new_note_between_disposable_clients() {
         .browse_notes("new note from sender", 10)
         .unwrap()
         .iter()
-        .any(|note| note.fields.iter().any(|field| field == "new note from sender")));
+        .any(|note| note
+            .fields
+            .iter()
+            .any(|field| field == "new note from sender")));
 
     // Restore receiver independently to prove its pre-merge backup retained
     // the original state rather than silently accepting the new remote note.
