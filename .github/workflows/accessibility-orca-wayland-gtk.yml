@@ -1,0 +1,40 @@
+name: Orca native Wayland GTK control diagnostic
+on:
+  push:
+    paths:
+      - .github/workflows/accessibility-orca-wayland-gtk.yml
+      - scripts/qa-orca-wayland-gtk.sh
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  reference:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify diagnostic syntax
+        run: bash -n scripts/qa-orca-wayland-gtk.sh
+      - name: Install native Wayland and Orca reference environment
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sway wtype grim jq zenity \
+            dbus dbus-user-session at-spi2-core orca \
+            speech-dispatcher speech-dispatcher-espeak-ng \
+            libegl1 libgl1-mesa-dri
+      - name: Require native GTK label spoken by real Orca on Sway
+        run: dbus-run-session -- bash scripts/qa-orca-wayland-gtk.sh
+      - name: Retain Wayland GUI and reader evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: retivus-independent-wayland-orca-control
+          path: |
+            ${{ runner.temp }}/retivus-orca-sway.log
+            ${{ runner.temp }}/retivus-orca-wayland-gtk.log
+            ${{ runner.temp }}/retivus-orca-wayland-gtk.png
+            ${{ runner.temp }}/retivus-orca-wayland-reader.log
+            ${{ runner.temp }}/retivus-orca-wayland-debug.log
+            ${{ runner.temp }}/retivus-orca-wayland-outputs.json
+          if-no-files-found: ignore
+          retention-days: 5
