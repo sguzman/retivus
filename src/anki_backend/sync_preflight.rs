@@ -57,10 +57,7 @@ impl From<ClientSyncState> for RemoteSyncPreflight {
 fn validate_temporary_host_key(key: &str) -> BackendResult<()> {
     // Anki's host keys are ASCII tokens. Reject control characters, whitespace
     // and excessive lengths instead of accepting log/header injection inputs.
-    if key.is_empty()
-        || key.len() > 1024
-        || key.bytes().any(|byte| !byte.is_ascii_graphic())
-    {
+    if key.is_empty() || key.len() > 1024 || key.bytes().any(|byte| !byte.is_ascii_graphic()) {
         return Err("a nonempty AnkiWeb host-key token is required".into());
     }
     Ok(())

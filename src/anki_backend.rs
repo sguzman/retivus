@@ -16,8 +16,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 
-mod sync_safety;
 mod sync_preflight;
+mod sync_safety;
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;
 
