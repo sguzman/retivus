@@ -5,6 +5,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Added
+- Added a backend-only, explicitly authorized normal Anki collection-sync path that publishes a validated private recovery archive before login, and refuses automatic full-upload/full-download decisions. Synthetic tests verify consent enforcement and the safe full-sync refusal; real AnkiWeb conflicts/media remain unverified.
 - Added backend-only temporary AnkiWeb authentication using upstream Anki Rust login followed by a read-only status query; synthetic login/rejection and local-state-preservation tests passed. Credentials are not stored, and real sync/conflict/media flows remain unimplemented.
 - Added an explicit, backend-only, read-only AnkiWeb status preflight using the pinned Anki Rust synchronization engine. Synthetic server tests verify status mapping and unchanged local data; authenticated live sync, media and conflict resolution are still pending.
 - Added optional **local-only Noto Sans CJK** fallback selection for multilingual study screens, preserving the Krypton preference without redistributing fonts; populated Wayland glyph inspection is still required.
