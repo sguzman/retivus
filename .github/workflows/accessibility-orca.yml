@@ -11,7 +11,12 @@ permissions:
   contents: read
 jobs:
   orca:
-    runs-on: ubuntu-latest
+    name: Orca speech (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -30,7 +35,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: retivus-orca-debug-evidence
+          name: retivus-orca-debug-evidence-${{ matrix.os }}
           path: |
             ${{ runner.temp }}/retivus-orca-debug.log
             ${{ runner.temp }}/retivus-orca-speech.txt
