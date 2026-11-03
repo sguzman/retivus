@@ -304,3 +304,12 @@
 - ⏳ **No release acceptance yet:** M4.5 authenticated AnkiWeb conflict/media/credential round trips or approved deferral (2%), M6.4 physical Wayland+Orca dynamic speech acceptance (3%), and M7.1–M7.4 legal/package/recovery/final release gates (8%). No login, private collection, tag or published release touched.
 
 **Whole-project verified progress: 87% → 87%; Δ +0 percentage points.** M4 15/17, M6 9/12, M7 0/8.
+
+
+## 2026-11-03 verified offline pre-sync recovery round trip (87%, Δ +0 pp)
+
+- ✅ **M4.5 recovery hardening, no milestone credit:** [`4c2c9de`](https://github.com/sguzman/retivus/commit/4c2c9dee4493b17480ffdac42cf70f956b9d959c) provides `restore_pre_sync_recovery_as_new_profile` alongside the earlier private bundle creator. Restores are **offline, isolated and no-clobber**; a detached SQLite snapshot is validated with the pinned Anki engine before the staged database and raw media are published together to a new Retivus-managed profile. Full review history and unreferenced raw media survive restore/reopen. The backup `.apkg` remains inside the original recovery ZIP as an additional manual fallback. ZIP path traversal, unexpected members, symlinks/nonregular entries, hidden duplicate central-directory filenames, incomplete entries and resource bounds are checked before publishing. The raw ZIP audit was added because the normal ZIP reader demonstrably hid a deliberately crafted duplicate member.
+- ✅ **Independent acceptance:** [end-to-end CI 41684038693](https://github.com/sguzman/retivus/actions/runs/41684038693) passed 54 Anki library tests (2 preexisting external-fixture tests ignored), including actual restore, duplicate ZIP and malicious-name cases, plus 28 native learner tests. [Rust foundation 41684038685](https://github.com/sguzman/retivus/actions/runs/41684038685) passed. The Anki feature and Linux release-candidate workflows on this application revision require their own final results; no release/tag made.
+- ⏳ **Acceptance boundary unchanged:** M4.5 (2%) needs authenticated AnkiWeb conflict/media/credential safety and real remote round trips or an expressly approved post-v1 classification. M6.4 (3%) requires real physical Wayland/Orca dynamic speech. M7 (8%) remains legally and release gated. Recovery ZIPs are private, exclude media sync index, and are not a substitute for full sync validation.
+
+**Whole-project progress: 87% → 87%; Δ +0 percentage points.** M4 15/17, M6 9/12, M7 0/8.
