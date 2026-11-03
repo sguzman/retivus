@@ -45,14 +45,8 @@ impl AnkiBackend {
             return Err("remote collection writes require explicit approval".into());
         }
         let client = new_ankiweb_http_client()?;
-        self.sync_ankiweb_collection_with_client(
-            username,
-            password,
-            recovery_zip,
-            client,
-            None,
-        )
-        .await
+        self.sync_ankiweb_collection_with_client(username, password, recovery_zip, client, None)
+            .await
     }
 
     async fn sync_ankiweb_collection_with_client(
@@ -129,7 +123,9 @@ mod tests {
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "local").unwrap();
         let deck = backend.create_deck("Keep existing study data").unwrap();
-        backend.add_basic_note(deck, "pregunta", "respuesta").unwrap();
+        backend
+            .add_basic_note(deck, "pregunta", "respuesta")
+            .unwrap();
         let before = backend.collection_stats().unwrap();
         let local = backend.collection.sync_meta().unwrap();
         let mut remote = serde_json::to_value(&local).unwrap();
@@ -163,7 +159,10 @@ mod tests {
                     if let Some(end) = bytes.windows(4).position(|w| w == b"\r\n\r\n") {
                         let head = String::from_utf8_lossy(&bytes[..end]);
                         let body = &bytes[end + 4..];
-                        if head.to_ascii_lowercase().contains("transfer-encoding: chunked") {
+                        if head
+                            .to_ascii_lowercase()
+                            .contains("transfer-encoding: chunked")
+                        {
                             if body.windows(5).any(|w| w == b"0\r\n\r\n") {
                                 break;
                             }
@@ -180,13 +179,11 @@ mod tests {
                         }
                     }
                 }
-                assert!(String::from_utf8_lossy(&bytes).starts_with(
-                    if index == 0 {
-                        "POST /sync/hostKey "
-                    } else {
-                        "POST /sync/meta "
-                    }
-                ));
+                assert!(String::from_utf8_lossy(&bytes).starts_with(if index == 0 {
+                    "POST /sync/hostKey "
+                } else {
+                    "POST /sync/meta "
+                }));
                 let compressed = zstd::stream::encode_all(response, 1).unwrap();
                 let headers = format!(
                     "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nanki-original-size: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -224,8 +221,6 @@ mod tests {
         assert!(recovery.is_file(), "private archive must precede login");
         assert!(std::fs::metadata(&recovery).unwrap().len() > 0);
         assert_eq!(backend.collection_stats().unwrap(), before);
-        assert!(backend
-            .create_pre_sync_recovery_bundle(&recovery)
-            .is_err());
+        assert!(backend.create_pre_sync_recovery_bundle(&recovery).is_err());
     }
 }
