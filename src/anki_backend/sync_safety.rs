@@ -8,6 +8,7 @@ use super::{
 use std::collections::HashSet;
 use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom};
+use std::time::SystemTime;
 use std::path::{Path, PathBuf};
 use tempfile::{Builder, NamedTempFile};
 use zip::write::SimpleFileOptions;
@@ -41,7 +42,7 @@ impl AnkiBackend {
         let (media, _) = check_managed_media(&managed)?;
         // Refuse symlinked/special media recursively BEFORE asking upstream
         // Anki to produce the history-preserving package.
-        verify_media_tree(&media, &media)?;
+        let media_before = snapshot_media_tree(&media, &media)?;
 
         if !destination.is_absolute()
             || destination.extension().and_then(|x| x.to_str()) != Some("zip")
@@ -82,6 +83,12 @@ impl AnkiBackend {
                 append_media(&mut zip, &media, &media)?;
             }
             zip.finish()?;
+        }
+        // Media may have changed while Anki exported the .apkg or while the
+        // raw files were copied. Refuse to publish an incomplete mixed-time
+        // bundle if an addition, deletion, rename or metadata change occurred.
+        if snapshot_media_tree(&media, &media)? != media_before {
+            return Err("media tree changed during pre-sync recovery snapshot".into());
         }
         // Re-read every ZIP entry before publishing. This verifies its actual
         // on-disk CRC and catches incomplete data or archive structure, while
@@ -381,7 +388,35 @@ fn media_entries(dir: &Path) -> BackendResult<Vec<PathBuf>> {
     Ok(children)
 }
 
-fn verify_media_tree(root: &Path, dir: &Path) -> BackendResult<()> {
+
+#[derive(Debug, PartialEq, Eq)]
+struct MediaStamp {
+    size: u64,
+    modified: SystemTime,
+    #[cfg(unix)]
+    device: u64,
+    #[cfg(unix)]
+    inode: u64,
+    #[cfg(unix)]
+    changed_seconds: i64,
+    #[cfg(unix)]
+    changed_nanoseconds: i64,
+}
+
+/// Inventory the *whole* media tree, not just the files that happened to be
+/// visited by the ZIP writer. A second inventory catches files added, removed,
+/// renamed or replaced while the collection and package exports were running.
+fn snapshot_media_tree(root: &Path, dir: &Path) -> BackendResult<Vec<(PathBuf, MediaStamp)>> {
+    let mut snapshot = Vec::new();
+    collect_media_snapshot(root, dir, &mut snapshot)?;
+    Ok(snapshot)
+}
+
+fn collect_media_snapshot(
+    root: &Path,
+    dir: &Path,
+    snapshot: &mut Vec<(PathBuf, MediaStamp)>,
+) -> BackendResult<()> {
     match fs::symlink_metadata(dir) {
         Err(err) if err.kind() == io::ErrorKind::NotFound && dir == root => return Ok(()),
         Err(err) => return Err(err.into()),
@@ -391,12 +426,31 @@ fn verify_media_tree(root: &Path, dir: &Path) -> BackendResult<()> {
     for path in media_entries(dir)? {
         let meta = fs::symlink_metadata(&path)?;
         if meta.file_type().is_dir() {
-            verify_media_tree(root, &path)?;
-        } else if !meta.file_type().is_file() {
+            collect_media_snapshot(root, &path, snapshot)?;
+        } else if meta.file_type().is_file() {
+            let relative = path.strip_prefix(root)?.to_path_buf();
+            if relative.to_str().is_none() {
+                return Err("non-UTF8 media name needs manual recovery".into());
+            }
+            #[cfg(unix)]
+            use std::os::unix::fs::MetadataExt;
+            snapshot.push((
+                relative,
+                MediaStamp {
+                    size: meta.len(),
+                    modified: meta.modified()?,
+                    #[cfg(unix)]
+                    device: meta.dev(),
+                    #[cfg(unix)]
+                    inode: meta.ino(),
+                    #[cfg(unix)]
+                    changed_seconds: meta.ctime(),
+                    #[cfg(unix)]
+                    changed_nanoseconds: meta.ctime_nsec(),
+                },
+            ));
+        } else {
             return Err("refusing symlink or special file inside media tree".into());
-        }
-        if path.strip_prefix(root)?.to_str().is_none() {
-            return Err("non-UTF8 media name needs manual recovery".into());
         }
     }
     Ok(())
@@ -620,6 +674,23 @@ mod tests {
         )
         .is_err());
         assert!(!dir.path().join("must-not-exist").exists());
+    }
+
+    #[test]
+    fn media_inventory_detects_additions_removals_and_renames() {
+        let dir = tempdir().unwrap();
+        let media = dir.path().join("collection.media");
+        fs::create_dir(&media).unwrap();
+        fs::write(media.join("one.dat"), b"one").unwrap();
+        let original = snapshot_media_tree(&media, &media).unwrap();
+        fs::write(media.join("two.dat"), b"two").unwrap();
+        assert_ne!(snapshot_media_tree(&media, &media).unwrap(), original);
+        fs::remove_file(media.join("two.dat")).unwrap();
+        assert_eq!(snapshot_media_tree(&media, &media).unwrap(), original);
+        fs::rename(media.join("one.dat"), media.join("renamed.dat")).unwrap();
+        assert_ne!(snapshot_media_tree(&media, &media).unwrap(), original);
+        fs::remove_file(media.join("renamed.dat")).unwrap();
+        assert_ne!(snapshot_media_tree(&media, &media).unwrap(), original);
     }
 
     #[cfg(unix)]
