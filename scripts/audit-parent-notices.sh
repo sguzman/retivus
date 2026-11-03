@@ -175,6 +175,19 @@ while IFS=$'\t' read -r name version license status notice; do
       expected_sha=5878605364af97a3358368a6eaef02104af2e016
     fi
   fi
+  # dispatch 0.2.0 declares MIT and credits Steven Sheldon but has no
+  # original upstream license file. Preserve a byte-exact MIT notice from the
+  # same author's companion project as distinct, NOT upstream-equivalent,
+  # provenance evidence. Final legal disposition remains M7.1 work.
+  if [[ "$name/$version" == "dispatch/0.2.0" ]]; then
+    [[ "$upstream" == "http://github.com/SSheldon/rust-dispatch" ]] || { echo "dispatch upstream changed" >&2; exit 1; }
+    [[ "$license" == "MIT" ]] || { echo "dispatch license declaration changed" >&2; exit 1; }
+    test "$(git hash-object "$out/source/LICENSES/upstream/dispatch-0.2.0/AUTHOR-COMPANION-MIT.txt")" = "e9ab3babc0d8602b83dccde8a462f8f3dc1e52ad" || { echo "dispatch companion MIT text changed" >&2; exit 1; }
+    test "$(git hash-object "$out/source/LICENSES/upstream/dispatch-0.2.0/COMPANION-PROVENANCE.md")" = "c60ed18c290af10385a987e876adca57ade5a7e7" || { echo "dispatch companion provenance changed" >&2; exit 1; }
+    expected_sha=82d6c7a5b75dc0c71c3f46f87bb6c16a476f7748
+    review=AUTHOR_COMPANION_NOTICE_PRESENT
+    evidence="LICENSES/upstream/dispatch-0.2.0/COMPANION-PROVENANCE.md,LICENSES/upstream/dispatch-0.2.0/AUTHOR-COMPANION-MIT.txt"
+  fi
   # hexf-parse's upstream publishes its CC0-1.0 declaration but no complete
   # standalone text. Debian's independent attribution and SPDX canonical CC0
   # text are bundled as corroboration, not a substituted upstream license.
@@ -287,5 +300,8 @@ test "$count" -gt 0
 (( extra_matched == extra_count )) || { echo "Stale notice manifest: $extra_matched/$extra_count matched" >&2; exit 1; }
 printf 'PARENT NOTICE REVIEW: %s missing crate-local notice files, %s upstream locations declared.\n' \
   "$count" "$(grep -vc $'\tUNDECLARED\t' "$report" || true)"
-printf 'Notice provenance: %s rows have pinned parent/nested evidence; %s still need source acquisition.\n' "$evidenced" "$pending"
-echo 'Evidence present is not legal clearance; all entries remain within M7.1 review.'
+printf 'Notice provenance: %s rows have notice/provenance evidence; %s without any such evidence.\n' "$evidenced" "$pending"
+printf 'Evidence categories: %s independent Debian; %s author-companion; all others pinned source/parent.\n' \
+  "$(awk -F '\t' '$5=="DEBIAN_PACKAGING_NOTICE_PRESENT" {n++} END{print n+0}' "$report")" \
+  "$(awk -F '\t' '$5=="AUTHOR_COMPANION_NOTICE_PRESENT" {n++} END{print n+0}' "$report")"
+echo 'Notice evidence is NOT legal clearance; final M7.1 compatibility/attribution review remains outstanding.'

@@ -40,6 +40,9 @@ cmp "$sources/PARENT-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" sour
 cmp "$sources/LINUX-TARGET-DEPENDENCIES.tsv" <(tar --zstd -xOf "$source_archive" source/LINUX-TARGET-DEPENDENCIES.tsv)
 cmp "$sources/LINUX-TARGET-NOTICE-REVIEW.tsv" <(tar --zstd -xOf "$source_archive" source/LINUX-TARGET-NOTICE-REVIEW.tsv)
 cmp "$binary_root/share/doc/retivus/source/docs/release-notice-exceptions.md" <(tar --zstd -xOf "$source_archive" source/docs/release-notice-exceptions.md)
+for notice in AUTHOR-COMPANION-MIT.txt COMPANION-PROVENANCE.md; do
+  cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/dispatch-0.2.0/$notice" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/dispatch-0.2.0/$notice")
+done
 for notice in CC0-1.0-SPDX.txt DEBIAN-PACKAGING-ATTRIBUTION.md; do
   cmp "$binary_root/share/doc/retivus/source/LICENSES/upstream/hexf-parse-0.2.1/$notice" <(tar --zstd -xOf "$source_archive" "source/LICENSES/upstream/hexf-parse-0.2.1/$notice")
 done
