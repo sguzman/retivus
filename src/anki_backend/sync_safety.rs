@@ -250,7 +250,7 @@ fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String
     let mut tail = vec![0_u8; tail_length];
     file.read_exact(&mut tail)?;
     let eocd_index = (0..=tail_length - 22).rev().find(|&i| {
-        tail[i..].starts_with(b"PK\x05\\x06")
+        tail[i..].starts_with(b"PK\x05\x06")
             && usize::from(u16_le(&tail, i + 20)) == tail_length - i - 22
     });
     let index = eocd_index.ok_or("recovery ZIP end-of-central-directory missing")?;
@@ -272,7 +272,7 @@ fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String
         file.seek(SeekFrom::Start(eocd_offset - 20))?;
         let mut locator = [0_u8; 20];
         file.read_exact(&mut locator)?;
-        if &locator[..4] != b"PK\x06\\x07"
+        if &locator[..4] != b"PK\x06\x07"
             || u32_le(&locator, 4) != 0
             || u32_le(&locator, 16) != 1
         {
@@ -281,7 +281,7 @@ fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String
         file.seek(SeekFrom::Start(u64_le(&locator, 8)))?;
         let mut zip64 = [0_u8; 56];
         file.read_exact(&mut zip64)?;
-        if &zip64[..4] != b"PK\x06\\x06"
+        if &zip64[..4] != b"PK\x06\x06"
             || u32_le(&zip64, 16) != 0
             || u32_le(&zip64, 20) != 0
         {
@@ -310,7 +310,7 @@ fn audit_recovery_central_directory(path: &Path) -> BackendResult<HashSet<String
         }
         let mut record = [0_u8; 46];
         file.read_exact(&mut record)?;
-        if &record[..4] != b"PK\x01\\x02" {
+        if &record[..4] != b"PK\x01\x02" {
             return Err("malformed recovery ZIP central entry".into());
         }
         let name_length = u16_le(&record, 28) as usize;
