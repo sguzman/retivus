@@ -225,7 +225,7 @@ fn valid_recovery_member_name(name: &str) -> bool {
                 && part != "."
                 && part != ".."
                 && !part.contains('\\')
-                && !part.contains('\\0')
+                && !part.contains('\0')
         })
 }
 
@@ -374,6 +374,7 @@ mod tests {
         let mut profile = AnkiBackend::create_managed_profile(dir.path(), "original").unwrap();
         let deck = profile.create_deck("Recovery").unwrap();
         profile.add_basic_note(deck, "luz", "light").unwrap();
+        profile.select_review_deck(deck).unwrap();
         profile.grade_next_card(4).unwrap().unwrap();
         let expected = profile.collection_stats().unwrap();
         assert_eq!(expected.review_events, 1);
