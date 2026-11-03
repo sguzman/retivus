@@ -14,7 +14,8 @@ history and referenced media, and independently copied raw media files.\n\
 Contains PRIVATE study history and possibly PRIVATE media. Do not share.\n\
 This is NOT proof of AnkiWeb compatibility or a complete media-sync-state\n\
 backup; the media sync index is not included. Never overwrite a learner\n\
-profile when recovering. All tests use disposable original fixtures.\n";
+profile when recovering. Concurrent media writes can still produce an\n\
+inconsistent snapshot; close other media writers before taking a backup.\n";
 
 impl AnkiBackend {
     /// Create an owner-requested recovery artifact **without contacting a
@@ -22,7 +23,8 @@ impl AnkiBackend {
     ///
     /// The ZIP contains an Anki-validated SQLite backup, a complete-history
     /// .apkg for interoperable restore, and even unreferenced regular media.
-    /// Source-media changes during copying cause the archive to be rejected.
+    /// Detected media size/mtime changes during copying reject the archive;
+    /// concurrent edits that preserve both cannot be reliably detected.
     /// The caller must choose an absolute .zip path outside its profile.
     pub fn create_pre_sync_recovery_bundle(&mut self, destination: &Path) -> BackendResult<()> {
         let managed = self
@@ -76,6 +78,15 @@ impl AnkiBackend {
                 append_media(&mut zip, &media, &media)?;
             }
             zip.finish()?;
+        }
+        // Re-read every ZIP entry before publishing. This verifies its actual
+        // on-disk CRC and catches incomplete data or archive structure, while
+        // keeping the private staging file out of the destination namespace.
+        {
+            let mut verified = zip::ZipArchive::new(output_file.reopen()?)?;
+            for index in 0..verified.len() {
+                io::copy(&mut verified.by_index(index)?, &mut io::sink())?;
+            }
         }
         output_file.as_file().sync_all()?;
         let finished = output_file.persist_noclobber(&output)?;
@@ -179,6 +190,15 @@ mod tests {
 
         let bundle = dir.path().join("offline-pre-sync.zip");
         profile.create_pre_sync_recovery_bundle(&bundle).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(
+                fs::metadata(&bundle).unwrap().permissions().mode() & 0o077,
+                0,
+                "recovery ZIP must not be readable by group or others"
+            );
+        }
         let mut archive = zip::ZipArchive::new(File::open(&bundle).unwrap()).unwrap();
         assert!(archive.by_name("RECOVERY-README.txt").is_ok());
         let mut bytes = Vec::new();
