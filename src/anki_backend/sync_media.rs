@@ -193,6 +193,157 @@ mod tests {
     }
 
     #[test]
+    fn synthetic_media_upload_marks_index_clean_only_after_server_acknowledgment() {
+        use std::io::{Read, Write};
+        use std::net::TcpListener;
+        use std::thread;
+        use std::time::Duration;
+
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "source").unwrap();
+        let media = backend.collection.media().unwrap();
+        media.add_file("uploaded.txt", b"synthetic media upload").unwrap();
+        drop(media);
+        let index_path = root.path().join("source/collection.mdb");
+        let dirty_before: i64 = rusqlite::Connection::open(&index_path)
+            .unwrap()
+            .query_row("SELECT dirty FROM media WHERE fname='uploaded.txt'", [], |row| {
+                row.get(0)
+            })
+            .unwrap();
+        assert_eq!(dirty_before, 1);
+
+        let recovery = root.path().join("before-synthetic-upload.zip");
+        let recovery_at_server = recovery.clone();
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let endpoint = format!("http://{}/", listener.local_addr().unwrap());
+        let server = thread::spawn(move || {
+            let routes = [
+                (
+                    "POST /sync/hostKey ",
+                    br#"{"key":"synthetic-upload-key"}"#.as_slice(),
+                ),
+                (
+                    "POST /msync/begin ",
+                    br#"{"data":{"usn":0,"sk":"synthetic-upload-key"},"err":""}"#.as_slice(),
+                ),
+                (
+                    "POST /msync/uploadChanges ",
+                    br#"{"data":[1,1],"err":""}"#.as_slice(),
+                ),
+                (
+                    "POST /msync/mediaSanity ",
+                    br#"{"data":"OK","err":""}"#.as_slice(),
+                ),
+            ];
+            for (route, response) in routes {
+                let (mut stream, _) = listener.accept().unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(10)))
+                    .unwrap();
+                assert!(
+                    recovery_at_server.is_file(),
+                    "recovery must exist before the first remote request"
+                );
+                let mut request = Vec::new();
+                let mut buffer = [0_u8; 8192];
+                loop {
+                    let len = stream.read(&mut buffer).unwrap();
+                    assert!(len > 0, "incomplete mock media-sync request");
+                    request.extend_from_slice(&buffer[..len]);
+                    assert!(request.len() < 2 * 1024 * 1024);
+                    if let Some(end) = request.windows(4).position(|part| part == b"\r\n\r\n") {
+                        let header = String::from_utf8_lossy(&request[..end]);
+                        let body = &request[end + 4..];
+                        if header
+                            .to_ascii_lowercase()
+                            .contains("transfer-encoding: chunked")
+                        {
+                            if body.windows(5).any(|part| part == b"0\r\n\r\n") {
+                                break;
+                            }
+                        } else if let Some(len) = header.lines().find_map(|line| {
+                            line.to_ascii_lowercase()
+                                .strip_prefix("content-length: ")
+                                .and_then(|text| text.trim().parse::<usize>().ok())
+                        }) {
+                            if body.len() >= len {
+                                break;
+                            }
+                        } else {
+                            break;
+                        }
+                    }
+                }
+                assert!(
+                    String::from_utf8_lossy(&request).starts_with(route),
+                    "wrong media sync endpoint or upload order"
+                );
+                let payload = zstd::stream::encode_all(response, 1).unwrap();
+                let headers = format!(
+                    "HTTP/1.1 200 OK\r\nContent-Type: application/octet-stream\r\nanki-original-size: {}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    response.len(),
+                    payload.len()
+                );
+                stream.write_all(headers.as_bytes()).unwrap();
+                stream.write_all(&payload).unwrap();
+                stream.flush().unwrap();
+            }
+        });
+        let client = reqwest::Client::builder().no_proxy().build().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        runtime
+            .block_on(backend.sync_ankiweb_media_with_client(
+                "user@example.test",
+                "synthetic-password",
+                &recovery,
+                client,
+                Some(endpoint),
+            ))
+            .unwrap();
+        server.join().unwrap();
+
+        let after = rusqlite::Connection::open(&index_path).unwrap();
+        let (dirty, sync_usn): (i64, i64) = after
+            .query_row(
+                "SELECT media.dirty, meta.lastUsn FROM media, meta WHERE media.fname='uploaded.txt'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        assert_eq!(dirty, 0);
+        assert_eq!(sync_usn, 1);
+        assert_eq!(
+            std::fs::read(root.path().join("source/collection.media/uploaded.txt")).unwrap(),
+            b"synthetic media upload"
+        );
+
+        // A new profile restored from the PRE-sync bundle has the original
+        // pending-media state, not the server-acknowledged state.
+        drop(after);
+        let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+            root.path(),
+            "restored",
+            &recovery,
+        )
+        .unwrap();
+        let original_dirty: i64 =
+            rusqlite::Connection::open(root.path().join("restored/collection.mdb"))
+                .unwrap()
+                .query_row(
+                    "SELECT dirty FROM media WHERE fname='uploaded.txt'",
+                    [],
+                    |row| row.get(0),
+                )
+                .unwrap();
+        assert_eq!(original_dirty, 1);
+        restored.close().unwrap();
+    }
+
+    #[test]
     fn unapproved_media_sync_does_not_create_an_index_or_recovery_zip() {
         let root = tempdir().unwrap();
         let mut backend = AnkiBackend::create_managed_profile(root.path(), "owned").unwrap();
