@@ -107,5 +107,4 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
         .join("receiver-pre-sync/collection.media/transferred.txt")
         .exists());
     restored.close().unwrap();
-
 }

@@ -52,7 +52,7 @@ fn real_anki_server_requires_separate_full_sync_direction_and_keeps_private_reco
     assert!(recovery.is_file());
     assert!(backend.create_pre_sync_recovery_bundle(&recovery).is_err());
 
-    let restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+    let mut restored = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
         root.path(),
         "restored-before-sync",
         &recovery,
