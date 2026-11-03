@@ -28,15 +28,10 @@ async fn obtain_temporary_host_key(
     endpoint: Option<String>,
     client: reqwest::Client,
 ) -> BackendResult<String> {
-    let auth = sync_login(
-        username.to_owned(),
-        password.to_owned(),
-        endpoint,
-        client,
-    )
-    .await
-    // Do not format upstream errors: they can include sensitive HTTP context.
-    .map_err(|_| "AnkiWeb login failed or is unavailable")?;
+    let auth = sync_login(username.to_owned(), password.to_owned(), endpoint, client)
+        .await
+        // Do not format upstream errors: they can include sensitive HTTP context.
+        .map_err(|_| "AnkiWeb login failed or is unavailable")?;
     if auth.hkey.is_empty()
         || auth.hkey.len() > 1024
         || auth.hkey.bytes().any(|byte| !byte.is_ascii_graphic())
@@ -165,7 +160,10 @@ mod tests {
         let endpoint = format!("http://{}/", listener.local_addr().unwrap());
         let server = thread::spawn(move || {
             for (path, payload) in [
-                ("/sync/hostKey", br#"{"key":"synthetic-host-key"}"#.as_slice()),
+                (
+                    "/sync/hostKey",
+                    br#"{"key":"synthetic-host-key"}"#.as_slice(),
+                ),
                 ("/sync/meta", meta.as_slice()),
             ] {
                 let (mut stream, _) = listener.accept().unwrap();
@@ -222,7 +220,9 @@ mod tests {
             let (mut stream, _) = listener.accept().unwrap();
             assert!(receive_http_request(&mut stream).starts_with("POST /sync/hostKey "));
             stream
-                .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .write_all(
+                    b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
                 .unwrap();
         });
         let client = reqwest::Client::builder().no_proxy().build().unwrap();

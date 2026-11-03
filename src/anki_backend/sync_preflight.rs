@@ -108,7 +108,7 @@ impl AnkiBackend {
         self.query_remote_status_with_auth(auth, client).await
     }
 
-    async fn query_remote_status_with_auth(
+    pub(super) async fn query_remote_status_with_auth(
         &mut self,
         auth: SyncAuth,
         client: reqwest::Client,
