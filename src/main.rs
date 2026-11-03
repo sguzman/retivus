@@ -353,10 +353,13 @@ impl eframe::App for Retivus {
         // Switching back to System must restore live operating-system theme tracking.
         ctx.set_theme(self.theme.preference());
         apply_accessibility_style(ctx, self.density, self.high_contrast, self.reduced_motion);
+        let mut narrow_toolbar = false;
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
-            // Keep all accessibility controls in the SAME wrapping layout.
-            // A separate second UI row was reserved but not painted on the
-            // 720px Sway viewport, making both settings effectively invisible.
+            // The headless Sway renderer reserves but doesn't paint a wrapped
+            // second row of this top panel at 720px. Keep the panel to one
+            // row, and render narrow accessibility controls below in the
+            // central panel, where their actual pixels are visible.
+            narrow_toolbar = ui.available_width() < 860.0;
             ui.horizontal_wrapped(|ui| {
                 ui.label(
                     egui::RichText::new("Retivus")
@@ -394,15 +397,30 @@ impl eframe::App for Retivus {
                 {
                     ctx.set_zoom_factor(self.ui_scale);
                 }
-                ui.checkbox(&mut self.high_contrast, "High contrast")
-                    .on_hover_text(
-                        "Use high-contrast text and backgrounds in either color scheme.",
-                    );
-                ui.checkbox(&mut self.reduced_motion, "Reduce motion")
-                    .on_hover_text("Disable standard widget transitions in Retivus.");
+                if !narrow_toolbar {
+                    ui.checkbox(&mut self.high_contrast, "High contrast")
+                        .on_hover_text(
+                            "Use high-contrast text and backgrounds in either color scheme.",
+                        );
+                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                        .on_hover_text("Disable standard widget transitions in Retivus.");
+                }
             });
         });
         egui::CentralPanel::default().show(ctx, |ui| {
+            if narrow_toolbar {
+                // Separate from the TopBottomPanel clipping scope. This is
+                // always visible above the scrollable learner workspace.
+                ui.horizontal_wrapped(|ui| {
+                    ui.checkbox(&mut self.high_contrast, "High contrast")
+                        .on_hover_text(
+                            "Use high-contrast text and backgrounds in either color scheme.",
+                        );
+                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                        .on_hover_text("Disable standard widget transitions in Retivus.");
+                });
+                ui.separator();
+            }
             ui.heading("Learn from any source.");
             ui.label("Anki ecosystem compatibility and versioned external data providers.");
             ui.separator();
