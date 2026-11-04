@@ -12,7 +12,7 @@ use anki::sync::collection::normal::SyncActionRequired;
 use anki::sync::login::SyncAuth;
 use std::path::Path;
 
-mod recent_edits;
+mod pending_changes;
 
 /// Separate decision required because the pinned Anki normal-sync protocol
 /// may complete with divergent edits that have an identical note timestamp.
@@ -82,7 +82,7 @@ impl AnkiBackend {
         // Best-effort additional guard: whole-second Anki note timestamps
         // cannot reliably distinguish two pending edits made at the same time.
         // This does NOT detect old simultaneous edits on another client.
-        recent_edits::refuse_fresh_pending_notes(self)?;
+        pending_changes::refuse_risky_pending_note_changes(self)?;
         let client = new_ankiweb_http_client()?;
         self.sync_ankiweb_collection_with_client(username, password, recovery_zip, client, None)
             .await
@@ -129,6 +129,7 @@ impl AnkiBackend {
 #[cfg(test)]
 mod tests {
     mod concurrent_edit;
+    mod deletion_recovery;
     mod normal_merge;
     mod same_second;
     mod upstream_server;

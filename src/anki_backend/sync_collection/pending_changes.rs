@@ -16,14 +16,14 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const COLLISION_WINDOW_SECONDS: i64 = 2;
 
 /// Must run before any archive, login or HTTP request in the public sync path.
-pub(super) fn refuse_fresh_pending_notes(backend: &AnkiBackend) -> BackendResult<()> {
+pub(super) fn refuse_risky_pending_note_changes(backend: &AnkiBackend) -> BackendResult<()> {
     let now = i64::try_from(SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs())?;
-    refuse_fresh_pending_notes_at(backend, now)
+    refuse_risky_pending_note_changes_at(backend, now)
 }
 
 /// Inject a clock for deterministic boundary tests. Always query the active
 /// Anki collection connection, never open a second SQLite writer/reader.
-fn refuse_fresh_pending_notes_at(backend: &AnkiBackend, now: i64) -> BackendResult<()> {
+fn refuse_risky_pending_note_changes_at(backend: &AnkiBackend, now: i64) -> BackendResult<()> {
     let cutoff = now.saturating_sub(COLLISION_WINDOW_SECONDS);
     let has_recent: bool = backend.collection.storage.db().query_row(
         "SELECT EXISTS(SELECT 1 FROM notes WHERE usn = -1 AND mod >= ?1)",
@@ -104,10 +104,10 @@ mod tests {
         assert_eq!(note.usn.0, -1, "new note must be pending upload");
         let modified = note.mtime.0;
 
-        assert!(refuse_fresh_pending_notes_at(&backend, modified).is_err());
-        assert!(refuse_fresh_pending_notes_at(&backend, modified + 1).is_err());
-        assert!(refuse_fresh_pending_notes_at(&backend, modified + 2).is_err());
-        assert!(refuse_fresh_pending_notes_at(&backend, modified + 3).is_ok());
+        assert!(refuse_risky_pending_note_changes_at(&backend, modified).is_err());
+        assert!(refuse_risky_pending_note_changes_at(&backend, modified + 1).is_err());
+        assert!(refuse_risky_pending_note_changes_at(&backend, modified + 2).is_err());
+        assert!(refuse_risky_pending_note_changes_at(&backend, modified + 3).is_ok());
 
         // The guard only considers unsynced notes. The clean fixture still
         // stays in the same managed profile, but it is no longer pending.
@@ -118,7 +118,7 @@ mod tests {
             .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
             .unwrap();
         assert_eq!(updated, 1);
-        assert!(refuse_fresh_pending_notes_at(&backend, modified).is_ok());
+        assert!(refuse_risky_pending_note_changes_at(&backend, modified).is_ok());
     }
 
     #[test]
@@ -145,7 +145,7 @@ mod tests {
             .db()
             .execute("UPDATE col SET ls=?1", [note_id + 10_000])
             .unwrap();
-        let error = refuse_fresh_pending_notes_at(&backend, modified + 60)
+        let error = refuse_risky_pending_note_changes_at(&backend, modified + 60)
             .unwrap_err()
             .to_string();
         assert!(error.contains("predate the last recorded sync"), "{error}");
@@ -157,7 +157,7 @@ mod tests {
             .db()
             .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
             .unwrap();
-        refuse_fresh_pending_notes_at(&backend, modified + 60).unwrap();
+        refuse_risky_pending_note_changes_at(&backend, modified + 60).unwrap();
 
         // A newly created pending note after the last-sync marker is not
         // blocked merely because it has been waiting for several seconds.
@@ -173,7 +173,7 @@ mod tests {
             .db()
             .execute("UPDATE notes SET usn=-1 WHERE id=?1", [note_id])
             .unwrap();
-        refuse_fresh_pending_notes_at(&backend, modified + 60).unwrap();
+        refuse_risky_pending_note_changes_at(&backend, modified + 60).unwrap();
     }
 
     #[test]
@@ -298,7 +298,7 @@ mod tests {
             )
             .unwrap();
         assert_eq!(pending_grave, 1);
-        refuse_fresh_pending_notes_at(&backend, 1_900_000_000).unwrap();
+        refuse_risky_pending_note_changes_at(&backend, 1_900_000_000).unwrap();
 
         // Without any recorded sync, the same tombstone cannot represent
         // an identified previously synced remote note.
@@ -308,7 +308,7 @@ mod tests {
             .db()
             .execute("UPDATE col SET ls=0", [])
             .unwrap();
-        refuse_fresh_pending_notes_at(&backend, 1_900_000_000).unwrap();
+        refuse_risky_pending_note_changes_at(&backend, 1_900_000_000).unwrap();
     }
 
     #[test]
@@ -346,6 +346,6 @@ mod tests {
     fn clean_and_empty_profiles_can_pass_local_only_preflight() {
         let dir = tempdir().unwrap();
         let backend = AnkiBackend::create_managed_profile(dir.path(), "empty").unwrap();
-        refuse_fresh_pending_notes_at(&backend, 1_800_000_000).unwrap();
+        refuse_risky_pending_note_changes_at(&backend, 1_800_000_000).unwrap();
     }
 }
