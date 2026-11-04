@@ -773,7 +773,7 @@ impl StudyPanel {
                 .inspect_local_collection_sync_readiness()
                 .and_then(|()| backend.inspect_local_media_conflict_risk())
             {
-                Ok(()) => "Offline check: no local sync blockers detected in collection or media index. Remote conflicts, unindexed media changes and AnkiWeb remain unverified; no sync was performed.".into(),
+                Ok(()) => "Offline check: no local sync blockers detected in collection or media files at inspection time. Remote conflicts, same-timestamp or concurrent media edits, and AnkiWeb behavior remain unverified; no sync was performed.".into(),
                 Err(error) => format!("Offline check refused: {error}. No network contacted."),
             },
             None => "Open a Retivus-managed learner profile before checking sync blockers.".into(),
@@ -1427,6 +1427,50 @@ mod tests {
                 .unwrap()[1],
             "private definition"
         );
+        panel.close();
+    }
+
+    #[test]
+    fn offline_sync_readiness_panel_detects_unindexed_media_without_remote_access() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "offline-media".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+
+        let managed = root.path().join("offline-media");
+        let media = anki::media::MediaManager::new(
+            managed.join("collection.media"),
+            managed.join("collection.mdb"),
+        )
+        .unwrap();
+        media.add_file("clean.txt", b"existing synchronized content").unwrap();
+        drop(media);
+        let index = managed.join("collection.mdb");
+        let db = rusqlite::Connection::open(&index).unwrap();
+        db.execute_batch("UPDATE media SET dirty=0; UPDATE meta SET lastUsn=7;")
+            .unwrap();
+        drop(db);
+
+        panel.check_local_sync_readiness();
+        assert!(panel.status.contains("no local sync blockers"), "{}", panel.status);
+        assert!(panel.status.contains("same-timestamp"), "{}", panel.status);
+
+        let unindexed = managed.join("collection.media/external.txt");
+        std::fs::write(&unindexed, b"manual edit outside Anki").unwrap();
+        let before = panel.backend.as_ref().unwrap().collection_stats().unwrap();
+        panel.check_local_sync_readiness();
+        assert!(panel.status.contains("Offline check refused"), "{}", panel.status);
+        assert!(
+            panel.status.contains("absent from the clean media index"),
+            "{}",
+            panel.status
+        );
+        assert!(panel.status.contains("No network contacted"), "{}", panel.status);
+        assert_eq!(panel.backend.as_ref().unwrap().collection_stats().unwrap(), before);
+        assert_eq!(std::fs::read(&unindexed).unwrap(), b"manual edit outside Anki");
+        assert!(!root.path().join("network-recovery.zip").exists());
         panel.close();
     }
 
