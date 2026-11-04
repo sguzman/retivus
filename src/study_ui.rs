@@ -773,7 +773,7 @@ impl StudyPanel {
                 .inspect_local_collection_sync_readiness()
                 .and_then(|()| backend.inspect_local_media_conflict_risk())
             {
-                Ok(()) => "Offline check: no local sync blockers detected in collection or media files at inspection time. Remote conflicts, same-timestamp or concurrent media edits, and AnkiWeb behavior remain unverified; no sync was performed.".into(),
+                Ok(()) => "Offline check: no local sync blockers detected in collection or media files at inspection time. Remote conflicts, media edits after inspection, deliberate checksum collisions, and AnkiWeb behavior remain unverified; no sync was performed.".into(),
                 Err(error) => format!("Offline check refused: {error}. No network contacted."),
             },
             None => "Open a Retivus-managed learner profile before checking sync blockers.".into(),
@@ -1461,7 +1461,7 @@ mod tests {
             "{}",
             panel.status
         );
-        assert!(panel.status.contains("same-timestamp"), "{}", panel.status);
+        assert!(panel.status.contains("media edits after inspection"), "{}", panel.status);
 
         let unindexed = managed.join("collection.media/external.txt");
         std::fs::write(&unindexed, b"manual edit outside Anki").unwrap();
