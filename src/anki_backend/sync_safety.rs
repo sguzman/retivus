@@ -589,7 +589,7 @@ mod tests {
         let replacement = dir.path().join("replacement.bin");
         fs::write(&original, b"private-A").unwrap();
         let before = fs::symlink_metadata(&original).unwrap();
-        let handle = File::open(&original).unwrap();
+        let mut handle = File::open(&original).unwrap();
 
         // A new inode with the same length and restored modification time
         // previously passed the per-file copy check. The old open file still
@@ -603,7 +603,12 @@ mod tests {
         let after_path = fs::symlink_metadata(&original).unwrap();
         assert_eq!(before.len(), after_path.len());
         assert_eq!(before.modified().unwrap(), after_path.modified().unwrap());
-        assert!(same_recovery_source(&before, &handle.metadata().unwrap()).unwrap());
+        let mut originally_opened = Vec::new();
+        handle.read_to_end(&mut originally_opened).unwrap();
+        assert_eq!(originally_opened, b"private-A");
+        assert_eq!(fs::read(&original).unwrap(), b"private-B");
+        // Unlinking may change even the old descriptor's ctime. Either way,
+        // the replacement pathname must not pass identity verification.
         assert!(!same_recovery_source(&before, &after_path).unwrap());
     }
 
