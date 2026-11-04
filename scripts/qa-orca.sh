@@ -23,7 +23,8 @@ debug="$RUNNER_TEMP/retivus-orca-debug.log"
 app_log="$RUNNER_TEMP/retivus-orca-app.log"
 reader_log="$RUNNER_TEMP/retivus-orca-startup.log"
 wm_log="$RUNNER_TEMP/retivus-orca-wm.log"
-wm=0; reader=0; learner=0
+pulse_log="$RUNNER_TEMP/retivus-orca-pulse.log"
+wm=0; reader=0; learner=0; pulse_started=0
 cleanup() {
   code=$?
   if (( code )); then
@@ -40,8 +41,33 @@ cleanup() {
     kill "$reader" 2>/dev/null || true
   fi
   if (( wm > 0 )); then kill "$wm" 2>/dev/null || true; fi
+  if (( pulse_started )); then pulseaudio --kill >/dev/null 2>&1 || true; fi
 }
 trap cleanup EXIT
+# CI runners have no physical audio device. Speech Dispatcher's eSpeak NG
+# module may block on sound output, preventing Orca from delivering later
+# announcements. Provide a real PulseAudio stream target backed by an
+# isolated null sink: no simulated AT-SPI or speech events are injected.
+# Physical audible and native Wayland acceptance remain a separate gate.
+pulseaudio --daemonize=yes --exit-idle-time=-1 --log-target="file:$pulse_log"
+pulse_started=1
+if ! timeout 8s pactl info >/dev/null; then
+  echo 'PulseAudio did not expose a usable CI server' >&2
+  exit 1
+fi
+pactl load-module module-null-sink sink_name=retivus_ci_orca >/dev/null
+pactl set-default-sink retivus_ci_orca
+export PULSE_SINK=retivus_ci_orca
+echo 'CI virtual audio sink active:' >&2
+pactl get-default-sink >&2
+# A real eSpeak/Speech Dispatcher pipeline must acknowledge completion
+# *before* Orca starts. Failure here is an audio-service test-environment
+# blocker, not an accessibility pass or Retivus status assertion.
+if ! timeout 12s spd-say -w -o espeak-ng 'Retivus CI audio service preflight'; then
+  echo 'Speech Dispatcher audio preflight failed before Orca startup' >&2
+  exit 1
+fi
+echo 'PASS: eSpeak NG completed a real Speech Dispatcher audio preflight.' >&2
 openbox > "$wm_log" 2>&1 & wm=$!
 PYTHONPATH="$diagnostics${PYTHONPATH:+:$PYTHONPATH}" orca --disable=braille --enable=speech --debug-file="$debug" > "$reader_log" 2>&1 & reader=$!
 sleep 3

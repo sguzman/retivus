@@ -27,7 +27,7 @@ jobs:
       - name: Install Orca screen reader and virtual desktop
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0 scrot
+          sudo apt-get install -y -qq dbus dbus-user-session at-spi2-core orca speech-dispatcher speech-dispatcher-espeak-ng pulseaudio pulseaudio-utils xvfb xdotool openbox libgl1-mesa-dri libxkbcommon-x11-0 scrot
       - name: Build native AccessKit-enabled Retivus
         run: cargo build --locked --bin retivus
       - name: Exercise named controls and changed-status speech in one session
@@ -44,5 +44,6 @@ jobs:
             ${{ runner.temp }}/retivus-orca-startup.log
             ${{ runner.temp }}/retivus-orca-app.log
             ${{ runner.temp }}/retivus-speechd-probe.log
+            ${{ runner.temp }}/retivus-orca-pulse.log
           if-no-files-found: ignore
           retention-days: 2
