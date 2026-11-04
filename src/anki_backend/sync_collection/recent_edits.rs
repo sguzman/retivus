@@ -2,11 +2,12 @@
 //! were recorded in Anki's one-second modification timestamp resolution.
 //!
 //! This prevents an immediate sync while *this* profile has very fresh pending
-//! notes. It also rejects older pending notes whose IDs predate the collection's
-//! last successful sync, conservatively treating them as possibly edited shared
-//! notes. Some imported or preexisting unsynced notes will be blocked too.
-//! Neither check can discover remote-only edits, prove convergence, or repair
-//! conflicts. The known risk still needs separate consent.
+//! notes. It also rejects older pending notes and note deletion tombstones
+//! whose IDs predate the collection's last successful sync, conservatively
+//! treating them as changes to possibly shared notes. Some imported or
+//! preexisting unsynced notes will be blocked too. These checks cannot
+//! discover remote-only edits, prove convergence, or repair conflicts.
+//! The known risk still needs separate consent.
 use super::{AnkiBackend, BackendResult};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -55,6 +56,26 @@ fn refuse_fresh_pending_notes_at(backend: &AnkiBackend, now: i64) -> BackendResu
     if has_possibly_shared_edit {
         return Err(
             "collection sync refused: pending notes predate the last recorded sync and may overwrite independently edited shared notes; manual conflict-safe reconciliation is required, not just waiting".into(),
+        );
+    }
+
+    // The pinned Anki engine stores deleted notes in graves (type=1). A
+    // deletion of a note that might already be shared is just as risky as an
+    // edit: normal sync can send this tombstone without comparing the remote
+    // note's content. There is no live notes row for the above check to see.
+    // This is deliberately conservative for imported or nonchronological IDs.
+    let has_possibly_shared_deletion: bool = backend.collection.storage.db().query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM graves, col
+            WHERE graves.usn = -1 AND graves.type = 1
+              AND col.ls > 0 AND graves.oid <= col.ls
+        )",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_possibly_shared_deletion {
+        return Err(
+            "collection sync refused: pending note deletions predate the last recorded sync and may erase independently edited shared notes; manual conflict-safe reconciliation is required".into(),
         );
     }
     Ok(())
@@ -198,6 +219,96 @@ mod tests {
         assert!(!output.exists());
         assert_eq!(backend.collection_stats().unwrap(), before);
         assert_eq!(backend.note_fields(note_id).unwrap()[1], "private answer");
+    }
+
+    #[test]
+    fn older_pending_note_deletion_blocks_sync_without_backup_or_network() {
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let deck = backend.create_deck("Shared note removal").unwrap();
+        let note_id = backend
+            .add_basic_note(deck, "remote-shared question", "private answer")
+            .unwrap();
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=?1", [note_id + 10_000])
+            .unwrap();
+        backend.remove_note(note_id).unwrap();
+        let pending_grave: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "SELECT COUNT(*) FROM graves WHERE oid=?1 AND type=1 AND usn=-1",
+                [note_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(pending_grave, 1, "pinned Anki must retain a note tombstone");
+        let before = backend.collection_stats().unwrap();
+        let recovery = dir.path().join("never-written.zip");
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let error = rt
+            .block_on(backend.sync_ankiweb_collection_with_recovery(
+                "fixture@example.invalid",
+                "test-only-password",
+                &recovery,
+                true,
+                CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+            ))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("pending note deletions"), "{error}");
+        assert!(!recovery.exists(), "must refuse before backup or login");
+        assert_eq!(backend.collection_stats().unwrap(), before);
+        assert!(backend.note_fields(note_id).is_err());
+        backend.undo_last().unwrap();
+        assert_eq!(backend.note_fields(note_id).unwrap()[1], "private answer");
+    }
+
+    #[test]
+    fn deletion_of_only_new_unsynced_note_does_not_trigger_shared_note_guard() {
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let deck = backend.create_deck("Never uploaded").unwrap();
+        let note_id = backend
+            .add_basic_note(deck, "new local question", "new local answer")
+            .unwrap();
+        // Model a previous sync that predates the new note's time-based ID.
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=?1", [note_id - 10_000])
+            .unwrap();
+        backend.remove_note(note_id).unwrap();
+        let pending_grave: i64 = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "SELECT COUNT(*) FROM graves WHERE oid=?1 AND type=1 AND usn=-1",
+                [note_id],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(pending_grave, 1);
+        refuse_fresh_pending_notes_at(&backend, 1_900_000_000).unwrap();
+
+        // Without any recorded sync, the same tombstone cannot represent
+        // an identified previously synced remote note.
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=0", [])
+            .unwrap();
+        refuse_fresh_pending_notes_at(&backend, 1_900_000_000).unwrap();
     }
 
     #[test]
