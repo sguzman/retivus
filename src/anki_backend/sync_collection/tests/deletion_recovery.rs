@@ -25,8 +25,7 @@ fn upstream_note_deletion_propagates_and_receiver_backup_restores_original() {
         .join("collection.anki2");
     assert!(!upstream.exists());
     fs::copy(&baseline, &upstream).unwrap();
-    let receiver_init =
-        AnkiBackend::create_managed_profile(root.path(), "receiver").unwrap();
+    let receiver_init = AnkiBackend::create_managed_profile(root.path(), "receiver").unwrap();
     receiver_init.close().unwrap();
     fs::copy(&baseline, root.path().join("receiver/collection.anki2")).unwrap();
 
@@ -73,7 +72,8 @@ fn upstream_note_deletion_propagates_and_receiver_backup_restores_original() {
         .await
     });
     assert_eq!(
-        received.expect("upstream deletion download timed out")
+        received
+            .expect("upstream deletion download timed out")
             .expect("upstream deletion download failed"),
         CollectionSyncOutcome::UpToDateOrMerged
     );
