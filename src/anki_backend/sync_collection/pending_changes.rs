@@ -385,7 +385,7 @@ mod tests {
     #[test]
     fn new_unshared_card_deck_tombstones_and_clean_historical_graves_pass_preflight() {
         let dir = tempdir().unwrap();
-        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
         let cutoff = 1_700_000_000_000_i64;
         backend
             .collection

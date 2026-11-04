@@ -65,9 +65,10 @@ impl AnkiBackend {
     /// The private recovery ZIP is a local fallback, not remote rollback.
     /// Separate acknowledgement of same-second divergence is mandatory;
     /// declining either permission stops before backup, login or network.
-    /// Recent, unsynced local note edits also fail closed until their coarse
-    /// modification timestamps age past the short collision window. This is
-    /// a best-effort local safeguard, not global conflict detection.
+    /// Fresh pending notes, older possibly shared note edits, and pending
+    /// note/card/deck deletions fail closed before login. These conservative
+    /// time-based guards may reject legitimate imported changes and cannot
+    /// detect remote-only edits or guarantee convergence.
     pub async fn sync_ankiweb_collection_with_recovery(
         &mut self,
         username: &str,
@@ -79,9 +80,8 @@ impl AnkiBackend {
         self.validate_sync_profile()?;
         validate_login_input(username, password)?;
         ensure_collection_sync_approval(approve_remote_changes, conflict_risk)?;
-        // Best-effort additional guard: whole-second Anki note timestamps
-        // cannot reliably distinguish two pending edits made at the same time.
-        // This does NOT detect old simultaneous edits on another client.
+        // Fail closed on risky pending shared changes and tombstones before
+        // touching the network; this cannot detect remote-only conflicts.
         pending_changes::refuse_risky_pending_note_changes(self)?;
         let client = new_ankiweb_http_client()?;
         self.sync_ankiweb_collection_with_client(username, password, recovery_zip, client, None)
