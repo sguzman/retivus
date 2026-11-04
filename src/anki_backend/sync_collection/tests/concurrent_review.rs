@@ -39,9 +39,11 @@ fn competing_real_card_grades_keep_both_private_pre_sync_histories() {
     let server = DisposableAnkiServer::start(root.path());
 
     let mut seed = AnkiBackend::create_managed_profile(root.path(), "sender").unwrap();
-    let deck = seed.create_deck("Shared review-grade conflict").unwrap();
+    // The native review queue opens on Anki's selected deck. Keep this
+    // disposable fixture on the default deck so both reopened clients can
+    // grade the same due card without changing collection deck settings.
     let note_id = seed
-        .add_basic_note(deck, "what did we review?", "two private answers")
+        .add_basic_note(1, "what did we review?", "two private answers")
         .unwrap();
     seed.close().unwrap();
 
