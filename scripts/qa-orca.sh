@@ -118,8 +118,10 @@ fi
 # Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
 # the previous offset assertion missed an event that the retained log proves
 # was spoken and incorrectly failed an otherwise successful run.
+status_speech_pass=1
 if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
    ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
+  status_speech_pass=0
   echo 'Orca did not speak updated validation status after direct button activation' >&2
   # Probe the same disposable Speech Dispatcher session *only after* strict
   # speech acceptance has already failed. A returned spd-say command is not
@@ -152,10 +154,13 @@ if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not ope
   tail -c "+$((announce_start + 1))" "$debug" \
     | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
     | tail -n 65 >&2 || true
-  exit 1
+  # Preserve the failure, but continue to an independent static-control
+  # speech test. Until now the early exit hid whether ordinary File/Validate
+  # labels were spoken in the same problematic Orca session.
 fi
-echo 'PASS: Orca speaks changed validation status before static navigation.'
-
+if (( status_speech_pass )); then
+  echo 'PASS: Orca spoke the changed validation status before static navigation.'
+fi
 
 # Static accessibility navigation runs after the live announcement,
 # so its focus-event burst cannot delay or suppress the first update.
@@ -173,10 +178,23 @@ done
 sleep 4
 test -s "$debug" || { echo "Orca produced no debug log"; exit 1; }
 grep -F 'SPEECH DISPATCHER: Speaking' "$debug" > "$RUNNER_TEMP/retivus-orca-speech.txt" || true
-test -s "$RUNNER_TEMP/retivus-orca-speech.txt" || { echo "Orca did not record speech dispatch"; exit 1; }
-grep -F "SPEECH DISPATCHER: Speaking 'Validate source'" "$debug" >/dev/null || { echo "Orca did not announce Validate source"; exit 1; }
-grep -F "SPEECH DISPATCHER: Speaking 'File'" "$debug" >/dev/null || { echo "Orca did not announce File"; exit 1; }
-for label in Appearance Density Format; do
-  grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null || { echo "Orca did not announce $label"; exit 1; }
+static_speech_pass=1
+if [[ ! -s "$RUNNER_TEMP/retivus-orca-speech.txt" ]]; then
+  echo 'FAIL: Orca did not record any speech dispatch' >&2
+  static_speech_pass=0
+fi
+for label in 'Validate source' File Appearance Density Format; do
+  if ! grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null; then
+    echo "FAIL: Orca did not speak named control: $label" >&2
+    static_speech_pass=0
+  fi
 done
-echo "PASS: Orca emitted speech-dispatch events while keyboard-navigating Retivus and recorded its named controls."
+if (( static_speech_pass )); then
+  echo 'PASS: Orca spoke core named controls during keyboard navigation.'
+fi
+# Neither result substitutes for the other: both are release-gate evidence.
+if (( ! status_speech_pass || ! static_speech_pass )); then
+  echo "FAIL: Orca acceptance: dynamic_status=$status_speech_pass static_controls=$static_speech_pass" >&2
+  exit 1
+fi
+echo 'PASS: Orca spoke both changing status and core named controls.'
