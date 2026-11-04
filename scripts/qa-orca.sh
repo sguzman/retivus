@@ -122,24 +122,12 @@ if ! bash scripts/qa-atspi-live-status.sh; then
   echo 'Validation button did not expose changed status; inspect retained screenshot before evaluating Orca speech' >&2
   exit 1
 fi
-# This fresh home contains exactly one validation activation. Require both
-# the emitted AT-SPI announcement AND its observed Orca speech-dispatch call.
-# Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
-# the previous offset assertion missed an event that the retained log proves
-# was spoken and incorrectly failed an otherwise successful run.
-status_speech_pass=1
-if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
-   ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
-  status_speech_pass=0
-  echo 'Orca did not speak updated validation status after direct button activation' >&2
-  # Preserve the failure, but continue to an independent static-control
-  # speech test. Until now the early exit hid whether ordinary File/Validate
-  # labels were spoken in the same problematic Orca session.
-fi
-if (( status_speech_pass )); then
-  echo 'PASS: Orca spoke the changed validation status before static navigation.'
-fi
-
+# This fresh home contains exactly one validation activation. The
+# upstream Orca debug writer is asynchronous: a 6-second immediate grep
+# returned false even though the retained log recorded the speech call at
+# event time. Do not falsely fail an actually spoken status by reading the
+# debug file before its buffers have flushed. Check the same event/speech
+# evidence after navigation and allow a bounded further flush window.
 # Static accessibility navigation runs after the live announcement,
 # so its focus-event burst cannot delay or suppress the first update.
 # A real Orca instance must receive the AT-SPI focus events caused by Tab.
@@ -178,6 +166,24 @@ for label in 'Validate source' File Appearance Density Format; do
 done
 if (( static_speech_pass )); then
   echo 'PASS: Orca spoke core named controls during keyboard navigation.'
+fi
+# The status event and actual speech call must both exist. Look for these
+# exact messages (never only a visual or AT-SPI status) after allowing
+# asynchronous Orca debug logging to catch up. The app sent just one
+# synthetic validation event; navigation cannot generate this status text.
+status_speech_pass=0
+for attempt in 1 2 3 4 5 6 7 8; do
+  if grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null &&
+     grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
+    status_speech_pass=1
+    break
+  fi
+  sleep 1
+done
+if (( status_speech_pass )); then
+  echo 'PASS: Orca spoke the changed validation status (independently retained speech log).'
+else
+  echo 'FAIL: Orca did not log actual speech for the changed validation status.' >&2
 fi
 # Neither result substitutes for the other: both are release-gate evidence.
 if (( ! status_speech_pass || ! static_speech_pass )); then
