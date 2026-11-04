@@ -766,6 +766,17 @@ impl StudyPanel {
         }
     }
 
+    /// Show only the local fail-closed result, never start a network sync.
+    fn check_local_sync_readiness(&mut self) {
+        self.status = match self.backend.as_ref() {
+            Some(backend) => match backend.inspect_local_collection_sync_readiness() {
+                Ok(()) => "Offline check: no local sync blockers detected. Remote conflicts, media and AnkiWeb remain unverified; no sync was performed.".into(),
+                Err(error) => format!("Offline check refused: {error}. No network contacted."),
+            },
+            None => "Open a Retivus-managed learner profile before checking sync blockers.".into(),
+        };
+    }
+
     fn close(&mut self) {
         if let Some(backend) = self.backend.take() {
             self.status = match backend.close() {
@@ -853,6 +864,15 @@ impl StudyPanel {
                 });
                 if ui.add_enabled(self.backend.is_some(), egui::Button::new("Close profile")).clicked() {
                     self.close();
+                }
+                if ui
+                    .add_enabled(
+                        self.backend.is_some(),
+                        egui::Button::new("Check local sync blockers (offline)"),
+                    )
+                    .clicked()
+                {
+                    self.check_local_sync_readiness();
                 }
             });
             egui::CollapsingHeader::new("Offline recovery · private pre-sync ZIP")
@@ -1349,6 +1369,41 @@ mod tests {
         assert!(BrowseScope::Conflicts.matches(&corrupt));
         assert!(BrowseScope::Conflicts.matches(&duplicate));
         assert!(!BrowseScope::SourceLinked.matches(&corrupt));
+    }
+
+    #[test]
+    fn offline_sync_readiness_in_study_panel_is_read_only_and_not_remote_approval() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.check_local_sync_readiness();
+        assert!(panel.status.contains("Open a Retivus-managed"));
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "offline-safety".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        panel.check_local_sync_readiness();
+        assert!(panel.status.contains("no local sync blockers"), "{}", panel.status);
+        assert!(panel.status.contains("Remote conflicts"));
+
+        let note_id = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .add_basic_note(1, "private word", "private definition")
+            .unwrap();
+        let before = panel.backend.as_ref().unwrap().collection_stats().unwrap();
+        panel.check_local_sync_readiness();
+        assert!(panel.status.contains("Offline check refused"), "{}", panel.status);
+        assert!(panel.status.contains("No network contacted"), "{}", panel.status);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().collection_stats().unwrap(),
+            before
+        );
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap()[1],
+            "private definition"
+        );
+        panel.close();
     }
 
     #[test]

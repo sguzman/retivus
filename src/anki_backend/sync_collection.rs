@@ -54,6 +54,18 @@ fn ensure_collection_sync_approval(
 }
 
 impl AnkiBackend {
+    /// Read-only local preflight using the SAME fail-closed predicates as the
+    /// public collection sync entry point. This never logs in, creates a
+    /// recovery archive, accesses AnkiWeb, or changes study records.
+    ///
+    /// Success only means no locally detectable blockers at this instant:
+    /// older or remote-only conflicts, nonchronological IDs and media changes
+    /// remain unverified. Callers must not treat this as sync approval.
+    pub fn inspect_local_collection_sync_readiness(&self) -> BackendResult<()> {
+        self.validate_sync_profile()?;
+        pending_changes::refuse_risky_pending_note_changes(self)
+    }
+
     /// After the caller has explicitly approved potential remote writes,
     /// create a private offline recovery archive and run Anki's collection
     /// normal-sync protocol once. Refuses an existing backup destination.
@@ -141,6 +153,42 @@ mod tests {
     use std::thread;
     use std::time::Duration;
     use tempfile::tempdir;
+
+    #[test]
+    fn offline_readiness_reuses_public_guard_without_mutating_collection() {
+        let root = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+        let before_empty = backend.collection_stats().unwrap();
+        backend.inspect_local_collection_sync_readiness().unwrap();
+        assert_eq!(backend.collection_stats().unwrap(), before_empty);
+
+        let note_id = backend
+            .add_basic_note(1, "offline-only readiness", "private answer")
+            .unwrap();
+        let before_blocked = backend.collection_stats().unwrap();
+        let result = backend.inspect_local_collection_sync_readiness();
+        let error = result.unwrap_err().to_string();
+        assert!(error.contains("recently edited unsynced notes"), "{error}");
+        assert_eq!(backend.collection_stats().unwrap(), before_blocked);
+        assert_eq!(backend.note_fields(note_id).unwrap()[1], "private answer");
+
+        // Synchronization status checks are read-only; no backup, login or
+        // remote write can be triggered by inspecting local readiness.
+        assert!(!root.path().join("recovery.zip").exists());
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
+            .unwrap();
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE cards SET usn=0 WHERE nid=?1", [note_id])
+            .unwrap();
+        backend.inspect_local_collection_sync_readiness().unwrap();
+    }
 
     #[test]
     fn unapproved_collection_sync_never_produces_a_backup_or_attempts_network() {
