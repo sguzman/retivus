@@ -129,6 +129,7 @@ impl AnkiBackend {
 #[cfg(test)]
 mod tests {
     mod concurrent_edit;
+    mod concurrent_review;
     mod deletion_recovery;
     mod normal_merge;
     mod same_second;
