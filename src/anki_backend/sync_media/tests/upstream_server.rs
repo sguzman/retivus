@@ -107,4 +107,41 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
         .join("receiver-pre-sync/collection.media/transferred.txt")
         .exists());
     restored.close().unwrap();
+
+    // After a REAL successful exchange with the pinned server, the media
+    // index has an acknowledged sequence. Rewriting the shared name locally
+    // must fail the public media path BEFORE another login, archive or upload.
+    let acknowledged_usn: i64 = rusqlite::Connection::open(
+        root.path().join("sender/collection.mdb"),
+    )
+    .unwrap()
+    .query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))
+    .unwrap();
+    assert!(acknowledged_usn > 0, "the pinned server acknowledged shared media");
+    let media = sender.collection.media().unwrap();
+    media
+        .add_file("transferred.txt", b"private revision after upload")
+        .unwrap();
+    drop(media);
+    let before_refusal = sender.collection_stats().unwrap();
+    let rejected_zip = root.path().join("never-write-shared-media.zip");
+    let refused = runtime.block_on(sender.sync_ankiweb_media_with_recovery(
+        "synthetic@example.invalid",
+        "synthetic-password",
+        &rejected_zip,
+        true,
+    ));
+    assert!(
+        refused
+            .unwrap_err()
+            .to_string()
+            .contains("pending local changes"),
+        "an acknowledged shared media filename must not be silently overwritten"
+    );
+    assert!(!rejected_zip.exists(), "refuse before backup and login");
+    assert_eq!(sender.collection_stats().unwrap(), before_refusal);
+    assert_eq!(
+        std::fs::read(root.path().join("sender/collection.media/transferred.txt")).unwrap(),
+        b"private revision after upload"
+    );
 }

@@ -769,8 +769,11 @@ impl StudyPanel {
     /// Show only the local fail-closed result, never start a network sync.
     fn check_local_sync_readiness(&mut self) {
         self.status = match self.backend.as_ref() {
-            Some(backend) => match backend.inspect_local_collection_sync_readiness() {
-                Ok(()) => "Offline check: no local sync blockers detected. Remote conflicts, media and AnkiWeb remain unverified; no sync was performed.".into(),
+            Some(backend) => match backend
+                .inspect_local_collection_sync_readiness()
+                .and_then(|()| backend.inspect_local_media_conflict_risk())
+            {
+                Ok(()) => "Offline check: no local sync blockers detected in collection or media index. Remote conflicts, unindexed media changes and AnkiWeb remain unverified; no sync was performed.".into(),
                 Err(error) => format!("Offline check refused: {error}. No network contacted."),
             },
             None => "Open a Retivus-managed learner profile before checking sync blockers.".into(),
@@ -1388,6 +1391,10 @@ mod tests {
             panel.status
         );
         assert!(panel.status.contains("Remote conflicts"));
+        assert!(
+            !root.path().join("offline-safety/collection.mdb").exists(),
+            "the offline inspection must not initialize the media index"
+        );
 
         let note_id = panel
             .backend

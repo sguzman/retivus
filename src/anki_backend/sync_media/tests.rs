@@ -6,6 +6,79 @@ use super::*;
 use tempfile::tempdir;
 
 #[test]
+fn public_media_sync_refuses_dirty_previous_media_before_backup_or_login() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    let media = backend.collection.media().unwrap();
+    media.add_file("local.txt", b"private local revision").unwrap();
+    drop(media);
+
+    let index = root.path().join("learner/collection.mdb");
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute("UPDATE meta SET lastUsn=7", []).unwrap();
+    drop(db);
+
+    let before = backend.collection_stats().unwrap();
+    let error = backend.inspect_local_media_conflict_risk().unwrap_err();
+    assert!(error.to_string().contains("pending local changes"));
+    let archive = root.path().join("must-not-write.zip");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let refused = rt.block_on(backend.sync_ankiweb_media_with_recovery(
+        "synthetic@example.invalid",
+        "synthetic-password",
+        &archive,
+        true,
+    ));
+    assert!(refused
+        .unwrap_err()
+        .to_string()
+        .contains("pending local changes"));
+    assert!(!archive.exists(), "do not create a recovery ZIP or log in");
+    assert_eq!(backend.collection_stats().unwrap(), before);
+    assert_eq!(
+        std::fs::read(root.path().join("learner/collection.media/local.txt")).unwrap(),
+        b"private local revision"
+    );
+    let (dirty, last_usn): (i64, i64) = rusqlite::Connection::open(&index)
+        .unwrap()
+        .query_row(
+            "SELECT dirty, lastUsn FROM media, meta WHERE fname='local.txt'",
+            [],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .unwrap();
+    assert_eq!((dirty, last_usn), (1, 7));
+}
+
+#[test]
+fn offline_media_guard_allows_new_index_and_clean_earlier_sync() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    let index = root.path().join("learner/collection.mdb");
+    backend.inspect_local_media_conflict_risk().unwrap();
+    assert!(!index.exists(), "read-only probe must not create an index");
+
+    let media = backend.collection.media().unwrap();
+    media.add_file("first.txt", b"first upload").unwrap();
+    drop(media);
+    backend.inspect_local_media_conflict_risk().unwrap();
+
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute("UPDATE meta SET lastUsn=2", []).unwrap();
+    drop(db);
+    assert!(backend.inspect_local_media_conflict_risk().is_err());
+
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute("UPDATE media SET dirty=0 WHERE fname='first.txt'", [])
+        .unwrap();
+    drop(db);
+    backend.inspect_local_media_conflict_risk().unwrap();
+}
+
+#[test]
 fn failed_media_request_preserves_recoverable_private_index_and_files() {
     use std::io::{Read, Write};
     use std::net::TcpListener;
