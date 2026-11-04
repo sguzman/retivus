@@ -39,6 +39,20 @@ fn public_media_sync_refuses_dirty_previous_media_before_backup_or_login() {
         .unwrap_err()
         .to_string()
         .contains("pending local changes"));
+    // Acknowledging remote overwrites cannot waive a separately detected
+    // local dirty-index conflict. Neither attempt may create a backup or
+    // contact AnkiWeb; both must fail on the same offline safety guard.
+    let still_refused = rt.block_on(backend.sync_ankiweb_media_with_recovery(
+        "synthetic@example.invalid",
+        "synthetic-password",
+        &archive,
+        true,
+        MediaSyncConflictRisk::ExplicitlyAcceptPossibleRemoteReplacement,
+    ));
+    assert!(still_refused
+        .unwrap_err()
+        .to_string()
+        .contains("pending local changes"));
     assert!(!archive.exists(), "do not create a recovery ZIP or log in");
     assert_eq!(backend.collection_stats().unwrap(), before);
     assert_eq!(
