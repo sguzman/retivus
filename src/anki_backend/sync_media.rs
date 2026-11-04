@@ -14,7 +14,10 @@ use std::time::UNIX_EPOCH;
 /// removed outside Anki's media manager. Refuse such changes on a profile
 /// with previous sync history *before* allowing that registration to write.
 /// This is deliberately conservative, and never modifies the index.
-fn refuse_unindexed_or_changed_media(managed: &Path, db: &rusqlite::Connection) -> BackendResult<()> {
+fn refuse_unindexed_or_changed_media(
+    managed: &Path,
+    db: &rusqlite::Connection,
+) -> BackendResult<()> {
     let mut indexed = HashMap::<String, i64>::new();
     let mut statement = db.prepare("SELECT fname, mtime FROM media WHERE csum IS NOT NULL")?;
     let entries = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
