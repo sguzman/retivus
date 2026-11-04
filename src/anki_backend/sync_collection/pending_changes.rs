@@ -381,6 +381,15 @@ mod tests {
             .unwrap()
             .mtime
             .0;
+        // This note-focused fixture models an otherwise acknowledged card.
+        // Leaving the new card pending would correctly trigger the separate
+        // shared-card guard even after the note is marked clean below.
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE cards SET usn=0 WHERE nid=?1", [note_id])
+            .unwrap();
         // Establish a synthetic prior sync after this note's creation. The
         // note remains pending, just as if it had been edited since sync.
         backend
