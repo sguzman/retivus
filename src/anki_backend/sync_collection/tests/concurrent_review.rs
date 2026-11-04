@@ -112,8 +112,14 @@ fn competing_real_card_grades_keep_both_private_pre_sync_histories() {
         &root.path().join("sender-after-competing-card-sync.zip"),
     );
 
-    assert_eq!(sender.note_fields(note_id).unwrap()[1], "two private answers");
-    assert_eq!(receiver.note_fields(note_id).unwrap()[1], "two private answers");
+    assert_eq!(
+        sender.note_fields(note_id).unwrap()[1],
+        "two private answers"
+    );
+    assert_eq!(
+        receiver.note_fields(note_id).unwrap()[1],
+        "two private answers"
+    );
 
     // Independently restore each ORIGINAL pre-sync review history. An upstream
     // winner, lost update, or ambiguous same-second grade cannot erase these
@@ -131,11 +137,20 @@ fn competing_real_card_grades_keep_both_private_pre_sync_histories() {
     )
     .unwrap();
     assert_eq!(restored_sender.review_event_count(sender_card).unwrap(), 1);
-    assert_eq!(restored_receiver.review_event_count(receiver_card).unwrap(), 1);
+    assert_eq!(
+        restored_receiver.review_event_count(receiver_card).unwrap(),
+        1
+    );
     assert_eq!(original_review_rating(&restored_sender, sender_card), 4);
     assert_eq!(original_review_rating(&restored_receiver, receiver_card), 1);
-    assert_eq!(card_schedule(&restored_sender, sender_card), sender_schedule);
-    assert_eq!(card_schedule(&restored_receiver, receiver_card), receiver_schedule);
+    assert_eq!(
+        card_schedule(&restored_sender, sender_card),
+        sender_schedule
+    );
+    assert_eq!(
+        card_schedule(&restored_receiver, receiver_card),
+        receiver_schedule
+    );
     restored_sender.close().unwrap();
     restored_receiver.close().unwrap();
 }
