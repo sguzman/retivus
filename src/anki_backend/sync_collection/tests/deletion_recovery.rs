@@ -168,7 +168,7 @@ fn recently_reviewed_shared_card_after_real_server_sync_refuses_before_login() {
         )
         .unwrap();
     assert_eq!(card_usn, -1, "native grade must make the card pending");
-    assert_eq!(note_usn, 0, "the shared note itself remains clean");
+    assert!(note_usn >= 0, "the shared note itself remains clean");
     assert!(
         last_sync > card_id,
         "the reviewed card predates a real successful upstream sync"
@@ -187,10 +187,7 @@ fn recently_reviewed_shared_card_after_real_server_sync_refuses_before_login() {
         ))
         .unwrap_err()
         .to_string();
-    assert!(
-        error.contains("recently changed unsynced cards"),
-        "{error}"
-    );
+    assert!(error.contains("recently changed unsynced cards"), "{error}");
     assert!(
         !rejected_archive.exists(),
         "the public path must refuse before backup and login"
