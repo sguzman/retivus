@@ -33,6 +33,7 @@ fn public_media_sync_refuses_dirty_previous_media_before_backup_or_login() {
         "synthetic-password",
         &archive,
         true,
+        MediaSyncConflictRisk::RefuseUnverifiedRemoteReplacement,
     ));
     assert!(refused
         .unwrap_err()
@@ -127,6 +128,7 @@ fn offline_media_guard_refuses_unindexed_files_after_a_prior_sync_before_network
         "synthetic-password",
         &archive,
         true,
+        MediaSyncConflictRisk::RefuseUnverifiedRemoteReplacement,
     ));
     assert!(denied
         .unwrap_err()
@@ -252,6 +254,7 @@ fn offline_media_guard_refuses_mtime_preserving_external_content_change() {
         "synthetic-password",
         &archive,
         true,
+        MediaSyncConflictRisk::RefuseUnverifiedRemoteReplacement,
     ));
     assert!(denied
         .unwrap_err()
@@ -308,6 +311,7 @@ fn malformed_preexisting_media_index_fails_closed_before_network() {
             "synthetic-password",
             &archive,
             true,
+            MediaSyncConflictRisk::RefuseUnverifiedRemoteReplacement,
         ))
         .is_err());
     assert!(
@@ -751,6 +755,40 @@ fn synthetic_download_adds_remote_media_and_preserves_original_recovery_state() 
 }
 
 #[test]
+fn public_media_sync_requires_separate_acknowledgement_of_remote_overwrite_risk() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "owned").unwrap();
+    let media = root.path().join("owned/collection.media");
+    std::fs::create_dir_all(&media).unwrap();
+    std::fs::write(media.join("private.txt"), b"local first-sync media").unwrap();
+    let backup = root.path().join("never-created.zip");
+    let index = root.path().join("owned/collection.mdb");
+    let before = backend.collection_stats().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+
+    // Permission to write media is not automatic consent to same-name
+    // replacement or remote deletion when no first-sync index exists.
+    let error = runtime
+        .block_on(backend.sync_ankiweb_media_with_recovery(
+            "synthetic@example.invalid",
+            "synthetic-password",
+            &backup,
+            true,
+            MediaSyncConflictRisk::RefuseUnverifiedRemoteReplacement,
+        ))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("separate explicit acknowledgement"), "{error}");
+    assert!(!backup.exists(), "do not create a recovery ZIP before risk consent");
+    assert!(!index.exists(), "do not initialize media index before risk consent");
+    assert_eq!(before, backend.collection_stats().unwrap());
+    assert_eq!(std::fs::read(media.join("private.txt")).unwrap(), b"local first-sync media");
+}
+
+#[test]
 fn unapproved_media_sync_does_not_create_an_index_or_recovery_zip() {
     let root = tempdir().unwrap();
     let mut backend = AnkiBackend::create_managed_profile(root.path(), "owned").unwrap();
@@ -767,6 +805,7 @@ fn unapproved_media_sync_does_not_create_an_index_or_recovery_zip() {
             "synthetic-password",
             &backup,
             false,
+            MediaSyncConflictRisk::ExplicitlyAcceptPossibleRemoteReplacement,
         ))
         .is_err());
     assert!(!backup.exists());

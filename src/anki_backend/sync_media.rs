@@ -11,6 +11,14 @@ use std::io::Read;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
+/// Separate acknowledgment of the pinned media engine's remote-wins
+/// behavior. Permission to write is not permission to silently overwrite.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MediaSyncConflictRisk {
+    RefuseUnverifiedRemoteReplacement,
+    ExplicitlyAcceptPossibleRemoteReplacement,
+}
+
 /// The pinned Anki media engine registers filesystem changes immediately
 /// before network sync. Dirty flags alone can miss a file added, edited, or
 /// removed outside Anki's media manager. Refuse such changes on a profile
@@ -163,6 +171,7 @@ impl AnkiBackend {
         password: &str,
         recovery_zip: &Path,
         approve_media_changes: bool,
+        conflict_risk: MediaSyncConflictRisk,
     ) -> BackendResult<()> {
         self.validate_sync_profile()?;
         validate_login_input(username, password)?;
@@ -172,6 +181,14 @@ impl AnkiBackend {
         // This is the PUBLIC safety boundary. The private client helper is
         // only used by disposable-server protocol characterization tests.
         self.inspect_local_media_conflict_risk()?;
+        // A clean or missing local index cannot reveal remote-only edits.
+        // Both write approval and distinct overwrite/deletion-risk consent
+        // must precede any archive creation, login or HTTP request.
+        if conflict_risk != MediaSyncConflictRisk::ExplicitlyAcceptPossibleRemoteReplacement {
+            return Err(
+                "AnkiWeb media sync refused: server media may replace same-name local files or delete locally clean files; separate explicit acknowledgement of unverified remote media conflicts is required".into(),
+            );
+        }
         let client = new_ankiweb_http_client()?;
         self.sync_ankiweb_media_with_client(username, password, recovery_zip, client, None)
             .await
