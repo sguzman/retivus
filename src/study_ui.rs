@@ -1382,7 +1382,11 @@ mod tests {
         panel.connect(true);
         assert!(panel.backend.is_some(), "{}", panel.status);
         panel.check_local_sync_readiness();
-        assert!(panel.status.contains("no local sync blockers"), "{}", panel.status);
+        assert!(
+            panel.status.contains("no local sync blockers"),
+            "{}",
+            panel.status
+        );
         assert!(panel.status.contains("Remote conflicts"));
 
         let note_id = panel
@@ -1393,14 +1397,27 @@ mod tests {
             .unwrap();
         let before = panel.backend.as_ref().unwrap().collection_stats().unwrap();
         panel.check_local_sync_readiness();
-        assert!(panel.status.contains("Offline check refused"), "{}", panel.status);
-        assert!(panel.status.contains("No network contacted"), "{}", panel.status);
+        assert!(
+            panel.status.contains("Offline check refused"),
+            "{}",
+            panel.status
+        );
+        assert!(
+            panel.status.contains("No network contacted"),
+            "{}",
+            panel.status
+        );
         assert_eq!(
             panel.backend.as_ref().unwrap().collection_stats().unwrap(),
             before
         );
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap()[1],
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap()[1],
             "private definition"
         );
         panel.close();
