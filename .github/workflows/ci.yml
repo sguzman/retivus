@@ -22,6 +22,11 @@ jobs:
         run: |
           bash -n scripts/qa-physical-wayland-orca.sh
           bash scripts/qa-physical-wayland-orca.sh --help
+      - name: Verify physical evidence audit using synthetic records only
+        run: |
+          bash -n scripts/audit-physical-wayland-evidence.sh
+          bash -n scripts/test-physical-wayland-evidence-audit.sh
+          bash scripts/test-physical-wayland-evidence-audit.sh
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Check code

@@ -101,6 +101,10 @@ printf 'UTC start: %s\n' "$(date -u +%FT%TZ)" > "$evidence/session.txt"
 printf 'Wayland socket: available (real desktop)\n' >> "$evidence/session.txt"
 printf 'Orca version:\n' >> "$evidence/session.txt"
 orca --version >> "$evidence/session.txt" 2>&1 || true
+# Record the exact binary whose behavior a human claims to have observed.
+# A pass without verifiable binary provenance is insufficient evidence.
+printf 'Retivus binary SHA-256: %s\n' "$(sha256sum "$binary" | cut -d ' ' -f 1)" >> "$evidence/session.txt"
+printf 'Session type: %s\n' "$XDG_SESSION_TYPE" >> "$evidence/session.txt"
 echo 'Orca must already be running. Listen to actual speech throughout the test.'
 echo 'Do not open a real AnkiWeb account or use real learner data in this QA session.'
 read -r -p "Verify you can HEAR Orca speak in this physical desktop; type HEARD to continue: " spoken
