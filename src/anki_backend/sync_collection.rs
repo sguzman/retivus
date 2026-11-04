@@ -65,10 +65,10 @@ impl AnkiBackend {
     /// The private recovery ZIP is a local fallback, not remote rollback.
     /// Separate acknowledgement of same-second divergence is mandatory;
     /// declining either permission stops before backup, login or network.
-    /// Fresh pending notes, older possibly shared note edits, and pending
-    /// note/card/deck deletions fail closed before login. These conservative
-    /// time-based guards may reject legitimate imported changes and cannot
-    /// detect remote-only edits or guarantee convergence.
+    /// Fresh pending notes or cards, older possibly shared note edits, and
+    /// pending note/card/deck deletions fail closed before login. These
+    /// conservative time-based guards may reject legitimate imported changes
+    /// and cannot detect remote-only edits or guarantee convergence.
     pub async fn sync_ankiweb_collection_with_recovery(
         &mut self,
         username: &str,

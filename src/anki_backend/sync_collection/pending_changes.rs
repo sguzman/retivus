@@ -1,8 +1,8 @@
-//! Conservative, read-only production preflight for local note changes that
-//! were recorded in Anki's one-second modification timestamp resolution.
+//! Conservative, read-only production preflight for local Anki changes
+//! recorded with one-second modification timestamp resolution.
 //!
 //! This prevents an immediate sync while *this* profile has very fresh pending
-//! notes. It also rejects older pending notes and note/card/deck deletion
+//! notes or cards. It also rejects older pending notes and note/card/deck deletion
 //! tombstones whose IDs predate the collection's last successful sync,
 //! conservatively treating them as changes to possibly shared objects.
 //! Some imported or preexisting unsynced changes will be blocked too.
@@ -57,6 +57,22 @@ fn refuse_risky_pending_note_changes_at(backend: &AnkiBackend, now: i64) -> Back
     if has_possibly_shared_edit {
         return Err(
             "collection sync refused: pending notes predate the last recorded sync and may overwrite independently edited shared notes; manual conflict-safe reconciliation is required, not just waiting".into(),
+        );
+    }
+
+    // Reviewed cards carry second-resolution modification timestamps too.
+    // A recently reviewed unsynced card may race with another client's
+    // scheduling edits; the earlier note preflight cannot see card-only
+    // changes. Waiting beyond the local window does NOT prove that a remote
+    // review or scheduling change is absent.
+    let has_recent_card: bool = backend.collection.storage.db().query_row(
+        "SELECT EXISTS(SELECT 1 FROM cards WHERE usn = -1 AND mod >= ?1)",
+        [cutoff],
+        |row| row.get(0),
+    )?;
+    if has_recent_card {
+        return Err(
+            "collection sync refused: recently changed unsynced cards have whole-second modification timestamps; retry after the local collision window, while still acknowledging possible remote review divergence".into(),
         );
     }
 
@@ -144,6 +160,86 @@ mod tests {
             .unwrap();
         assert_eq!(updated, 1);
         assert!(refuse_risky_pending_note_changes_at(&backend, modified).is_ok());
+    }
+
+    #[test]
+    fn recent_pending_card_window_is_exact_and_clean_cards_are_allowed() {
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let deck = backend.create_deck("Card timing").unwrap();
+        let note_id = backend
+            .add_basic_note(deck, "recent card", "answer")
+            .unwrap();
+        // Isolate the card hazard from the pending-note guard, as happens
+        // after a card review on an otherwise already-synced note.
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
+            .unwrap();
+        let (card_id, modified, usn): (i64, i64, i64) = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "SELECT id, mod, usn FROM cards WHERE nid=?1 LIMIT 1",
+                [note_id],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(usn, -1, "new card must be pending");
+        for offset in 0..=2 {
+            let error = refuse_risky_pending_note_changes_at(&backend, modified + offset)
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("recently changed unsynced cards"), "{error}");
+        }
+        refuse_risky_pending_note_changes_at(&backend, modified + 3).unwrap();
+
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE cards SET usn=0 WHERE id=?1", [card_id])
+            .unwrap();
+        refuse_risky_pending_note_changes_at(&backend, modified).unwrap();
+    }
+
+    #[test]
+    fn recently_changed_card_refuses_public_sync_before_backup_or_login() {
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let deck = backend.create_deck("Card only pending").unwrap();
+        let note_id = backend
+            .add_basic_note(deck, "keep private", "original answer")
+            .unwrap();
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
+            .unwrap();
+        let before = backend.collection_stats().unwrap();
+        let archive = dir.path().join("must-not-create.zip");
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let error = rt
+            .block_on(backend.sync_ankiweb_collection_with_recovery(
+                "fixture@example.invalid",
+                "test-only-password",
+                &archive,
+                true,
+                CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+            ))
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("recently changed unsynced cards"), "{error}");
+        assert!(!archive.exists());
+        assert_eq!(backend.collection_stats().unwrap(), before);
+        assert_eq!(backend.note_fields(note_id).unwrap()[1], "original answer");
     }
 
     #[test]
