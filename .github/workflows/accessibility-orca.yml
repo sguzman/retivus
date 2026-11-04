@@ -4,6 +4,7 @@ on:
     paths:
       - .github/workflows/accessibility-orca.yml
       - scripts/qa-orca.sh
+      - scripts/qa-atspi-live-status.sh
       - src/main.rs
       - src/study_ui.rs
   workflow_dispatch:
@@ -22,7 +23,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Validate Orca QA script syntax
-        run: bash -n scripts/qa-orca.sh
+        run: bash -n scripts/qa-orca.sh && bash -n scripts/qa-atspi-live-status.sh
       - name: Install Orca screen reader and virtual desktop
         run: |
           sudo apt-get update -qq

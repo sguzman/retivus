@@ -71,15 +71,22 @@ sleep 2
 # live-status event. The static File/Validate keyboard checks still run below.
 sleep 1
 announce_start="$(wc -c < "$debug")"
-# Retained screenshots from CI 41871061180 show Validate source at
-# x=8..105, y=355..374 (window-relative). The old y=331 clicked the File
-# field instead, leaving the status "No source checked". The click now
-# targets the button; real Orca speech remains a strict acceptance check.
-xdotool mousemove --window "$window" 70 365 click 1
+# In the CI screenshots, the X11 client content begins at screen y=219,
+# while Validate source occupies y=555..573. xdotool --window coordinates
+# are relative to that client content, not to the decorated frame at y=200.
+# Thus the button center is near client (70, 345); prior y=331 and y=365
+# hit the gaps above and below it, leaving "No source checked".
+xdotool mousemove --window "$window" 70 345 click 1
+echo "Validation click: $(xdotool getmouselocation)" >&2
 sleep 6
-# Preserve the visual result to distinguish an input-targeting failure
-# from an actual unspoken status change when reviewing CI evidence.
 scrot "$RUNNER_TEMP/retivus-orca-after-validation.png" || true
+# Require independent application-state evidence before claiming an Orca
+# failure. This reads the same AT-SPI bus used by real screen readers; it
+# does not weaken the actual speech-dispatch assertion below.
+if ! bash scripts/qa-atspi-live-status.sh; then
+  echo 'Validation button did not expose changed status; inspect retained screenshot before evaluating Orca speech' >&2
+  exit 1
+fi
 # This fresh home contains exactly one validation activation. Require both
 # the emitted AT-SPI announcement AND its observed Orca speech-dispatch call.
 # Do not use a byte offset in Orca's asynchronously flushed, multi-MB log:
