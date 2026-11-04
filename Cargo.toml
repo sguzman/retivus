@@ -8,7 +8,7 @@ license = "AGPL-3.0-or-later"
 
 [features]
 default = []
-anki-backend = ["dep:anki", "dep:reqwest", "dep:tokio", "dep:tempfile", "dep:zip", "dep:zstd"]
+anki-backend = ["dep:anki", "dep:reqwest", "dep:sha1", "dep:tokio", "dep:tempfile", "dep:zip", "dep:zstd"]
 
 [dependencies]
 anki = { git = "https://github.com/ankitects/anki", rev = "136bd42bfbd356fc756b6d3e28cc77b02da11ea7", optional = true }
@@ -19,6 +19,8 @@ reqwest = { version = "0.12.28", default-features = false, optional = true }
 eframe = { version = "0.33", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
 serde_json = "1"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
+# Match Anki media-index SHA-1 checksums without mutating its sync database.
+sha1 = { version = "=0.10.7", optional = true }
 ttf-parser = "0.25"
 tempfile = { version = "3", optional = true }
 zip = { version = "9.0.5", default-features = false, features = ["deflate", "time"], optional = true }

@@ -205,6 +205,77 @@ fn offline_media_guard_refuses_deleted_clean_indexed_media() {
     );
 }
 
+
+#[test]
+fn offline_media_guard_refuses_mtime_preserving_external_content_change() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    let media = backend.collection.media().unwrap();
+    media.add_file("tracked.txt", b"original bytes").unwrap();
+    drop(media);
+
+    let index = root.path().join("learner/collection.mdb");
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute_batch("UPDATE media SET dirty=0; UPDATE meta SET lastUsn=7;")
+        .unwrap();
+    drop(db);
+    backend.inspect_local_media_conflict_risk().unwrap();
+
+    let tracked = root.path().join("learner/collection.media/tracked.txt");
+    let original_mtime = std::fs::metadata(&tracked).unwrap().modified().unwrap();
+    std::fs::write(&tracked, b"changed  bytes").unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&tracked)
+        .unwrap()
+        .set_modified(original_mtime)
+        .unwrap();
+    assert_eq!(std::fs::metadata(&tracked).unwrap().modified().unwrap(), original_mtime);
+
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("media checksum differs from disk"), "{error}");
+    let archive = root.path().join("must-not-write-same-time.zip");
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let denied = runtime.block_on(backend.sync_ankiweb_media_with_recovery(
+        "synthetic@example.invalid",
+        "synthetic-password",
+        &archive,
+        true,
+    ));
+    assert!(denied.unwrap_err().to_string().contains("media checksum differs from disk"));
+    assert!(!archive.exists(), "refuse before recovery ZIP or network");
+    assert_eq!(std::fs::read(&tracked).unwrap(), b"changed  bytes");
+}
+
+#[test]
+fn offline_media_guard_refuses_corrupted_clean_index_checksum() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    let media = backend.collection.media().unwrap();
+    media.add_file("tracked.txt", b"unchanged bytes").unwrap();
+    drop(media);
+
+    let index = root.path().join("learner/collection.mdb");
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute_batch(
+        "UPDATE media SET dirty=0, csum='0000000000000000000000000000000000000000';
+         UPDATE meta SET lastUsn=7;",
+    )
+    .unwrap();
+    drop(db);
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("media checksum differs from disk"), "{error}");
+}
+
 #[test]
 fn malformed_preexisting_media_index_fails_closed_before_network() {
     let root = tempdir().unwrap();

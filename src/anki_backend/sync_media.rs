@@ -5,7 +5,9 @@ use super::sync_preflight::new_ankiweb_http_client;
 use super::{AnkiBackend, BackendResult};
 use anki::sync::login::SyncAuth;
 use rusqlite::OpenFlags;
+use sha1::{Digest, Sha1};
 use std::collections::HashMap;
+use std::io::Read;
 use std::path::Path;
 use std::time::UNIX_EPOCH;
 
@@ -14,16 +16,36 @@ use std::time::UNIX_EPOCH;
 /// removed outside Anki's media manager. Refuse such changes on a profile
 /// with previous sync history *before* allowing that registration to write.
 /// This is deliberately conservative, and never modifies the index.
+/// Hash each clean file against Anki's own recorded checksum. Timestamp-only
+/// checks are insufficient: an external editor can retain the original mtime.
+/// This scans media bytes and may take time on large profiles; it intentionally
+/// neither marks media dirty nor updates the on-disk sync index.
+fn matches_index_checksum(path: &Path, checksum: &str) -> BackendResult<bool> {
+    let mut file = std::fs::File::open(path)?;
+    let mut digest = Sha1::new();
+    let mut buffer = [0u8; 65_536];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        digest.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", digest.finalize()) == checksum)
+}
+
 fn refuse_unindexed_or_changed_media(
     managed: &Path,
     db: &rusqlite::Connection,
 ) -> BackendResult<()> {
-    let mut indexed = HashMap::<String, i64>::new();
-    let mut statement = db.prepare("SELECT fname, mtime FROM media WHERE csum IS NOT NULL")?;
-    let entries = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    let mut indexed = HashMap::<String, (i64, String)>::new();
+    let mut statement = db.prepare("SELECT fname, mtime, csum FROM media WHERE csum IS NOT NULL")?;
+    let entries = statement.query_map([], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?))
+    })?;
     for entry in entries {
-        let (filename, recorded_mtime): (String, i64) = entry?;
-        indexed.insert(filename, recorded_mtime);
+        let (filename, recorded_mtime, checksum) = entry?;
+        indexed.insert(filename, (recorded_mtime, checksum));
     }
 
     let media_dir = managed.join("collection.media");
@@ -49,7 +71,7 @@ fn refuse_unindexed_or_changed_media(
         let name = name
             .to_str()
             .ok_or("media sync refused: non-Unicode media filename")?;
-        let recorded_mtime = indexed
+        let (recorded_mtime, checksum) = indexed
             .remove(name)
             .ok_or("media sync refused: local media file is absent from the clean media index")?;
         // The pinned Anki change tracker records whole seconds, while its
@@ -60,6 +82,9 @@ fn refuse_unindexed_or_changed_media(
         let milliseconds = i64::try_from(modified.as_millis())?;
         if recorded_mtime != seconds && recorded_mtime != milliseconds {
             return Err("media sync refused: indexed media file changed on disk".into());
+        }
+        if !matches_index_checksum(&entry.path(), &checksum)? {
+            return Err("media sync refused: indexed media checksum differs from disk".into());
         }
     }
     if !indexed.is_empty() {
@@ -78,7 +103,8 @@ impl AnkiBackend {
     /// This check cannot inspect remote-only changes, prove that a filename
     /// never existed upstream, or protect the first media sync. It also
     /// conservatively rejects newly added, removed or timestamp-changed media
-    /// after a prior sync. It cannot detect edits preserving the stored mtime.
+    /// after a prior sync, including content edits that preserve file mtime.
+    /// It cannot prevent concurrent changes after the inspection.
     pub fn inspect_local_media_conflict_risk(&self) -> BackendResult<()> {
         self.validate_sync_profile()?;
         let managed = self
