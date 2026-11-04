@@ -37,8 +37,7 @@ impl AnkiBackend {
         let db = rusqlite::Connection::open_with_flags(&index, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
         // A missing or malformed metadata row must fail closed. An EXISTS
         // cross-join would otherwise return false for an empty meta table.
-        let last_usn: i64 =
-            db.query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))?;
+        let last_usn: i64 = db.query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))?;
         if last_usn < 0 {
             return Err("media sync refused: invalid media sync sequence".into());
         }

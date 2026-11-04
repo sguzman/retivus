@@ -103,7 +103,10 @@ fn malformed_preexisting_media_index_fails_closed_before_network() {
             true,
         ))
         .is_err());
-    assert!(!archive.exists(), "invalid index must block before backup/login");
+    assert!(
+        !archive.exists(),
+        "invalid index must block before backup/login"
+    );
 }
 
 #[test]

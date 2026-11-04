@@ -128,8 +128,7 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
         b"private revision after upload",
     )
     .unwrap();
-    let media_db =
-        rusqlite::Connection::open(root.path().join("sender/collection.mdb")).unwrap();
+    let media_db = rusqlite::Connection::open(root.path().join("sender/collection.mdb")).unwrap();
     assert_eq!(
         media_db
             .execute("UPDATE media SET dirty=1 WHERE fname='transferred.txt'", [])
