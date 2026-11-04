@@ -442,17 +442,41 @@ fn write_text(zip: &mut BundleZip<'_>, name: &str, text: &str) -> BackendResult<
     Ok(())
 }
 
+/// Compare the source file opened for a recovery ZIP with its original
+/// pathname metadata. A same-size replacement with a copied mtime is not
+/// the same source: on Unix it must also retain device, inode and ctime.
+fn same_recovery_source(before: &fs::Metadata, after: &fs::Metadata) -> BackendResult<bool> {
+    let mut same = before.file_type().is_file()
+        && after.file_type().is_file()
+        && before.len() == after.len()
+        && before.modified()? == after.modified()?;
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        same = same
+            && before.dev() == after.dev()
+            && before.ino() == after.ino()
+            && before.ctime() == after.ctime()
+            && before.ctime_nsec() == after.ctime_nsec();
+    }
+    Ok(same)
+}
+
 fn copy_file(zip: &mut BundleZip<'_>, name: &str, path: &Path) -> BackendResult<()> {
     check_regular(path, false)?;
-    let before = fs::metadata(path)?;
+    let before = fs::symlink_metadata(path)?;
     let mut input = File::open(path)?;
+    // Compare both the open descriptor and the pathname. Checking the path
+    // alone could accidentally validate a replacement while an older file
+    // descriptor is being read, or overlook a replaced same-size media file.
+    if !same_recovery_source(&before, &input.metadata()?)? {
+        return Err("a recovery source file changed before opening".into());
+    }
     zip.start_file(name, SimpleFileOptions::default())?;
     let size = io::copy(&mut input, zip)?;
-    let after = fs::symlink_metadata(path)?;
-    if !after.file_type().is_file()
-        || before.len() != size
-        || before.len() != after.len()
-        || before.modified()? != after.modified()?
+    if before.len() != size
+        || !same_recovery_source(&before, &input.metadata()?)?
+        || !same_recovery_source(&before, &fs::symlink_metadata(path)?)?
     {
         return Err("a recovery source file changed while being copied".into());
     }
@@ -556,6 +580,32 @@ mod tests {
     use super::*;
     use std::io::Read;
     use tempfile::tempdir;
+
+    #[cfg(unix)]
+    #[test]
+    fn recovery_copy_rejects_same_size_replacement_with_preserved_mtime() {
+        let dir = tempdir().unwrap();
+        let original = dir.path().join("original.bin");
+        let replacement = dir.path().join("replacement.bin");
+        fs::write(&original, b"private-A").unwrap();
+        let before = fs::symlink_metadata(&original).unwrap();
+        let handle = File::open(&original).unwrap();
+
+        // A new inode with the same length and restored modification time
+        // previously passed the per-file copy check. The old open file still
+        // refers to the original bytes, while the pathname was replaced.
+        fs::write(&replacement, b"private-B").unwrap();
+        File::open(&replacement)
+            .unwrap()
+            .set_modified(before.modified().unwrap())
+            .unwrap();
+        fs::rename(&replacement, &original).unwrap();
+        let after_path = fs::symlink_metadata(&original).unwrap();
+        assert_eq!(before.len(), after_path.len());
+        assert_eq!(before.modified().unwrap(), after_path.modified().unwrap());
+        assert!(same_recovery_source(&before, &handle.metadata().unwrap()).unwrap());
+        assert!(!same_recovery_source(&before, &after_path).unwrap());
+    }
 
     #[test]
     fn pre_sync_archive_is_private_offline_no_clobber_and_includes_unreferenced_media() {
