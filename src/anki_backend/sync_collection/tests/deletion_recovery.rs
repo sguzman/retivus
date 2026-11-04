@@ -194,6 +194,32 @@ fn recently_reviewed_shared_card_after_real_server_sync_refuses_before_login() {
     );
     assert_eq!(receiver.collection_stats().unwrap(), before);
     assert_eq!(receiver.review_event_count(card_id).unwrap(), 1);
+
+    // Age the card's timestamp ONLY in the disposable fixture. A genuine
+    // review performed after real upstream synchronization is still a shared
+    // pending schedule, and time alone cannot prove remote convergence.
+    receiver
+        .collection
+        .storage
+        .db()
+        .execute("UPDATE cards SET mod=1 WHERE id=?1", [card_id])
+        .unwrap();
+    let later_archive = root.path().join("must-not-write-aged-review.zip");
+    let aged_error = server
+        .runtime
+        .block_on(receiver.sync_ankiweb_collection_with_recovery(
+            "synthetic@example.invalid",
+            "synthetic-password",
+            &later_archive,
+            true,
+            CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+        ))
+        .unwrap_err()
+        .to_string();
+    assert!(aged_error.contains("pending cards predate"), "{aged_error}");
+    assert!(!later_archive.exists(), "refuse before backup or login");
+    assert_eq!(receiver.collection_stats().unwrap(), before);
+    assert_eq!(receiver.review_event_count(card_id).unwrap(), 1);
 }
 
 #[test]

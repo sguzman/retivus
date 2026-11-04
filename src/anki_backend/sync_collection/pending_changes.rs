@@ -2,8 +2,8 @@
 //! recorded with one-second modification timestamp resolution.
 //!
 //! This prevents an immediate sync while *this* profile has very fresh pending
-//! notes or cards. It also rejects older pending notes and note/card/deck deletion
-//! tombstones whose IDs predate the collection's last successful sync,
+//! notes or cards. It also rejects older pending notes, cards, and note/card/deck
+//! deletion tombstones whose IDs predate the collection's last successful sync,
 //! conservatively treating them as changes to possibly shared objects.
 //! Some imported or preexisting unsynced changes will be blocked too.
 //! These checks cannot discover remote-only edits, prove convergence,
@@ -73,6 +73,28 @@ fn refuse_risky_pending_note_changes_at(backend: &AnkiBackend, now: i64) -> Back
     if has_recent_card {
         return Err(
             "collection sync refused: recently changed unsynced cards have whole-second modification timestamps; retry after the local collision window, while still acknowledging possible remote review divergence".into(),
+        );
+    }
+
+    // A card graded on a previously synchronized device remains a shared
+    // scheduling object even after its coarse modification timestamp ages out
+    // of the collision window. A remote client may have graded it too.
+    // Do not let the mere passage of time authorize overwriting its schedule.
+    // As for notes, time-based IDs are only a conservative approximation of
+    // sharing: imported/nonchronological IDs can cause false positives or
+    // false negatives. Explicit risk acknowledgement cannot override this
+    // local fail-closed condition without a real conflict-safe merge protocol.
+    let has_possibly_shared_card_edit: bool = backend.collection.storage.db().query_row(
+        "SELECT EXISTS(
+            SELECT 1 FROM cards, col
+            WHERE cards.usn = -1 AND col.ls > 0 AND cards.id <= col.ls
+        )",
+        [],
+        |row| row.get(0),
+    )?;
+    if has_possibly_shared_card_edit {
+        return Err(
+            "collection sync refused: pending cards predate the last recorded sync and may overwrite independently reviewed shared cards; manual conflict-safe reconciliation is required, not just waiting".into(),
         );
     }
 
@@ -217,6 +239,94 @@ mod tests {
             .execute("UPDATE cards SET usn=0 WHERE id=?1", [card_id])
             .unwrap();
         refuse_risky_pending_note_changes_at(&backend, modified).unwrap();
+    }
+
+    #[test]
+    fn older_pending_shared_card_refuses_even_after_collision_window() {
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let note_id = backend
+            .add_basic_note(1, "shared question", "answer")
+            .unwrap();
+        let (card_id, original_mod): (i64, i64) = backend
+            .collection
+            .storage
+            .db()
+            .query_row(
+                "SELECT id, mod FROM cards WHERE nid=?1 LIMIT 1",
+                [note_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .unwrap();
+        let last_sync = card_id + 10_000;
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
+            .unwrap();
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=?1", [last_sync])
+            .unwrap();
+
+        // The previous timing-only check allowed this aged card. It must
+        // remain blocked because its ID predates a successful last sync.
+        let error = refuse_risky_pending_note_changes_at(&backend, original_mod + 30)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("pending cards predate"), "{error}");
+
+        let before = backend.collection_stats().unwrap();
+        let archive = dir.path().join("must-not-create.zip");
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let refusal = rt
+            .block_on(backend.sync_ankiweb_collection_with_recovery(
+                "fixture@example.invalid",
+                "test-only-password",
+                &archive,
+                true,
+                CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+            ))
+            .unwrap_err()
+            .to_string();
+        // The original card may still be fresh in real wall clock time.
+        // Either early failure is safe, but it must not create the archive.
+        assert!(
+            refusal.contains("recently changed unsynced cards")
+                || refusal.contains("pending cards predate"),
+            "{refusal}"
+        );
+        assert!(!archive.exists());
+        assert_eq!(backend.collection_stats().unwrap(), before);
+
+        // A genuinely new card whose ID postdates the last recorded sync is
+        // not presumed shared merely because it has an unsynced USN.
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=?1", [card_id - 10_000])
+            .unwrap();
+        refuse_risky_pending_note_changes_at(&backend, original_mod + 30).unwrap();
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE cards SET usn=0 WHERE id=?1", [card_id])
+            .unwrap();
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=?1", [last_sync])
+            .unwrap();
+        refuse_risky_pending_note_changes_at(&backend, original_mod).unwrap();
     }
 
     #[test]
