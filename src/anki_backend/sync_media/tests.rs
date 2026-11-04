@@ -10,7 +10,9 @@ fn public_media_sync_refuses_dirty_previous_media_before_backup_or_login() {
     let root = tempdir().unwrap();
     let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
     let media = backend.collection.media().unwrap();
-    media.add_file("local.txt", b"private local revision").unwrap();
+    media
+        .add_file("local.txt", b"private local revision")
+        .unwrap();
     drop(media);
 
     let index = root.path().join("learner/collection.mdb");
@@ -76,6 +78,32 @@ fn offline_media_guard_allows_new_index_and_clean_earlier_sync() {
         .unwrap();
     drop(db);
     backend.inspect_local_media_conflict_risk().unwrap();
+}
+
+#[test]
+fn malformed_preexisting_media_index_fails_closed_before_network() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    drop(backend.collection.media().unwrap());
+    let index = root.path().join("learner/collection.mdb");
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute("DELETE FROM meta", []).unwrap();
+    drop(db);
+    assert!(backend.inspect_local_media_conflict_risk().is_err());
+    let archive = root.path().join("must-not-write-malformed.zip");
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    assert!(runtime
+        .block_on(backend.sync_ankiweb_media_with_recovery(
+            "synthetic@example.invalid",
+            "synthetic-password",
+            &archive,
+            true,
+        ))
+        .is_err());
+    assert!(!archive.exists(), "invalid index must block before backup/login");
 }
 
 #[test]

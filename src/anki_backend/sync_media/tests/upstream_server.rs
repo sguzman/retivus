@@ -111,18 +111,32 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
     // After a REAL successful exchange with the pinned server, the media
     // index has an acknowledged sequence. Rewriting the shared name locally
     // must fail the public media path BEFORE another login, archive or upload.
-    let acknowledged_usn: i64 = rusqlite::Connection::open(
-        root.path().join("sender/collection.mdb"),
+    let acknowledged_usn: i64 =
+        rusqlite::Connection::open(root.path().join("sender/collection.mdb"))
+            .unwrap()
+            .query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))
+            .unwrap();
+    assert!(
+        acknowledged_usn > 0,
+        "the pinned server acknowledged shared media"
+    );
+    // A normal add_file() may rename an existing filename to avoid a
+    // collision. This disposable fixture intentionally edits the existing
+    // media bytes and marks the ORIGINAL index entry pending instead.
+    std::fs::write(
+        root.path().join("sender/collection.media/transferred.txt"),
+        b"private revision after upload",
     )
-    .unwrap()
-    .query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))
     .unwrap();
-    assert!(acknowledged_usn > 0, "the pinned server acknowledged shared media");
-    let media = sender.collection.media().unwrap();
-    media
-        .add_file("transferred.txt", b"private revision after upload")
-        .unwrap();
-    drop(media);
+    let media_db =
+        rusqlite::Connection::open(root.path().join("sender/collection.mdb")).unwrap();
+    assert_eq!(
+        media_db
+            .execute("UPDATE media SET dirty=1 WHERE fname='transferred.txt'", [])
+            .unwrap(),
+        1
+    );
+    drop(media_db);
     let before_refusal = sender.collection_stats().unwrap();
     let rejected_zip = root.path().join("never-write-shared-media.zip");
     let refused = runtime.block_on(sender.sync_ankiweb_media_with_recovery(

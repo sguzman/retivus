@@ -21,6 +21,7 @@ on:
       # Test-only changes cannot alter the release executable or legal bundle.
       - '!src/anki_backend/sync_collection/tests/**'
       - '!src/anki_backend/sync_media/tests/**'
+      - '!src/anki_backend/sync_media/tests.rs'
       - '!src/anki_backend/sync_test_server.rs'
   workflow_dispatch:
 permissions:

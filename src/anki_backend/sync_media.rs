@@ -35,15 +35,19 @@ impl AnkiBackend {
         // READ_ONLY forbids silently creating or migrating the on-disk index
         // as part of an offline preflight or a refused remote operation.
         let db = rusqlite::Connection::open_with_flags(&index, OpenFlags::SQLITE_OPEN_READ_ONLY)?;
-        let risk: bool = db.query_row(
-            "SELECT EXISTS(
-                SELECT 1 FROM media, meta
-                WHERE media.dirty != 0 AND meta.lastUsn > 0
-            )",
+        // A missing or malformed metadata row must fail closed. An EXISTS
+        // cross-join would otherwise return false for an empty meta table.
+        let last_usn: i64 =
+            db.query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))?;
+        if last_usn < 0 {
+            return Err("media sync refused: invalid media sync sequence".into());
+        }
+        let has_dirty: bool = db.query_row(
+            "SELECT EXISTS(SELECT 1 FROM media WHERE dirty != 0)",
             [],
             |row| row.get(0),
         )?;
-        if risk {
+        if last_usn > 0 && has_dirty {
             return Err(
                 "AnkiWeb media sync refused: previously synchronized media has pending local changes; a remote same-name change could replace local bytes. A private recovery ZIP is not conflict-free reconciliation".into(),
             );
