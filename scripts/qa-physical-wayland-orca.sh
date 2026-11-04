@@ -103,8 +103,18 @@ printf 'Orca version:\n' >> "$evidence/session.txt"
 orca --version >> "$evidence/session.txt" 2>&1 || true
 # Record the exact binary whose behavior a human claims to have observed.
 # A pass without verifiable binary provenance is insufficient evidence.
-printf 'Retivus binary SHA-256: %s\n' "$(sha256sum "$binary" | cut -d ' ' -f 1)" >> "$evidence/session.txt"
+binary_digest="$(sha256sum "$binary" | cut -d ' ' -f 1)"
+printf 'Retivus binary SHA-256: %s\n' "$binary_digest" >> "$evidence/session.txt"
 printf 'Session type: %s\n' "$XDG_SESSION_TYPE" >> "$evidence/session.txt"
+# Do not accept mixed-version evidence if another build replaces this binary.
+require_unchanged_binary() {
+  local current_digest
+  current_digest="$(sha256sum "$binary" | cut -d ' ' -f 1)"
+  if [[ "$current_digest" != "$binary_digest" ]]; then
+    echo 'Retivus binary changed during physical QA; evidence invalid.' >&2
+    exit 1
+  fi
+}
 echo 'Orca must already be running. Listen to actual speech throughout the test.'
 echo 'Do not open a real AnkiWeb account or use real learner data in this QA session.'
 read -r -p "Verify you can HEAR Orca speak in this physical desktop; type HEARD to continue: " spoken
@@ -117,6 +127,7 @@ printf 'Orca audible in physical desktop: manually confirmed\n' >> "$evidence/se
 for scene in review conflict; do
   for dimensions in 720x650 1080x800; do
     scenario="$scene-$dimensions"
+    require_unchanged_binary
     root="$evidence/$scenario"
     mkdir -m 700 "$root" "$root/home" "$root/tmp" "$root/config" "$root/data"
     log="$root/retivus.log"
@@ -156,8 +167,10 @@ for scene in review conflict; do
     kill "$current_app" 2>/dev/null || true
     wait "$current_app" 2>/dev/null || true
     current_app=0
+    require_unchanged_binary
   done
 done
+require_unchanged_binary
 printf 'UTC finish: %s\n' "$(date -u +%FT%TZ)" >> "$evidence/session.txt"
 echo "Results saved privately in: $results"
 finished=1

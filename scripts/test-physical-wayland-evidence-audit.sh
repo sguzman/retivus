@@ -8,6 +8,7 @@ evidence="$root/synthetic-test-only"
 mkdir "$evidence"
 printf 'MANUALLY REPORTED PASS: pending independent evidence review\n' > "$evidence/STATUS.txt"
 {
+  printf 'UTC start: 2026-11-04T17:55:00Z\n'
   printf 'Retivus binary SHA-256: %064d\n' 0
   printf 'Orca audible in physical desktop: manually confirmed\n'
   printf 'Session type: wayland\n'
@@ -42,6 +43,21 @@ cp "$root/expected.tsv" "$evidence/results.tsv"
 sed -i 's/\tp$/\ts/' "$evidence/results.tsv"
 if bash "$auditor" "$evidence" >/dev/null 2>&1; then
   echo 'Auditor accepted skipped checks' >&2; exit 1
+fi
+cp "$root/expected.tsv" "$evidence/results.tsv"
+sed -i '2s/\t/\t\t/' "$evidence/results.tsv"
+if bash "$auditor" "$evidence" >/dev/null 2>&1; then
+  echo 'Auditor accepted an empty TSV column' >&2; exit 1
+fi
+cp "$root/expected.tsv" "$evidence/results.tsv"
+sed -i '2s/$/\t/' "$evidence/results.tsv"
+if bash "$auditor" "$evidence" >/dev/null 2>&1; then
+  echo 'Auditor accepted an extra TSV column' >&2; exit 1
+fi
+cp "$root/expected.tsv" "$evidence/results.tsv"
+sed -i '2s/\t/ /' "$evidence/results.tsv"
+if bash "$auditor" "$evidence" >/dev/null 2>&1; then
+  echo 'Auditor accepted a missing TSV field separator' >&2; exit 1
 fi
 cp "$root/expected.tsv" "$evidence/results.tsv"
 printf 'INCOMPLETE\n' > "$evidence/STATUS.txt"
