@@ -103,3 +103,58 @@ jobs:
             ${{ runner.temp }}/retivus-source-audit/SOURCE-AUDIT.txt
           if-no-files-found: error
           retention-days: 7
+
+
+  offline-rebuild:
+    # Compile the actual archived source on an independent hosted VM.
+    # This runner never checks out Retivus and uses a fresh Cargo home.
+    needs: audit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Download the audited source bundle from its producing job
+        uses: actions/download-artifact@v4
+        with:
+          name: retivus-locked-source-audit
+          path: ${{ runner.temp }}/retivus-offline-evidence
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install local native build prerequisites
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq protobuf-compiler zstd pkg-config
+      - name: Compile Anki-enabled Retivus from vendored source with no Cargo network
+        shell: bash
+        env:
+          CARGO_NET_OFFLINE: 'true'
+          CARGO_BUILD_JOBS: '2'
+          CARGO_PROFILE_DEV_DEBUG: '0'
+          PROTOC: /usr/bin/protoc
+        run: |
+          set -euo pipefail
+          evidence="$RUNNER_TEMP/retivus-offline-evidence"
+          source_archive="$evidence/retivus-source-$GITHUB_SHA.tar.zst"
+          test -s "$source_archive"
+          (cd "$evidence" && sha256sum --check "$(basename "$source_archive").sha256")
+          grep -Fx "Root commit: $GITHUB_SHA" "$evidence/SOURCE-AUDIT.txt"
+          grep -Fx 'Offline Cargo metadata: PASS' "$evidence/SOURCE-AUDIT.txt"
+          root="$RUNNER_TEMP/retivus-independent-source-rebuild"
+          mkdir -m 700 "$root"
+          tar --zstd -xf "$source_archive" -C "$root"
+          test -s "$root/source/.cargo/config.toml"
+          test -s "$root/source/vendor/.version"
+          test -s "$root/source/vendor/anki-0.0.0/Cargo.toml"
+          test -s "$root/source/Cargo.lock"
+          cargo_home="$RUNNER_TEMP/retivus-empty-cargo-home"
+          mkdir -m 700 "$cargo_home"
+          export CARGO_HOME="$cargo_home"
+          export CARGO_TARGET_DIR="$RUNNER_TEMP/retivus-offline-build-target"
+          (
+            cd "$root/source"
+            # No registry or Git fetches. This does not establish
+            # bit-for-bit reproducibility or legal release clearance.
+            cargo build --locked --offline --features anki-backend --bin retivus
+          )
+          test -x "$CARGO_TARGET_DIR/debug/retivus"
+          printf 'Source archive: %s\n' "$(basename "$source_archive")"
+          printf 'Independent offline Cargo build: PASS\n'
+          sha256sum "$CARGO_TARGET_DIR/debug/retivus"
