@@ -47,16 +47,13 @@ fn refuse_unindexed_or_changed_media(managed: &Path, db: &rusqlite::Connection) 
         let recorded_mtime = indexed
             .remove(name)
             .ok_or("media sync refused: local media file is absent from the clean media index")?;
-        // The pinned Anki change tracker records whole-second mtimes. Compare
-        // using the same resolution, without altering the file or index.
-        let current_mtime = i64::try_from(
-            entry
-                .metadata()?
-                .modified()?
-                .duration_since(UNIX_EPOCH)?
-                .as_secs(),
-        )?;
-        if current_mtime != recorded_mtime {
+        // The pinned Anki change tracker records whole seconds, while its
+        // direct add/download paths store milliseconds in this same column.
+        // Accept either documented representation without altering the index.
+        let modified = entry.metadata()?.modified()?.duration_since(UNIX_EPOCH)?;
+        let seconds = i64::try_from(modified.as_secs())?;
+        let milliseconds = i64::try_from(modified.as_millis())?;
+        if recorded_mtime != seconds && recorded_mtime != milliseconds {
             return Err("media sync refused: indexed media file changed on disk".into());
         }
     }
@@ -76,7 +73,7 @@ impl AnkiBackend {
     /// This check cannot inspect remote-only changes, prove that a filename
     /// never existed upstream, or protect the first media sync. It also
     /// conservatively rejects newly added, removed or timestamp-changed media
-    /// after a prior sync. It cannot detect edits preserving whole-second mtime.
+    /// after a prior sync. It cannot detect edits preserving the stored mtime.
     pub fn inspect_local_media_conflict_risk(&self) -> BackendResult<()> {
         self.validate_sync_profile()?;
         let managed = self

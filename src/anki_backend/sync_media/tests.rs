@@ -78,6 +78,14 @@ fn offline_media_guard_allows_new_index_and_clean_earlier_sync() {
         .unwrap();
     drop(db);
     backend.inspect_local_media_conflict_risk().unwrap();
+
+    // Anki's change tracker writes seconds, but direct media additions use
+    // milliseconds. Both are valid clean index representations.
+    let db = rusqlite::Connection::open(&index).unwrap();
+    db.execute("UPDATE media SET mtime = mtime / 1000", [])
+        .unwrap();
+    drop(db);
+    backend.inspect_local_media_conflict_risk().unwrap();
 }
 
 #[test]
