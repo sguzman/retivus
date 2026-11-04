@@ -1361,7 +1361,9 @@ mod tests {
         assert!(panel.backend.is_some(), "{}", panel.status);
         let backend = panel.backend.as_mut().unwrap();
         backend.enable_fsrs().unwrap();
-        let note_id = backend.add_basic_note(1, "shared?", "private answer").unwrap();
+        let note_id = backend
+            .add_basic_note(1, "shared?", "private answer")
+            .unwrap();
         let card_id = backend.grade_next_card(4).unwrap().unwrap();
         assert_eq!(backend.review_event_count(card_id).unwrap(), 1);
         let archive = dir.path().join("private-pre-sync-recovery.zip");
@@ -1378,15 +1380,27 @@ mod tests {
         panel.restore_private_recovery();
         assert!(panel.backend.is_some(), "{}", panel.status);
         assert_eq!(panel.profile_id, "restored-study");
-        assert!(panel.status.contains("Original profiles were not replaced."));
+        assert!(panel
+            .status
+            .contains("Original profiles were not replaced."));
         assert!(panel.recovery_zip.is_empty());
         assert!(!panel.confirm_recovery);
         assert_eq!(
-            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap()[1],
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap()[1],
             "private answer"
         );
         assert_eq!(
-            panel.backend.as_ref().unwrap().review_event_count(card_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
             1
         );
 
@@ -1395,7 +1409,12 @@ mod tests {
         panel.connect(false);
         assert!(panel.backend.is_some(), "{}", panel.status);
         assert_eq!(
-            panel.backend.as_ref().unwrap().review_event_count(card_id).unwrap(),
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
             1
         );
         panel.close();
