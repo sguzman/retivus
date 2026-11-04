@@ -781,11 +781,23 @@ fn public_media_sync_requires_separate_acknowledgement_of_remote_overwrite_risk(
         ))
         .unwrap_err()
         .to_string();
-    assert!(error.contains("separate explicit acknowledgement"), "{error}");
-    assert!(!backup.exists(), "do not create a recovery ZIP before risk consent");
-    assert!(!index.exists(), "do not initialize media index before risk consent");
+    assert!(
+        error.contains("separate explicit acknowledgement"),
+        "{error}"
+    );
+    assert!(
+        !backup.exists(),
+        "do not create a recovery ZIP before risk consent"
+    );
+    assert!(
+        !index.exists(),
+        "do not initialize media index before risk consent"
+    );
     assert_eq!(before, backend.collection_stats().unwrap());
-    assert_eq!(std::fs::read(media.join("private.txt")).unwrap(), b"local first-sync media");
+    assert_eq!(
+        std::fs::read(media.join("private.txt")).unwrap(),
+        b"local first-sync media"
+    );
 }
 
 #[test]
