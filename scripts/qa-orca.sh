@@ -92,10 +92,19 @@ done
 [[ -n "$window" ]] || { echo "Retivus window not found"; exit 1; }
 xdotool windowactivate --sync "$window"
 sleep 2
-# Dynamic check uses the same Orca and D-Bus session, without
-# introducing an unrelated File-focus transition immediately before the
-# live-status event. The static File/Validate keyboard checks still run below.
-sleep 1
+# Controlled focus readiness experiment: the newer Orca stack speaks ordinary
+# controls when it has a keyboard-focus context, but not the first live status.
+# One real Tab event precedes validation; do not fake a focus or speech event.
+# Previous pre-validation focus tests had an incorrectly targeted button click
+# and therefore could not establish whether focused context helped.
+focus_start="$(wc -c < "$debug")"
+xdotool key --clearmodifiers Tab
+sleep 3
+if tail -c "+$((focus_start + 1))" "$debug" | grep -E "SPEECH DISPATCHER: Speaking|EVENT MANAGER: object:state-changed:focused" >/dev/null; then
+  echo 'FOCUS-WARMUP: Orca observed a spoken or focused event before validation.' >&2
+else
+  echo 'FOCUS-WARMUP: No observed spoken/focused event before validation.' >&2
+fi
 announce_start="$(wc -c < "$debug")"
 # In the CI screenshots, the X11 client content begins at screen y=219,
 # while Validate source occupies y=555..573. xdotool --window coordinates
@@ -123,37 +132,6 @@ if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not ope
    ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
   status_speech_pass=0
   echo 'Orca did not speak updated validation status after direct button activation' >&2
-  # Probe the same disposable Speech Dispatcher session *only after* strict
-  # speech acceptance has already failed. A returned spd-say command is not
-  # equivalent to Orca announcing the status; this is diagnostic evidence.
-  probe="$RUNNER_TEMP/retivus-speechd-probe.log"
-  {
-    echo "Speech Dispatcher diagnostic at $(date -u +%FT%TZ)"
-    if command -v spd-say >/dev/null 2>&1; then
-      for probe_number in 1 2; do
-        if timeout 8s spd-say "Retivus diagnostic speech probe $probe_number"; then
-          echo "Independent SSIP probe $probe_number: command acknowledged"
-        else
-          echo "Independent SSIP probe $probe_number: timed out or failed ($?)"
-        fi
-      done
-    else
-      echo 'spd-say not installed; independent SSIP probe unavailable'
-    fi
-    ps -eo pid,stat,wchan:24,args | grep -E '[s]peech-dispatcher|[s]d_espeak-ng|[s]d_openjtalk' || true
-  } > "$probe" 2>&1
-  cat "$probe" >&2
-  # Capture every Python thread before cleanup. This distinguishes an Orca
-  # event-loop stall from a healthy loop that deliberately drops the event.
-  # If the process has exited, leave the original failure and logs intact.
-  if kill -0 "$reader" 2>/dev/null; then
-    echo 'Requesting Orca Python thread dump (SIGUSR2)' >&2
-    kill -USR2 "$reader" 2>/dev/null || true
-    sleep 1
-  fi
-  tail -c "+$((announce_start + 1))" "$debug" \
-    | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
-    | tail -n 65 >&2 || true
   # Preserve the failure, but continue to an independent static-control
   # speech test. Until now the early exit hid whether ordinary File/Validate
   # labels were spoken in the same problematic Orca session.
@@ -195,6 +173,38 @@ fi
 # Neither result substitutes for the other: both are release-gate evidence.
 if (( ! status_speech_pass || ! static_speech_pass )); then
   echo "FAIL: Orca acceptance: dynamic_status=$status_speech_pass static_controls=$static_speech_pass" >&2
+  # Probe the disposable Speech Dispatcher only after both independent
+  # Orca speech checks have finished. This avoids skewing static-control
+  # evidence with extra test-generated audio or SIGUSR2 during navigation. A returned spd-say command is not
+  # equivalent to Orca announcing the status; this is diagnostic evidence.
+  probe="$RUNNER_TEMP/retivus-speechd-probe.log"
+  {
+    echo "Speech Dispatcher diagnostic at $(date -u +%FT%TZ)"
+    if command -v spd-say >/dev/null 2>&1; then
+      for probe_number in 1 2; do
+        if timeout 8s spd-say "Retivus diagnostic speech probe $probe_number"; then
+          echo "Independent SSIP probe $probe_number: command acknowledged"
+        else
+          echo "Independent SSIP probe $probe_number: timed out or failed ($?)"
+        fi
+      done
+    else
+      echo 'spd-say not installed; independent SSIP probe unavailable'
+    fi
+    ps -eo pid,stat,wchan:24,args | grep -E '[s]peech-dispatcher|[s]d_espeak-ng|[s]d_openjtalk' || true
+  } > "$probe" 2>&1
+  cat "$probe" >&2
+  # Capture every Python thread before cleanup. This distinguishes an Orca
+  # event-loop stall from a healthy loop that deliberately drops the event.
+  # If the process has exited, leave the original failure and logs intact.
+  if kill -0 "$reader" 2>/dev/null; then
+    echo 'Requesting Orca Python thread dump (SIGUSR2)' >&2
+    kill -USR2 "$reader" 2>/dev/null || true
+    sleep 1
+  fi
+  tail -c "+$((announce_start + 1))" "$debug" \
+    | grep -Ei 'SPEECH DISPATCHER|object:announcement|source|name.changed|property' \
+    | tail -n 65 >&2 || true
   exit 1
 fi
 echo 'PASS: Orca spoke both changing status and core named controls.'
