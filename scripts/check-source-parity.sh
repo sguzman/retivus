@@ -31,6 +31,12 @@ grep -Fx "Retivus source commit: $expected_sha" "$binary_root/share/doc/retivus/
 binary_lock="$binary_root/share/doc/retivus/source/Cargo.lock"
 test -s "$binary_lock"
 cmp "$binary_lock" <(tar --zstd -xOf "$source_archive" source/Cargo.lock)
+# Keep the toolchain used to rebuild corresponding source in sync with
+# the installable candidate. An exact patch-level version is mandatory.
+toolchain="$binary_root/share/doc/retivus/source/rust-toolchain.toml"
+test -s "$toolchain"
+grep -Eq '^channel = "[0-9]+\.[0-9]+\.[0-9]+"$' "$toolchain"
+cmp "$toolchain" <(tar --zstd -xOf "$source_archive" source/rust-toolchain.toml)
 lock_sha="$(sha256sum "$binary_lock" | cut -d' ' -f1)"
 grep -Fx "Retivus Cargo.lock sha256: $lock_sha" "$binary_root/share/doc/retivus/SOURCE-PROVENANCE.txt"
 grep -Fx "Cargo.lock sha256: $lock_sha" "$sources/SOURCE-AUDIT.txt"

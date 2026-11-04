@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - .github/workflows/linux-candidate.yml
+      - rust-toolchain.toml
       - .github/workflows/source-bundle-audit.yml
       - scripts/audit-offline-source.sh
       - scripts/audit-license-files.sh
@@ -50,6 +51,8 @@ jobs:
           path: upstream-rust-url
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
       - name: Install build and headless display prerequisites
         run: |
           sudo apt-get update -qq

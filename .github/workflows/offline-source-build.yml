@@ -18,6 +18,8 @@ jobs:
     timeout-minutes: 45
     steps:
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.99.1
       - name: Install source build dependencies
         run: sudo apt-get update -qq && sudo apt-get install -y -qq protobuf-compiler zstd
       - name: Download previously audited source archive

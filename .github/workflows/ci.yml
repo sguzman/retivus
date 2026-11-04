@@ -16,6 +16,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
+          toolchain: 1.99.1
           components: rustfmt, clippy
       - name: Check physical Wayland QA harness contract without running it
         run: |
