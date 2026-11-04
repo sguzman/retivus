@@ -8,12 +8,22 @@ Retivus disables eframe default features to control its native build. Its explic
 
 ## Automated coverage
 
+## 2026-11-04 verified accessibility state (headless CI, not physical acceptance)
+
+The strict [Orca screen-reader CI run 41888204577](https://github.com/sguzman/retivus/actions/runs/41888204577) **passed on both Ubuntu 24.04 and ubuntu-latest** at `f738602`. In isolated Xvfb sessions, a real Retivus button activation changed the externally inspected AT-SPI status, and actual Orca Speech Dispatcher output recorded both the changed source-validation announcement and five named controls. The test does not pass on mere accessible-event delivery or a screenshot. [Rust foundation 41888204791](https://github.com/sguzman/retivus/actions/runs/41888204791) passed at the same commit.
+
+The separately required **real physical Wayland + Orca evaluation** remains unperformed and is **M6.4 0/3**: review/conflict scenes, due-card and changing status speech, actual keyboard accessibility, high contrast, reduced motion, and narrow/wide layouts require personally heard and observed evidence. Headless speech dispatch is not proof of physical audible output.
+
+The physical harness was hardened in [fbed4f2](https://github.com/sguzman/retivus/commit/fbed4f24b56ca374144e81adc3e2e89d8bfd269a), [5e0d06c](https://github.com/sguzman/retivus/commit/5e0d06cd00d90580c183c4244d13f5959a50c35b), and [9eea254](https://github.com/sguzman/retivus/commit/9eea254681acd9d10dc05801d0e392921d84bd74). It checks for a running Orca process and an explicit human confirmation of heard speech, records the tested binary's SHA-256, refuses a binary replaced during the session, and marks interrupted sessions incomplete. A separate structural auditor rejects malformed, missing, duplicated, or skipped scenario rows. [Foundation CI 41897680655](https://github.com/sguzman/retivus/actions/runs/41897680655) passed its shell contract, synthetic audit regressions, Rust checks and GUI smoke. These tests do **not** authenticate a human report or grant M6.4 acceptance.
+
+Historical failures and experimental controls below document the earlier investigation; they are not the latest status.
+
 | Contract | Test/evidence | Status |
 | --- | --- | --- |
 | AccessKit platform accessibility implementation compiled into native app | Explicit `eframe/accesskit`, [foundation CI 41370243289](https://github.com/sguzman/retivus/actions/runs/41370243289) | **Verified build, not screen-reader usability** |
-| Test-only Orca speech-debug and keyboard focus | [Orca CI 41371981361](https://github.com/sguzman/retivus/actions/runs/41371981361) verified spoken `Appearance`, `Density`, `Format`, `File` and `Validate source` during real keyboard navigation | **Verified named-control announcements; not full assistive-technology usability** |
+| Test-only Orca speech-debug and keyboard focus | [Orca CI 41888204577](https://github.com/sguzman/retivus/actions/runs/41888204577) verified real speech-dispatch calls for `Appearance`, `Density`, `Format`, `File`, `Validate source`, and a changed validation status on both Ubuntu stacks | **Verified headless Orca speech dispatch; physical Wayland usability pending** |
 | Populated learner/reviewer/conflict keyboard and scaling regression | `populated_native_review_and_conflict_remain_accessible_across_zoom_and_themes` in `src/study_ui.rs` uses a real disposable Anki profile, Enter grading, 1080×800 and 720×650 at 1.5× zoom, and a malformed source tag conflict state | **Unified E2E CI 41471532608 passed; latest pinned feature CI pending** |
-| Dynamic review, due-count, conflict and source-validation status nodes | Polite AccessKit live-region metadata in `src/study_ui.rs` and `src/main.rs`; [foundation CI 41469642651](https://github.com/sguzman/retivus/actions/runs/41469642651) passed | **Foundation CI 41469642651 and E2E CI 41469642552 passed; automatic spoken Orca announcement still pending** |
+| Dynamic review, due-count, conflict and source-validation status nodes | Polite AccessKit live-region metadata in `src/study_ui.rs` and `src/main.rs`; [Orca CI 41888204577](https://github.com/sguzman/retivus/actions/runs/41888204577) verifies source-validation status speech in Xvfb | **Source-validation Orca speech verified in both Ubuntu CI jobs; populated review/due/conflict live speech still awaits physical testing** |
 | Real native Linux AT-SPI widget registration | [AT-SPI CI 41371103522](https://github.com/sguzman/retivus/actions/runs/41371103522) used an external client to discover `File` and `Validate source` among 23 accessible objects | **Verified native registration** |
 | Keyboard focus follows Tab and Shift+Tab | Native egui_kittest source-file focus and reversal test in src/main.rs | Verified in feature CI 41347374839 |
 | Native pointer controls actually complete a review | Source validation, precise sense selection, card creation, grade and persistence via egui_kittest | Verified in feature CI 41347374839 |
@@ -42,6 +52,8 @@ Run this only from a real physical Wayland/Orca desktop with Orca already enable
 
 ```bash
 bash scripts/qa-physical-wayland-orca.sh /absolute/path/to/debug/retivus
+# After the private manual run, check completeness without pretending to hear speech:
+bash scripts/audit-physical-wayland-evidence.sh /absolute/path/to/private/evidence-dir
 ```
 
 The exact binary path is intentionally supplied by the tester; the harness does not invoke Cargo, bypass `mbx`, or substitute a different build. The script's `--help` and `bash -n` checks may run in CI, but **CI cannot claim a physical spoken-language pass**. Failing/skipped items produce a nonzero exit. Manual results require independent review against M6.4's criterion; the checklist remains open until that real evidence exists.
