@@ -143,6 +143,7 @@ fn two_disposable_retivus_profiles_exchange_media_via_pinned_upstream_sync_serve
         "synthetic-password",
         &rejected_zip,
         true,
+        MediaSyncConflictRisk::RefuseUnverifiedRemoteReplacement,
     ));
     assert!(
         refused
