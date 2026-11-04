@@ -45,6 +45,14 @@ if ! command -v orca >/dev/null 2>&1; then
   echo 'Orca is required. Install and start Orca yourself before manual QA.' >&2
   exit 2
 fi
+# An installed Orca binary is not evidence that a screen reader is running.
+# Check for either a named Orca process or an interpreter launching Orca.
+# This preflight is necessary, not sufficient: the human must also hear it.
+if ! pgrep -u "$(id -u)" -x orca >/dev/null 2>&1 &&
+   ! pgrep -u "$(id -u)" -f '(^|[[:space:]])(/[^[:space:]]*/)?orca([[:space:]]|$)' >/dev/null 2>&1; then
+  echo 'No running Orca screen reader was found for this user. Start Orca in the physical desktop first.' >&2
+  exit 2
+fi
 umask 077
 if [[ $# -eq 2 ]]; then
   if [[ -e "$2" || -L "$2" ]]; then
@@ -59,10 +67,17 @@ fi
 results="$evidence/results.tsv"
 printf 'scenario\tcheck\tresult\n' > "$results"
 current_app=0
+finished=0
 cleanup() {
   if (( current_app > 0 )); then
     kill "$current_app" 2>/dev/null || true
     wait "$current_app" 2>/dev/null || true
+  fi
+  # Interrupted or failed fixtures must never leave a seemingly complete
+  # success transcript, especially if all previous scenarios were passed.
+  if (( ! finished )); then
+    printf 'Session interrupted or terminated before all scenarios completed: %s\n' "$(date -u +%FT%TZ)" >> "$evidence/session.txt"
+    printf 'INCOMPLETE: session interrupted or fixture failed\n' > "$evidence/STATUS.txt"
   fi
 }
 trap cleanup EXIT
@@ -88,6 +103,12 @@ printf 'Orca version:\n' >> "$evidence/session.txt"
 orca --version >> "$evidence/session.txt" 2>&1 || true
 echo 'Orca must already be running. Listen to actual speech throughout the test.'
 echo 'Do not open a real AnkiWeb account or use real learner data in this QA session.'
+read -r -p "Verify you can HEAR Orca speak in this physical desktop; type HEARD to continue: " spoken
+if [[ "$spoken" != HEARD ]]; then
+  echo 'Aborting without accessibility acceptance: Orca speech has not been personally verified.' >&2
+  exit 1
+fi
+printf 'Orca audible in physical desktop: manually confirmed\n' >> "$evidence/session.txt"
 
 for scene in review conflict; do
   for dimensions in 720x650 1080x800; do
@@ -135,9 +156,12 @@ for scene in review conflict; do
 done
 printf 'UTC finish: %s\n' "$(date -u +%FT%TZ)" >> "$evidence/session.txt"
 echo "Results saved privately in: $results"
+finished=1
 if (( any_incomplete )); then
+  printf 'INCOMPLETE: failed/skipped checks require correction or further QA\n' > "$evidence/STATUS.txt"
   echo 'INCOMPLETE: failed/skipped checks require correction or further QA.' >&2
   exit 1
 fi
+printf 'MANUALLY REPORTED PASS: pending independent evidence review\n' > "$evidence/STATUS.txt"
 echo 'All manually reported checks passed; this is human evidence, not automated Orca speech proof.'
 echo 'M6.4 still requires independent review and acceptance of this evidence.'
