@@ -94,6 +94,112 @@ fn upstream_note_deletion_propagates_and_receiver_backup_restores_original() {
 }
 
 #[test]
+fn recently_reviewed_shared_card_after_real_server_sync_refuses_before_login() {
+    use crate::anki_backend::CollectionSyncConflictRisk;
+
+    let root = tempdir().unwrap();
+    let server = DisposableAnkiServer::start(root.path());
+    let mut seed = AnkiBackend::create_managed_profile(root.path(), "sender").unwrap();
+    seed.enable_fsrs().unwrap();
+    seed.add_basic_note(1, "shared review question", "original answer")
+        .unwrap();
+    seed.close().unwrap();
+
+    let baseline = root.path().join("sender/collection.anki2");
+    let upstream = root
+        .path()
+        .join("upstream-server")
+        .join(server.username)
+        .join("collection.anki2");
+    assert!(!upstream.exists());
+    fs::copy(&baseline, &upstream).unwrap();
+    let empty_receiver = AnkiBackend::create_managed_profile(root.path(), "receiver").unwrap();
+    empty_receiver.close().unwrap();
+    fs::copy(&baseline, root.path().join("receiver/collection.anki2")).unwrap();
+
+    let mut sender = AnkiBackend::open_managed_profile(root.path(), "sender").unwrap();
+    let mut receiver = AnkiBackend::open_managed_profile(root.path(), "receiver").unwrap();
+    // Create a real, nonempty normal-sync exchange rather than fabricating
+    // col.ls. Both collections will have a successful upstream sync history.
+    sender
+        .add_basic_note(1, "additional shared question", "shared answer")
+        .unwrap();
+    let client = reqwest::Client::builder().no_proxy().build().unwrap();
+    for (backend, name) in [
+        (&mut sender, "initial-review-sender.zip"),
+        (&mut receiver, "initial-review-receiver.zip"),
+    ] {
+        let result = server.runtime.block_on(async {
+            tokio::time::timeout(
+                Duration::from_secs(45),
+                backend.sync_ankiweb_collection_with_client(
+                    server.username,
+                    server.password,
+                    &root.path().join(name),
+                    client.clone(),
+                    Some(server.endpoint.clone()),
+                ),
+            )
+            .await
+        });
+        assert_eq!(
+            result
+                .expect("baseline review sync timed out")
+                .expect("baseline review sync failed"),
+            CollectionSyncOutcome::UpToDateOrMerged
+        );
+    }
+    assert!(receiver.fsrs_enabled());
+    let card_id = receiver
+        .grade_next_card(4)
+        .unwrap()
+        .expect("a synced default-deck card must be due");
+    assert_eq!(receiver.review_event_count(card_id).unwrap(), 1);
+    let (card_usn, note_usn, last_sync): (i64, i64, i64) = receiver
+        .collection
+        .storage
+        .db()
+        .query_row(
+            "SELECT cards.usn, notes.usn, col.ls
+             FROM cards JOIN notes ON notes.id=cards.nid CROSS JOIN col
+             WHERE cards.id=?1",
+            [card_id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+        )
+        .unwrap();
+    assert_eq!(card_usn, -1, "native grade must make the card pending");
+    assert_eq!(note_usn, 0, "the shared note itself remains clean");
+    assert!(
+        last_sync > card_id,
+        "the reviewed card predates a real successful upstream sync"
+    );
+
+    let before = receiver.collection_stats().unwrap();
+    let rejected_archive = root.path().join("never-write-review-archive.zip");
+    let error = server
+        .runtime
+        .block_on(receiver.sync_ankiweb_collection_with_recovery(
+            "synthetic@example.invalid",
+            "synthetic-password",
+            &rejected_archive,
+            true,
+            CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+        ))
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("recently changed unsynced cards"),
+        "{error}"
+    );
+    assert!(
+        !rejected_archive.exists(),
+        "the public path must refuse before backup and login"
+    );
+    assert_eq!(receiver.collection_stats().unwrap(), before);
+    assert_eq!(receiver.review_event_count(card_id).unwrap(), 1);
+}
+
+#[test]
 fn previously_synced_shared_note_edit_and_deletion_fail_closed_before_login() {
     use crate::anki_backend::CollectionSyncConflictRisk;
 
