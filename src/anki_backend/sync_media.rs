@@ -39,9 +39,14 @@ fn refuse_unindexed_or_changed_media(
     db: &rusqlite::Connection,
 ) -> BackendResult<()> {
     let mut indexed = HashMap::<String, (i64, String)>::new();
-    let mut statement = db.prepare("SELECT fname, mtime, csum FROM media WHERE csum IS NOT NULL")?;
+    let mut statement =
+        db.prepare("SELECT fname, mtime, csum FROM media WHERE csum IS NOT NULL")?;
     let entries = statement.query_map([], |row| {
-        Ok((row.get::<_, String>(0)?, row.get::<_, i64>(1)?, row.get::<_, String>(2)?))
+        Ok((
+            row.get::<_, String>(0)?,
+            row.get::<_, i64>(1)?,
+            row.get::<_, String>(2)?,
+        ))
     })?;
     for entry in entries {
         let (filename, recorded_mtime, checksum) = entry?;

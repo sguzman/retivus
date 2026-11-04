@@ -205,7 +205,6 @@ fn offline_media_guard_refuses_deleted_clean_indexed_media() {
     );
 }
 
-
 #[test]
 fn offline_media_guard_refuses_mtime_preserving_external_content_change() {
     let root = tempdir().unwrap();
@@ -230,13 +229,19 @@ fn offline_media_guard_refuses_mtime_preserving_external_content_change() {
         .unwrap()
         .set_modified(original_mtime)
         .unwrap();
-    assert_eq!(std::fs::metadata(&tracked).unwrap().modified().unwrap(), original_mtime);
+    assert_eq!(
+        std::fs::metadata(&tracked).unwrap().modified().unwrap(),
+        original_mtime
+    );
 
     let error = backend
         .inspect_local_media_conflict_risk()
         .unwrap_err()
         .to_string();
-    assert!(error.contains("media checksum differs from disk"), "{error}");
+    assert!(
+        error.contains("media checksum differs from disk"),
+        "{error}"
+    );
     let archive = root.path().join("must-not-write-same-time.zip");
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -248,7 +253,10 @@ fn offline_media_guard_refuses_mtime_preserving_external_content_change() {
         &archive,
         true,
     ));
-    assert!(denied.unwrap_err().to_string().contains("media checksum differs from disk"));
+    assert!(denied
+        .unwrap_err()
+        .to_string()
+        .contains("media checksum differs from disk"));
     assert!(!archive.exists(), "refuse before recovery ZIP or network");
     assert_eq!(std::fs::read(&tracked).unwrap(), b"changed  bytes");
 }
@@ -273,7 +281,10 @@ fn offline_media_guard_refuses_corrupted_clean_index_checksum() {
         .inspect_local_media_conflict_risk()
         .unwrap_err()
         .to_string();
-    assert!(error.contains("media checksum differs from disk"), "{error}");
+    assert!(
+        error.contains("media checksum differs from disk"),
+        "{error}"
+    );
 }
 
 #[test]
