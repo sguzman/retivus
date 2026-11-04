@@ -6,6 +6,65 @@ use super::{AnkiBackend, BackendResult};
 use anki::sync::login::SyncAuth;
 use rusqlite::OpenFlags;
 use std::path::Path;
+use std::collections::HashMap;
+use std::time::UNIX_EPOCH;
+
+/// The pinned Anki media engine registers filesystem changes immediately
+/// before network sync. Dirty flags alone can miss a file added, edited, or
+/// removed outside Anki's media manager. Refuse such changes on a profile
+/// with previous sync history *before* allowing that registration to write.
+/// This is deliberately conservative, and never modifies the index.
+fn refuse_unindexed_or_changed_media(managed: &Path, db: &rusqlite::Connection) -> BackendResult<()> {
+    let mut indexed = HashMap::<String, i64>::new();
+    let mut statement = db.prepare("SELECT fname, mtime FROM media WHERE csum IS NOT NULL")?;
+    let entries = statement.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+    for entry in entries {
+        let (filename, recorded_mtime): (String, i64) = entry?;
+        indexed.insert(filename, recorded_mtime);
+    }
+
+    let media_dir = managed.join("collection.media");
+    let directory = match std::fs::read_dir(&media_dir) {
+        Ok(directory) => directory,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            if indexed.is_empty() {
+                return Ok(());
+            }
+            return Err("media sync refused: indexed media files are missing on disk".into());
+        }
+        Err(error) => return Err(error.into()),
+    };
+
+    for entry in directory {
+        let entry = entry?;
+        // A nested directory or symlink cannot be safely interpreted as
+        // one of Anki's flat, regular media files.
+        if !entry.file_type()?.is_file() {
+            return Err("media sync refused: unexpected non-regular media entry".into());
+        }
+        let name = entry.file_name();
+        let name = name.to_str().ok_or("media sync refused: non-Unicode media filename")?;
+        let recorded_mtime = indexed
+            .remove(name)
+            .ok_or("media sync refused: local media file is absent from the clean media index")?;
+        // The pinned Anki change tracker records whole-second mtimes. Compare
+        // using the same resolution, without altering the file or index.
+        let current_mtime = i64::try_from(
+            entry
+                .metadata()?
+                .modified()?
+                .duration_since(UNIX_EPOCH)?
+                .as_secs(),
+        )?;
+        if current_mtime != recorded_mtime {
+            return Err("media sync refused: indexed media file changed on disk".into());
+        }
+    }
+    if !indexed.is_empty() {
+        return Err("media sync refused: indexed media file is missing on disk".into());
+    }
+    Ok(())
+}
 
 impl AnkiBackend {
     /// Inspect the existing media index *without creating or writing it*.
@@ -16,7 +75,8 @@ impl AnkiBackend {
     ///
     /// This check cannot inspect remote-only changes, prove that a filename
     /// never existed upstream, or protect the first media sync. It also
-    /// conservatively rejects newly added local media after a prior sync.
+    /// conservatively rejects newly added, removed or timestamp-changed media
+    /// after a prior sync. It cannot detect edits preserving whole-second mtime.
     pub fn inspect_local_media_conflict_risk(&self) -> BackendResult<()> {
         self.validate_sync_profile()?;
         let managed = self
@@ -46,10 +106,15 @@ impl AnkiBackend {
             [],
             |row| row.get(0),
         )?;
-        if last_usn > 0 && has_dirty {
-            return Err(
-                "AnkiWeb media sync refused: previously synchronized media has pending local changes; a remote same-name change could replace local bytes. A private recovery ZIP is not conflict-free reconciliation".into(),
-            );
+        if last_usn > 0 {
+            if has_dirty {
+                return Err(
+                    "AnkiWeb media sync refused: previously synchronized media has pending local changes; a remote same-name change could replace local bytes. A private recovery ZIP is not conflict-free reconciliation".into(),
+                );
+            }
+            // Even if SQLite records are clean, a direct filesystem edit can
+            // be registered as dirty only after Anki starts media sync.
+            refuse_unindexed_or_changed_media(managed, &db)?;
         }
         Ok(())
     }
