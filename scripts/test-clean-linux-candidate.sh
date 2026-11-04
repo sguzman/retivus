@@ -73,6 +73,17 @@ xvfb-run -a bash -c '
   cat /tmp/retivus-container-wm.log || true
   echo "--- Retivus log ---"
   cat /tmp/retivus-container-app.log || true
+  echo "--- Retivus process state ---"
+  ps -p "$app" -o pid,ppid,stat,etime,pcpu,pmem,wchan:32,cmd || true
+  echo "--- Retivus native threads ---"
+  ps -T -p "$app" -o pid,tid,stat,wchan:32,comm || true
+  echo "--- Native display environment ---"
+  printf "DISPLAY=%s XDG_SESSION_TYPE=%s WAYLAND_DISPLAY=%s\n" \
+    "${DISPLAY:-unset}" "${XDG_SESSION_TYPE:-unset}" "${WAYLAND_DISPLAY:-unset}"
+  echo "--- Display and GPU driver nodes ---"
+  ls -ld /tmp/.X11-unix/* /dev/dri/* 2>/dev/null || true
+  # Failure-only diagnostics: no change to timeout, window visibility,
+  # installer acceptance, or the requirement that GUI mapping succeeds.
   exit 1
 ' bash "$prefix/bin/retivus" "$root/share/doc/retivus/source/scripts/wait-for-openbox.sh"
 "$root/uninstall.sh" "$prefix"

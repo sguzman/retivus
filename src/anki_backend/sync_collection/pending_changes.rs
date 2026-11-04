@@ -159,6 +159,19 @@ mod tests {
             .execute("UPDATE notes SET usn=0 WHERE id=?1", [note_id])
             .unwrap();
         assert_eq!(updated, 1);
+        // This fixture also created an unsynced card. Its own coarse
+        // timestamp must still block a same-second collection sync.
+        let error = refuse_risky_pending_note_changes_at(&backend, modified)
+            .unwrap_err()
+            .to_string();
+        assert!(error.contains("recently changed unsynced cards"), "{error}");
+        let card_updates = backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE cards SET usn=0 WHERE nid=?1", [note_id])
+            .unwrap();
+        assert!(card_updates > 0);
         assert!(refuse_risky_pending_note_changes_at(&backend, modified).is_ok());
     }
 
