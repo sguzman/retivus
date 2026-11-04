@@ -49,6 +49,11 @@ pub struct StudyPanel {
     import_with_scheduling: bool,
     export_with_scheduling: bool,
     snapshot_id: String,
+    // Private recovery ZIPs contain study history and media. These paths and
+    // one-shot consent live only in the non-persisted native study panel.
+    recovery_zip: String,
+    restore_profile_id: String,
+    confirm_recovery: bool,
     backend: Option<AnkiBackend>,
     decks: Vec<(i64, String)>,
     deck_id: Option<i64>,
@@ -191,6 +196,50 @@ impl StudyPanel {
                 self.refresh_review();
             }
             Err(error) => self.status = format!("Profile was not opened: {error}"),
+        }
+    }
+
+    /// Restore only a private pre-sync ZIP into a *new* owned profile.
+    /// The backend audits the archive and refuses any existing destination.
+    /// No network access, profile replacement, or automated merge occurs.
+    fn restore_private_recovery(&mut self) {
+        if !self.confirm_recovery {
+            self.status = "Confirm the private recovery and new profile ID first.".into();
+            return;
+        }
+        // A previous click must never authorize a different archive or ID.
+        self.confirm_recovery = false;
+        if self.backend.is_some() {
+            self.status = "Close the active profile before restoring another.".into();
+            return;
+        }
+        let result = (|| -> Result<(PathBuf, AnkiBackend), String> {
+            let root = fs::canonicalize(&self.root)
+                .map_err(|error| format!("Recovery profile root unavailable: {error}"))?;
+            let backend = AnkiBackend::restore_pre_sync_recovery_as_new_profile(
+                &root,
+                &self.restore_profile_id,
+                Path::new(&self.recovery_zip),
+            )
+            .map_err(|error| error.to_string())?;
+            Ok((root, backend))
+        })();
+        match result {
+            Ok((root, backend)) => {
+                self.active_root = Some(root);
+                self.profile_id = self.restore_profile_id.clone();
+                self.active_profile_id = Some(self.profile_id.clone());
+                self.backend = Some(backend);
+                self.status = format!(
+                    "Private recovery opened as new Retivus profile {}. Original profiles were not replaced.",
+                    self.profile_id
+                );
+                self.recovery_zip.clear();
+                self.restore_profile_id.clear();
+                self.refresh();
+                self.refresh_review();
+            }
+            Err(error) => self.status = format!("Private recovery refused: {error}"),
         }
     }
 
@@ -754,6 +803,9 @@ impl StudyPanel {
         self.import_with_scheduling = false;
         self.export_with_scheduling = false;
         self.snapshot_id.clear();
+        self.recovery_zip.clear();
+        self.restore_profile_id.clear();
+        self.confirm_recovery = false;
         self.new_deck.clear();
         self.review = None;
         self.revealed = false;
@@ -767,11 +819,16 @@ impl StudyPanel {
             ui.label("Choose an existing root directory and a Retivus profile ID. No ordinary Anki profile is opened automatically.");
             ui.horizontal_wrapped(|ui| {
                 let root_label = ui.label("Profile root");
-                ui.add_enabled(
-                    self.backend.is_none(),
-                    egui::TextEdit::singleline(&mut self.root).desired_width(280.0),
-                )
-                .labelled_by(root_label.id);
+                if ui
+                    .add_enabled(
+                        self.backend.is_none(),
+                        egui::TextEdit::singleline(&mut self.root).desired_width(280.0),
+                    )
+                    .labelled_by(root_label.id)
+                    .changed()
+                {
+                    self.confirm_recovery = false;
+                }
                 let id_label = ui.label("Profile ID");
                 ui.add_enabled(
                     self.backend.is_none(),
@@ -798,6 +855,48 @@ impl StudyPanel {
                     self.close();
                 }
             });
+            egui::CollapsingHeader::new("Offline recovery · private pre-sync ZIP")
+                .show(ui, |ui| {
+                    ui.weak("Restores review history and media into a brand-new owned profile. Nothing is uploaded or merged. Keep this ZIP private.");
+                    ui.add_enabled_ui(self.backend.is_none(), |ui| {
+                        ui.horizontal_wrapped(|ui| {
+                            let label = ui.label("Private recovery ZIP");
+                            if ui.add(
+                                egui::TextEdit::singleline(&mut self.recovery_zip)
+                                    .hint_text("/absolute/path/to/private-backup.zip")
+                                    .desired_width(340.0),
+                            ).labelled_by(label.id).changed() {
+                                self.confirm_recovery = false;
+                            }
+                        });
+                        ui.horizontal_wrapped(|ui| {
+                            let label = ui.label("New profile ID");
+                            if ui.add(
+                                egui::TextEdit::singleline(&mut self.restore_profile_id)
+                                    .hint_text("must not already exist")
+                                    .desired_width(200.0),
+                            ).labelled_by(label.id).changed() {
+                                self.confirm_recovery = false;
+                            }
+                        });
+                        ui.checkbox(
+                            &mut self.confirm_recovery,
+                            "Confirm: restore into a NEW profile; never overwrite an existing one",
+                        );
+                        if ui
+                            .add_enabled(
+                                self.confirm_recovery,
+                                egui::Button::new("Restore private ZIP as new profile"),
+                            )
+                            .clicked()
+                        {
+                            self.restore_private_recovery();
+                        }
+                    });
+                    if self.backend.is_some() {
+                        ui.weak("Close the active profile before offline recovery.");
+                    }
+                });
             if self.backend.is_some() {
                 ui.separator();
                 ui.heading("Decks and notes");
@@ -1250,6 +1349,67 @@ mod tests {
         assert!(BrowseScope::Conflicts.matches(&corrupt));
         assert!(BrowseScope::Conflicts.matches(&duplicate));
         assert!(!BrowseScope::SourceLinked.matches(&corrupt));
+    }
+
+    #[test]
+    fn offline_private_recovery_requires_consent_and_preserves_original_study_history() {
+        let dir = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = dir.path().to_string_lossy().into_owned();
+        panel.profile_id = "original-study".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let backend = panel.backend.as_mut().unwrap();
+        backend.enable_fsrs().unwrap();
+        let note_id = backend.add_basic_note(1, "shared?", "private answer").unwrap();
+        let card_id = backend.grade_next_card(4).unwrap().unwrap();
+        assert_eq!(backend.review_event_count(card_id).unwrap(), 1);
+        let archive = dir.path().join("private-pre-sync-recovery.zip");
+        backend.create_pre_sync_recovery_bundle(&archive).unwrap();
+        panel.close();
+
+        panel.recovery_zip = archive.to_string_lossy().into_owned();
+        panel.restore_profile_id = "restored-study".into();
+        panel.restore_private_recovery();
+        assert!(panel.status.contains("Confirm"), "{}", panel.status);
+        assert!(!dir.path().join("restored-study").exists());
+
+        panel.confirm_recovery = true;
+        panel.restore_private_recovery();
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        assert_eq!(panel.profile_id, "restored-study");
+        assert!(panel.status.contains("Original profiles were not replaced."));
+        assert!(panel.recovery_zip.is_empty());
+        assert!(!panel.confirm_recovery);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().note_fields(note_id).unwrap()[1],
+            "private answer"
+        );
+        assert_eq!(
+            panel.backend.as_ref().unwrap().review_event_count(card_id).unwrap(),
+            1
+        );
+
+        panel.close();
+        panel.profile_id = "original-study".into();
+        panel.connect(false);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        assert_eq!(
+            panel.backend.as_ref().unwrap().review_event_count(card_id).unwrap(),
+            1
+        );
+        panel.close();
+
+        panel.recovery_zip = archive.to_string_lossy().into_owned();
+        panel.restore_profile_id = "restored-study".into();
+        panel.confirm_recovery = true;
+        panel.restore_private_recovery();
+        assert!(panel.backend.is_none());
+        assert!(panel.status.contains("already exists"), "{}", panel.status);
+        assert!(!panel.confirm_recovery);
+        assert!(archive.is_file());
+        assert!(dir.path().join("original-study/collection.anki2").is_file());
+        assert!(dir.path().join("restored-study/collection.anki2").is_file());
     }
 
     #[test]
