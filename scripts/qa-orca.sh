@@ -95,6 +95,26 @@ fi
 if ! grep -F "EVENT MANAGER: object:announcement for [status bar: 'Could not open source:" "$debug" >/dev/null ||
    ! grep -F "SPEECH DISPATCHER: Speaking 'Could not open source:" "$debug" >/dev/null; then
   echo 'Orca did not speak updated validation status after direct button activation' >&2
+  # Probe the same disposable Speech Dispatcher session *only after* strict
+  # speech acceptance has already failed. A returned spd-say command is not
+  # equivalent to Orca announcing the status; this is diagnostic evidence.
+  probe="$RUNNER_TEMP/retivus-speechd-probe.log"
+  {
+    echo "Speech Dispatcher diagnostic at $(date -u +%FT%TZ)"
+    if command -v spd-say >/dev/null 2>&1; then
+      for probe_number in 1 2; do
+        if timeout 8s spd-say "Retivus diagnostic speech probe $probe_number"; then
+          echo "Independent SSIP probe $probe_number: command acknowledged"
+        else
+          echo "Independent SSIP probe $probe_number: timed out or failed ($?)"
+        fi
+      done
+    else
+      echo 'spd-say not installed; independent SSIP probe unavailable'
+    fi
+    ps -eo pid,stat,wchan:24,args | grep -E '[s]peech-dispatcher|[s]d_espeak-ng|[s]d_openjtalk' || true
+  } > "$probe" 2>&1
+  cat "$probe" >&2
   # Capture every Python thread before cleanup. This distinguishes an Orca
   # event-loop stall from a healthy loop that deliberately drops the event.
   # If the process has exited, leave the original failure and logs intact.

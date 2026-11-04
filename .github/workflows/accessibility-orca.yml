@@ -43,5 +43,6 @@ jobs:
             ${{ runner.temp }}/retivus-orca-after-validation.png
             ${{ runner.temp }}/retivus-orca-startup.log
             ${{ runner.temp }}/retivus-orca-app.log
+            ${{ runner.temp }}/retivus-speechd-probe.log
           if-no-files-found: ignore
           retention-days: 2
