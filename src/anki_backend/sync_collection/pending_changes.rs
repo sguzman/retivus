@@ -2,11 +2,12 @@
 //! were recorded in Anki's one-second modification timestamp resolution.
 //!
 //! This prevents an immediate sync while *this* profile has very fresh pending
-//! notes. It also rejects older pending notes and note deletion tombstones
-//! whose IDs predate the collection's last successful sync, conservatively
-//! treating them as changes to possibly shared notes. Some imported or
-//! preexisting unsynced notes will be blocked too. These checks cannot
-//! discover remote-only edits, prove convergence, or repair conflicts.
+//! notes. It also rejects older pending notes and note/card/deck deletion
+//! tombstones whose IDs predate the collection's last successful sync,
+//! conservatively treating them as changes to possibly shared objects.
+//! Some imported or preexisting unsynced changes will be blocked too.
+//! These checks cannot discover remote-only edits, prove convergence,
+//! or repair conflicts.
 //! The known risk still needs separate consent.
 use super::{AnkiBackend, BackendResult};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -76,6 +77,30 @@ fn refuse_risky_pending_note_changes_at(backend: &AnkiBackend, now: i64) -> Back
     if has_possibly_shared_deletion {
         return Err(
             "collection sync refused: pending note deletions predate the last recorded sync and may erase independently edited shared notes; manual conflict-safe reconciliation is required".into(),
+        );
+    }
+
+    // The pinned Anki grave table also holds deleted cards (type=0) and
+    // decks (type=2). Unlike notes, these tombstones have no live row to
+    // examine, and deleting a previously shared card or deck can discard
+    // remotely changed scheduling or collection structure.
+    //
+    // An ordinary ID is millisecond-time based, but imported and custom IDs
+    // can yield false positives and nonchronological false negatives. Fail
+    // closed for potentially shared IDs; this is not remote state validation.
+    let has_possibly_shared_card_or_deck_deletion: bool =
+        backend.collection.storage.db().query_row(
+            "SELECT EXISTS(
+                SELECT 1 FROM graves, col
+                WHERE graves.usn = -1 AND graves.type IN (0, 2)
+                  AND col.ls > 0 AND graves.oid <= col.ls
+            )",
+            [],
+            |row| row.get(0),
+        )?;
+    if has_possibly_shared_card_or_deck_deletion {
+        return Err(
+            "collection sync refused: pending card or deck deletions predate the last recorded sync and may erase previously shared study or deck data; manual conflict-safe reconciliation is required".into(),
         );
     }
     Ok(())
@@ -308,6 +333,88 @@ mod tests {
             .db()
             .execute("UPDATE col SET ls=0", [])
             .unwrap();
+        refuse_risky_pending_note_changes_at(&backend, 1_900_000_000).unwrap();
+    }
+
+    #[test]
+    fn older_pending_card_and_deck_deletions_fail_closed_before_backup_or_login() {
+        for kind in [0, 2] {
+            let dir = tempdir().unwrap();
+            let mut backend =
+                AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+            let existing_id = 1_600_000_000_000_i64 + i64::from(kind);
+            backend
+                .collection
+                .storage
+                .db()
+                .execute("UPDATE col SET ls=?1", [existing_id + 10_000])
+                .unwrap();
+            // Simulate the exact pinned grave schema for a previously shared
+            // card or deck without mutating a real user profile.
+            backend
+                .collection
+                .storage
+                .db()
+                .execute(
+                    "INSERT INTO graves (usn, oid, type) VALUES (-1, ?1, ?2)",
+                    rusqlite::params![existing_id, kind],
+                )
+                .unwrap();
+            let before = backend.collection_stats().unwrap();
+            let recovery = dir.path().join("never-written.zip");
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .unwrap();
+            let error = rt
+                .block_on(backend.sync_ankiweb_collection_with_recovery(
+                    "fixture@example.invalid",
+                    "test-only-password",
+                    &recovery,
+                    true,
+                    CollectionSyncConflictRisk::ExplicitlyAcceptPossibleSameSecondDivergence,
+                ))
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("pending card or deck deletions"), "{error}");
+            assert!(!recovery.exists(), "no backup or network before refusal");
+            assert_eq!(backend.collection_stats().unwrap(), before);
+        }
+    }
+
+    #[test]
+    fn new_unshared_card_deck_tombstones_and_clean_historical_graves_pass_preflight() {
+        let dir = tempdir().unwrap();
+        let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+        let cutoff = 1_700_000_000_000_i64;
+        backend
+            .collection
+            .storage
+            .db()
+            .execute("UPDATE col SET ls=?1", [cutoff])
+            .unwrap();
+        for kind in [0, 2] {
+            // Newer, locally created objects are not presumed shared.
+            backend
+                .collection
+                .storage
+                .db()
+                .execute(
+                    "INSERT INTO graves (usn, oid, type) VALUES (-1, ?1, ?2)",
+                    rusqlite::params![cutoff + 10_000 + i64::from(kind), kind],
+                )
+                .unwrap();
+            // A completed, non-pending grave should not trip a fresh sync.
+            backend
+                .collection
+                .storage
+                .db()
+                .execute(
+                    "INSERT INTO graves (usn, oid, type) VALUES (0, ?1, ?2)",
+                    rusqlite::params![cutoff - 10_000 - i64::from(kind), kind],
+                )
+                .unwrap();
+        }
         refuse_risky_pending_note_changes_at(&backend, 1_900_000_000).unwrap();
     }
 
