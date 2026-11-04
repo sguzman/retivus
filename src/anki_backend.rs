@@ -25,6 +25,7 @@ mod sync_safety;
 mod sync_test_server;
 
 pub use sync_collection::{CollectionSyncConflictRisk, CollectionSyncOutcome};
+pub use sync_media::MediaSyncConflictRisk;
 pub use sync_preflight::{RemoteSyncNeed, RemoteSyncPreflight};
 
 type BackendResult<T> = Result<T, Box<dyn Error>>;
