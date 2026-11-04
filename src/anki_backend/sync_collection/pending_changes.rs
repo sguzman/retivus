@@ -340,8 +340,7 @@ mod tests {
     fn older_pending_card_and_deck_deletions_fail_closed_before_backup_or_login() {
         for kind in [0, 2] {
             let dir = tempdir().unwrap();
-            let mut backend =
-                AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
+            let mut backend = AnkiBackend::create_managed_profile(dir.path(), "client").unwrap();
             let existing_id = 1_600_000_000_000_i64 + i64::from(kind);
             backend
                 .collection
