@@ -162,7 +162,16 @@ if [[ ! -s "$RUNNER_TEMP/retivus-orca-speech.txt" ]]; then
   static_speech_pass=0
 fi
 for label in 'Validate source' File Appearance Density Format; do
-  if ! grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null; then
+  # Newer Orca speaks labels and roles as separate utterances; Orca 46 can
+  # speak a single combined label+role utterance. Both are actual Orca speech.
+  # Do not accept a mere AT-SPI focus event or arbitrary partial label text.
+  case "$label" in
+    'Validate source') combined='Validate source push button.' ;;
+    File) combined='File entry.' ;;
+    Appearance|Density|Format) combined="$label combo box." ;;
+  esac
+  if ! grep -F "SPEECH DISPATCHER: Speaking '$label'" "$debug" >/dev/null &&
+     ! grep -F "SPEECH DISPATCHER: Speaking '$combined'" "$debug" >/dev/null; then
     echo "FAIL: Orca did not speak named control: $label" >&2
     static_speech_pass=0
   fi
