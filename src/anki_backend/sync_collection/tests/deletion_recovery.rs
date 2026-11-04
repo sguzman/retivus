@@ -93,7 +93,6 @@ fn upstream_note_deletion_propagates_and_receiver_backup_restores_original() {
     restored.close().unwrap();
 }
 
-
 #[test]
 fn previously_synced_shared_note_edit_and_deletion_fail_closed_before_login() {
     use crate::anki_backend::CollectionSyncConflictRisk;
@@ -199,10 +198,7 @@ fn previously_synced_shared_note_edit_and_deletion_fail_closed_before_login() {
         "{deletion_error}"
     );
     let edit_error = rejection(&mut receiver, &edit_archive);
-    assert!(
-        edit_error.contains("pending notes predate"),
-        "{edit_error}"
-    );
+    assert!(edit_error.contains("pending notes predate"), "{edit_error}");
     assert!(!deletion_archive.exists());
     assert!(!edit_archive.exists());
     assert_eq!(sender.collection_stats().unwrap(), sender_before);
