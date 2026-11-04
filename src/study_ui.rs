@@ -1461,7 +1461,11 @@ mod tests {
             "{}",
             panel.status
         );
-        assert!(panel.status.contains("media edits after inspection"), "{}", panel.status);
+        assert!(
+            panel.status.contains("media edits after inspection"),
+            "{}",
+            panel.status
+        );
 
         let unindexed = managed.join("collection.media/external.txt");
         std::fs::write(&unindexed, b"manual edit outside Anki").unwrap();

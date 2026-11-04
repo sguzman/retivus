@@ -64,7 +64,10 @@ jobs:
           CARGO_BUILD_JOBS: '2'
           PROTOC: /usr/bin/protoc
         run: |
-          echo 'f0f69401e2ebdcfe53fe66d289633d2237902394ee75df3defa7d322195c540b  Cargo.lock' | sha256sum -c -
+          # Derive the expected lockfile from this audited source commit.
+          # A static pre-change digest rejects intentional dependency updates;
+          # comparing against HEAD still refuses modified/uncommitted locks.
+          git show "HEAD:Cargo.lock" | cmp - Cargo.lock
           cargo build --locked --release --features anki-backend --bin retivus
       - name: Package source-accompanied candidate
         env:
