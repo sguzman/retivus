@@ -1445,7 +1445,9 @@ mod tests {
             managed.join("collection.mdb"),
         )
         .unwrap();
-        media.add_file("clean.txt", b"existing synchronized content").unwrap();
+        media
+            .add_file("clean.txt", b"existing synchronized content")
+            .unwrap();
         drop(media);
         let index = managed.join("collection.mdb");
         let db = rusqlite::Connection::open(&index).unwrap();
@@ -1454,22 +1456,40 @@ mod tests {
         drop(db);
 
         panel.check_local_sync_readiness();
-        assert!(panel.status.contains("no local sync blockers"), "{}", panel.status);
+        assert!(
+            panel.status.contains("no local sync blockers"),
+            "{}",
+            panel.status
+        );
         assert!(panel.status.contains("same-timestamp"), "{}", panel.status);
 
         let unindexed = managed.join("collection.media/external.txt");
         std::fs::write(&unindexed, b"manual edit outside Anki").unwrap();
         let before = panel.backend.as_ref().unwrap().collection_stats().unwrap();
         panel.check_local_sync_readiness();
-        assert!(panel.status.contains("Offline check refused"), "{}", panel.status);
+        assert!(
+            panel.status.contains("Offline check refused"),
+            "{}",
+            panel.status
+        );
         assert!(
             panel.status.contains("absent from the clean media index"),
             "{}",
             panel.status
         );
-        assert!(panel.status.contains("No network contacted"), "{}", panel.status);
-        assert_eq!(panel.backend.as_ref().unwrap().collection_stats().unwrap(), before);
-        assert_eq!(std::fs::read(&unindexed).unwrap(), b"manual edit outside Anki");
+        assert!(
+            panel.status.contains("No network contacted"),
+            "{}",
+            panel.status
+        );
+        assert_eq!(
+            panel.backend.as_ref().unwrap().collection_stats().unwrap(),
+            before
+        );
+        assert_eq!(
+            std::fs::read(&unindexed).unwrap(),
+            b"manual edit outside Anki"
+        );
         assert!(!root.path().join("network-recovery.zip").exists());
         panel.close();
     }

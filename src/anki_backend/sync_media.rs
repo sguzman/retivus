@@ -5,8 +5,8 @@ use super::sync_preflight::new_ankiweb_http_client;
 use super::{AnkiBackend, BackendResult};
 use anki::sync::login::SyncAuth;
 use rusqlite::OpenFlags;
-use std::path::Path;
 use std::collections::HashMap;
+use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 /// The pinned Anki media engine registers filesystem changes immediately
@@ -46,7 +46,9 @@ fn refuse_unindexed_or_changed_media(
             return Err("media sync refused: unexpected non-regular media entry".into());
         }
         let name = entry.file_name();
-        let name = name.to_str().ok_or("media sync refused: non-Unicode media filename")?;
+        let name = name
+            .to_str()
+            .ok_or("media sync refused: non-Unicode media filename")?;
         let recorded_mtime = indexed
             .remove(name)
             .ok_or("media sync refused: local media file is absent from the clean media index")?;

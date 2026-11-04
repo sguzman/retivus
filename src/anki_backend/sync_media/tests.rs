@@ -93,7 +93,9 @@ fn offline_media_guard_refuses_unindexed_files_after_a_prior_sync_before_network
     let root = tempdir().unwrap();
     let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
     let media = backend.collection.media().unwrap();
-    media.add_file("tracked.txt", b"already synchronized").unwrap();
+    media
+        .add_file("tracked.txt", b"already synchronized")
+        .unwrap();
     drop(media);
 
     let index = root.path().join("learner/collection.mdb");
@@ -106,8 +108,14 @@ fn offline_media_guard_refuses_unindexed_files_after_a_prior_sync_before_network
     let added = root.path().join("learner/collection.media/new-file.txt");
     std::fs::write(&added, b"manually added local media").unwrap();
     let before = backend.collection_stats().unwrap();
-    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
-    assert!(error.contains("absent from the clean media index"), "{error}");
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("absent from the clean media index"),
+        "{error}"
+    );
 
     let archive = root.path().join("must-not-write-unindexed.zip");
     let runtime = tokio::runtime::Builder::new_current_thread()
@@ -120,10 +128,16 @@ fn offline_media_guard_refuses_unindexed_files_after_a_prior_sync_before_network
         &archive,
         true,
     ));
-    assert!(denied.unwrap_err().to_string().contains("absent from the clean media index"));
+    assert!(denied
+        .unwrap_err()
+        .to_string()
+        .contains("absent from the clean media index"));
     assert!(!archive.exists(), "refuse before backup or network login");
     assert_eq!(backend.collection_stats().unwrap(), before);
-    assert_eq!(std::fs::read(&added).unwrap(), b"manually added local media");
+    assert_eq!(
+        std::fs::read(&added).unwrap(),
+        b"manually added local media"
+    );
 }
 
 #[test]
@@ -150,9 +164,18 @@ fn offline_media_guard_refuses_directly_modified_clean_media() {
         .set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(120))
         .unwrap();
 
-    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
-    assert!(error.contains("indexed media file changed on disk"), "{error}");
-    assert_eq!(std::fs::read(&tracked).unwrap(), b"directly changed content");
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("indexed media file changed on disk"),
+        "{error}"
+    );
+    assert_eq!(
+        std::fs::read(&tracked).unwrap(),
+        b"directly changed content"
+    );
 }
 
 #[test]
@@ -172,8 +195,14 @@ fn offline_media_guard_refuses_deleted_clean_indexed_media() {
 
     let tracked = root.path().join("learner/collection.media/tracked.txt");
     std::fs::remove_file(&tracked).unwrap();
-    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
-    assert!(error.contains("indexed media file is missing on disk"), "{error}");
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("indexed media file is missing on disk"),
+        "{error}"
+    );
 }
 
 #[test]
