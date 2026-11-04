@@ -19,15 +19,17 @@ scan_status() {
   while IFS=$'\t' read -r child_service child_path; do
     [[ -n "$child_service" && -n "$child_path" ]] || continue
     scan_status "$child_service" "$child_path" "$((depth + 1))"
-    (( found )) && return 0
+    if (( found )); then return 0; fi
   done < <(printf '%s\n' "$children" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
+  # An unsuccessful subtree probe is not a shell failure: keep scanning.
+  return 0
 }
 for attempt in 1 2 3; do
   children="$(busctl --address="$address" --timeout=2s call org.a11y.atspi.Registry /org/a11y/atspi/accessible/root org.a11y.atspi.Accessible GetChildren)"
   while IFS=$'\t' read -r service object; do
     [[ -n "$service" && -n "$object" ]] || continue
     scan_status "$service" "$object" 0
-    (( found )) && break
+    if (( found )); then break; fi
   done < <(printf '%s\n' "$children" | grep -oE '"[^"]+"' | tr -d '"' | paste - -)
   if (( found )); then
     echo "PASS: Retivus exposed changed validation status via AT-SPI ($nodes nodes scanned)."
