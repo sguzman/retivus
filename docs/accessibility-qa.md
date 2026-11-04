@@ -34,6 +34,18 @@ Retivus disables eframe default features to control its native build. Its explic
 **Scope:** Native AT-SPI registration, keyboard/scale/theme focus regression, and **Orca announcements for the named core controls** have passed CI. **M6.4 remains pending (0/3 points)** because populated browse/reviewer/conflict states in a physical Wayland session, broader screen-reader status/due-card announcements, and high-contrast/reduced-motion preferences have not been independently accepted. The tests do not claim universal assistive-technology usability.
 
 
+## Physical native Wayland + Orca acceptance harness (manual, no milestone credit)
+
+A separate manual-only script, `scripts/qa-physical-wayland-orca.sh`, makes the remaining real desktop evaluation reproducible without using a real learner profile. It requires a **debug, feature-enabled** Retivus binary (for example, a locally built binary with `--features anki-backend`, using the project build coordinator). It refuses X11 or missing native Wayland sockets, and launches four isolated synthetic fixtures: populated review and source conflict at 720×650 and 1080×800.
+
+Run this only from a real physical Wayland/Orca desktop with Orca already enabled. The script never starts or stops the screen reader, never uses real AnkiWeb credentials, creates fresh private `HOME`/`TMPDIR`/`XDG_*` directories for each app instance, and never takes or uploads screenshots. It records manually observed rendering, keyboard/high-contrast/reduced-motion behavior, and **actually heard** dynamic due/review/status speech as pass/fail/skipped in a private `results.tsv`. A sample invocation:
+
+```bash
+bash scripts/qa-physical-wayland-orca.sh /absolute/path/to/debug/retivus
+```
+
+The exact binary path is intentionally supplied by the tester; the harness does not invoke Cargo, bypass `mbx`, or substitute a different build. The script's `--help` and `bash -n` checks may run in CI, but **CI cannot claim a physical spoken-language pass**. Failing/skipped items produce a nonzero exit. Manual results require independent review against M6.4's criterion; the checklist remains open until that real evidence exists.
+
 ## 2026-11-03 independent GTK/Orca control (no M6.4 credit)
 
 The disposable Xvfb/Openbox/DBus Orca test was run against **unrelated GTK 4 software**, `zenity --question`, with two explicitly labelled native buttons. The GTK test uses the same Orca + AT-SPI stack as Retivus, but **no Retivus binary, AccessKit source, or learner profile**.

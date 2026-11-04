@@ -17,6 +17,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
+      - name: Check physical Wayland QA harness contract without running it
+        run: |
+          bash -n scripts/qa-physical-wayland-orca.sh
+          bash scripts/qa-physical-wayland-orca.sh --help
       - name: Check formatting
         run: cargo fmt --all -- --check
       - name: Check code
