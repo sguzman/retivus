@@ -17,6 +17,12 @@
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 9% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
+## Current continuation — 2026-11-04 (87%, Δ +0 percentage points)
+
+- 🟡 **M4.5 🌐 verified shared-note edit/deletion refusal:** [E2E CI 41746187598](https://github.com/sguzman/retivus/actions/runs/41746187598) passed the disposable pinned-server regression: after successful real baseline synchronization, potentially conflicting shared-note edits and deletions are refused before login or network access. This is local fail-closed protection, **not proof of remote convergence**.
+- 🟡 **M4.5 🌐 expanded pending tombstones:** [0cc2fdb](https://github.com/sguzman/retivus/commit/0cc2fdbdbde87398ca1df2b6067b1b95aae33ea7) now also rejects pending deletions of possibly shared cards (Anki grave type 0) and decks (type 2). Disposable SQLite tests check previously shared deletions refuse before backup/network and newer unsynced or already-acknowledged tombstones pass local preflight. [Foundation CI 41746963920](https://github.com/sguzman/retivus/actions/runs/41746963920) passed. [Full backend E2E CI 41746963777](https://github.com/sguzman/retivus/actions/runs/41746963777) was still in progress at this checkpoint. Imported/nonchronological IDs and remote-only changes are unresolved; M4.5 remains **0/2 points**.
+- **Unfinished acceptance:** real authenticated AnkiWeb conflict/media/credential safety, Wayland/Orca QA, release/legal approval, and final distribution all remain pending. No real user account, release, or tag was touched.
+
 ## Current continuation — 2026-11-03 (87%, Δ +0 percentage points)
 
 - 🟡 **M4.5 🌐 (still 0/2 points):** commit [0955e53](https://github.com/sguzman/retivus/commit/0955e5351c80bf7d734b24c4379682e3047a5a5f) adds a fail-closed preflight for pending notes whose time-based IDs predate the recorded last sync. It supplements the recent-edit guard and may conservatively block some legitimate older unsent/imported notes. The tests cover time boundaries, clean/new-note allowance, and public-path refusal before backup or login. [Foundation CI 41742123481](https://github.com/sguzman/retivus/actions/runs/41742123481) and [end-to-end CI 41742123319](https://github.com/sguzman/retivus/actions/runs/41742123319) are the code-verification records. Even green results would only verify the guard, not remote convergence.
