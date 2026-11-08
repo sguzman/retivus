@@ -70,6 +70,86 @@ fn public_media_sync_refuses_dirty_previous_media_before_backup_or_login() {
     assert_eq!((dirty, last_usn), (1, 7));
 }
 
+#[cfg(unix)]
+#[test]
+fn first_media_sync_refuses_symlink_without_initializing_index_or_contacting_server() {
+    use std::os::unix::fs::symlink;
+
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    let media_dir = root.path().join("learner/collection.media");
+    std::fs::create_dir_all(&media_dir).unwrap();
+    let private_file = root.path().join("outside-private.txt");
+    std::fs::write(&private_file, b"not media for upload").unwrap();
+    symlink(&private_file, media_dir.join("outside.txt")).unwrap();
+
+    let index = root.path().join("learner/collection.mdb");
+    assert!(!index.exists());
+    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
+    assert!(error.contains("unexpected non-regular media entry"), "{error}");
+    assert!(!index.exists(), "offline inspection must not create an index");
+
+    let archive = root.path().join("must-not-write-symlink.zip");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let denied = rt.block_on(backend.sync_ankiweb_media_with_recovery(
+        "synthetic@example.invalid",
+        "synthetic-password",
+        &archive,
+        true,
+        MediaSyncConflictRisk::ExplicitlyAcceptPossibleRemoteReplacement,
+    ));
+    assert!(denied
+        .unwrap_err()
+        .to_string()
+        .contains("unexpected non-regular media entry"));
+    assert!(!archive.exists(), "refusal must precede backup and login");
+    assert!(!index.exists(), "refusal must precede index initialization");
+    assert_eq!(std::fs::read(&private_file).unwrap(), b"not media for upload");
+}
+
+#[test]
+fn first_media_sync_with_new_index_refuses_nested_directory_before_backup() {
+    let root = tempdir().unwrap();
+    let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
+    let media = backend.collection.media().unwrap();
+    media.add_file("regular.txt", b"allowed first upload").unwrap();
+    drop(media);
+
+    let index = root.path().join("learner/collection.mdb");
+    let sequence: i64 = rusqlite::Connection::open(&index)
+        .unwrap()
+        .query_row("SELECT lastUsn FROM meta", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(sequence, 0);
+    let nested = root.path().join("learner/collection.media/nested");
+    std::fs::create_dir(&nested).unwrap();
+
+    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
+    assert!(error.contains("unexpected non-regular media entry"), "{error}");
+
+    let archive = root.path().join("must-not-write-nested.zip");
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let denied = rt.block_on(backend.sync_ankiweb_media_with_recovery(
+        "synthetic@example.invalid",
+        "synthetic-password",
+        &archive,
+        true,
+        MediaSyncConflictRisk::ExplicitlyAcceptPossibleRemoteReplacement,
+    ));
+    assert!(denied
+        .unwrap_err()
+        .to_string()
+        .contains("unexpected non-regular media entry"));
+    assert!(!archive.exists(), "refusal must precede backup and login");
+    assert_eq!(std::fs::read(root.path().join("learner/collection.media/regular.txt")).unwrap(), b"allowed first upload");
+}
+
 #[test]
 fn offline_media_guard_allows_new_index_and_clean_earlier_sync() {
     let root = tempdir().unwrap();

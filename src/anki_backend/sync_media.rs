@@ -28,6 +28,28 @@ pub enum MediaSyncConflictRisk {
 /// checks are insufficient: an external editor can retain the original mtime.
 /// This scans media bytes and may take time on large profiles; it intentionally
 /// neither marks media dirty nor updates the on-disk sync index.
+/// A first media sync has no trustworthy index to compare filenames with,
+/// but it must still refuse symlinks, subdirectories and non-Unicode entries
+/// before Anki registers media or builds the private recovery archive.
+/// Unlike a previous-sync audit, newly added regular files are permitted.
+fn refuse_unsafe_initial_media_entries(managed: &Path) -> BackendResult<()> {
+    let directory = match std::fs::read_dir(managed.join("collection.media")) {
+        Ok(directory) => directory,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    for entry in directory {
+        let entry = entry?;
+        if !entry.file_type()?.is_file() {
+            return Err("media sync refused: unexpected non-regular media entry".into());
+        }
+        if entry.file_name().to_str().is_none() {
+            return Err("media sync refused: non-Unicode media filename".into());
+        }
+    }
+    Ok(())
+}
+
 fn matches_index_checksum(path: &Path, checksum: &str) -> BackendResult<bool> {
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha1::new();
@@ -117,7 +139,9 @@ impl AnkiBackend {
     /// never existed upstream, or protect the first media sync. It also
     /// conservatively rejects newly added, removed or timestamp-changed media
     /// after a prior sync, including content edits that preserve file mtime.
-    /// It cannot prevent concurrent changes after the inspection.
+    /// Initial media sync also refuses symlinks, subdirectories and names
+    /// which cannot be represented as Unicode, even without an index. It
+    /// cannot prevent concurrent changes after the inspection.
     pub fn inspect_local_media_conflict_risk(&self) -> BackendResult<()> {
         self.validate_sync_profile()?;
         let managed = self
@@ -127,7 +151,9 @@ impl AnkiBackend {
         let index = managed.join("collection.mdb");
         let metadata = match std::fs::symlink_metadata(&index) {
             Ok(value) => value,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return refuse_unsafe_initial_media_entries(managed);
+            }
             Err(error) => return Err(error.into()),
         };
         if !metadata.file_type().is_file() {
@@ -156,6 +182,11 @@ impl AnkiBackend {
             // Even if SQLite records are clean, a direct filesystem edit can
             // be registered as dirty only after Anki starts media sync.
             refuse_unindexed_or_changed_media(managed, &db)?;
+        } else {
+            // A first sync cannot compare against a remote state or a clean
+            // local index, but must never register non-regular filesystem
+            // entries such as links to files outside the owned profile.
+            refuse_unsafe_initial_media_entries(managed)?;
         }
         Ok(())
     }
