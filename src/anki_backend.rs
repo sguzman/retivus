@@ -1709,6 +1709,7 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         fs::write(&source, b"original-source").unwrap();
         let before = fs::symlink_metadata(&source).unwrap();
         let opened = fs::File::open(&source).unwrap();
+        assert!(offline_source_identity_matches(&before, &opened.metadata().unwrap()).unwrap());
 
         fs::write(&replacement, b"replaced-source").unwrap();
         fs::OpenOptions::new()
@@ -1724,7 +1725,8 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         assert_eq!(before.len(), after.len());
         assert_eq!(before.modified().unwrap(), after.modified().unwrap());
         assert_eq!(fs::read(&source).unwrap(), b"replaced-source");
-        assert!(offline_source_identity_matches(&before, &opened.metadata().unwrap()).unwrap());
+        // Renaming away the original inode can itself update its ctime.
+        // Only the pathname's replacement identity must be compared here.
         assert!(!offline_source_identity_matches(&before, &after).unwrap());
     }
 
