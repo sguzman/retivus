@@ -168,6 +168,13 @@ impl StudyPanel {
         Ok(())
     }
 
+    /// The status of a prior failed open/create attempt is no longer relevant
+    /// after changing either part of the requested profile location.
+    fn profile_location_changed(&mut self) {
+        self.status.clear();
+        self.confirm_recovery = false;
+    }
+
     fn connect(&mut self, create: bool) {
         if self.backend.is_some() {
             self.status = "Close the active profile before switching profiles.".into();
@@ -177,7 +184,10 @@ impl StudyPanel {
         let canonical_root = match fs::canonicalize(root) {
             Ok(canonical) => canonical,
             Err(error) => {
-                self.status = format!("Profile root cannot be opened: {error}");
+                self.status = format!(
+                    "Profile root '{}' could not be opened: {error}",
+                    self.root
+                );
                 return;
             }
         };
@@ -195,7 +205,13 @@ impl StudyPanel {
                 self.refresh();
                 self.refresh_review();
             }
-            Err(error) => self.status = format!("Profile was not opened: {error}"),
+            Err(error) => {
+                let action = if create { "create" } else { "open" };
+                self.status = format!(
+                    "Could not {action} profile '{}' under '{}': {error}",
+                    self.profile_id, self.root
+                );
+            }
         }
     }
 
@@ -841,14 +857,19 @@ impl StudyPanel {
                     .labelled_by(root_label.id)
                     .changed()
                 {
-                    self.confirm_recovery = false;
+                    self.profile_location_changed();
                 }
                 let id_label = ui.label("Profile ID");
-                ui.add_enabled(
-                    self.backend.is_none(),
-                    egui::TextEdit::singleline(&mut self.profile_id).desired_width(160.0),
-                )
-                .labelled_by(id_label.id);
+                if ui
+                    .add_enabled(
+                        self.backend.is_none(),
+                        egui::TextEdit::singleline(&mut self.profile_id).desired_width(160.0),
+                    )
+                    .labelled_by(id_label.id)
+                    .changed()
+                {
+                    self.profile_location_changed();
+                }
             });
             ui.horizontal_wrapped(|ui| {
                 let snapshot_label = ui.label("Source snapshot ID");
@@ -1372,6 +1393,28 @@ mod tests {
         assert!(BrowseScope::Conflicts.matches(&corrupt));
         assert!(BrowseScope::Conflicts.matches(&duplicate));
         assert!(!BrowseScope::SourceLinked.matches(&corrupt));
+    }
+
+    #[test]
+    fn correcting_failed_profile_location_clears_stale_error_and_creates_profile() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().join("missing-root").to_string_lossy().into_owned();
+        panel.profile_id = "admin".into();
+        panel.connect(true);
+        assert!(panel.backend.is_none());
+        assert!(panel.status.contains("missing-root"));
+
+        // A corrected root and profile ID must not retain the previous failure.
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "test".into();
+        panel.profile_location_changed();
+        assert!(panel.status.is_empty());
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        assert!(panel.status.contains("test"));
+        assert!(root.path().join("test/collection.anki2").is_file());
+        panel.close();
     }
 
     #[test]
