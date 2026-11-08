@@ -5,9 +5,13 @@ All meaningful product changes will be recorded here. Detailed implementation st
 ## Unreleased
 
 ### Known limitations
+- The first stable release is explicitly local-only by the owner's 2026-11-08 scope decision. AnkiWeb sync is post-v1 and unverified; the retained experimental local-server sync tests do not establish production credential/media/conflict safety.
 - The public media-sync guard deliberately blocks dirty local media, out-of-index filesystem changes, and checksum mismatches after a recorded media sync, including legitimate new uploads or externally modified files. It scans indexed media content and may be slow for large collections. It cannot identify unseen remote filenames, concurrent writes after preflight, first-sync collisions, or deliberate SHA-1 collisions. It prevents known local remote-wins scenarios but is not a conflict-resolution protocol.
 - Production collection sync deliberately refuses aged pending reviews of potentially previously shared cards; a timer expiring is not evidence of conflict-free synchronization. This may prevent otherwise legitimate shared-card reviews from syncing until a safe reconciliation flow is implemented. Nonchronological IDs can cause conservative false positives or missed cases, and remote-only conflicts cannot be detected by this local guard.
 - A deterministic regression with two independently edited notes sharing one whole-second modification timestamp confirms divergent client content even after successful upstream normal-sync responses. Independent private recovery ZIPs restore both edits; automatic conflict detection/reconciliation and production AnkiWeb acceptance remain open.
+
+### Fixed
+- Defer application-wide egui zoom until the scale slider's pointer interaction ends so the slider no longer changes its own coordinates during dragging. A pointer-release regression test was added and the preview screen now tells users how to launch the local learner. CI verification and physical slider dogfooding are still pending.
 
 ### Added
 - Refuse symlinks, nested directories and non-Unicode media filenames on a first Anki media sync, including when the local index has not yet been created. A read-only preflight now rejects unsafe entries before media-index initialization, private backup or login while allowing ordinary first-time regular-file additions. [Foundation CI 42495066449](https://github.com/sguzman/retivus/actions/runs/42495066449) and [feature-enabled E2E 42495066487](https://github.com/sguzman/retivus/actions/runs/42495066487) passed, including two new synthetic refusal tests. Remote-only first-sync conflicts and concurrent filesystem changes remain unverified.

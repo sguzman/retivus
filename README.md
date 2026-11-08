@@ -8,7 +8,7 @@ The first external vocabulary provider is [Mexilex](https://github.com/sguzman/m
 
 ## Development status
 
-Active development; **87% of the weighted acceptance roadmap is verified**. M0–M3 and M5 are complete. M4 has verified third-party/AnkiDroid packages, cloze/media/CSS round-trips, safe offline collection-copy migration and a real official Anki Desktop GUI import/reexport, but **not authenticated AnkiWeb sync**. The native learner has verified keyboard/pointer workflows, FSRS reviews, source-conflict guards and X11/Wayland rendering. The 124,444-entry Mexilex release passed bounded-memory and indexed-search benchmarks. Experimental, backend-only tests now verify full-sync refusal, two-client normal collection transfer, timestamp-separated note conflict convergence and media transfer against Anki's pinned *local* Rust server. A reproducible pinned-Anki-server regression confirms that same-second edits to one note can **remain divergent despite successful sync responses**; Retivus preserves both pre-sync local edits in separate private recovery archives, but automated conflict resolution is not implemented. None of these tests establishes production AnkiWeb acceptance. Cross-layer integration and archive security regressions are verified; broader accessibility and release acceptance remain in progress. [ROADMAP.md](ROADMAP.md) is authoritative for verified completion.
+Active development; **89% of the weighted acceptance roadmap is verified**. M0–M5 are complete under the owner's explicit **local-only v1** scope; M4 has verified third-party/AnkiDroid packages, cloze/media/CSS round-trips, safe offline collection-copy migration and a real official Anki Desktop GUI import/reexport. **AnkiWeb sync is deferred beyond v1, not validated or needed for local study.** The native learner has verified keyboard/pointer workflows, FSRS reviews, source-conflict guards and X11/Wayland rendering. The 124,444-entry Mexilex release passed bounded-memory and indexed-search benchmarks. Experimental, backend-only tests now verify full-sync refusal, two-client normal collection transfer, timestamp-separated note conflict convergence and media transfer against Anki's pinned *local* Rust server. A reproducible pinned-Anki-server regression confirms that same-second edits to one note can **remain divergent despite successful sync responses**; Retivus preserves both pre-sync local edits in separate private recovery archives, but automated conflict resolution is not implemented. None of these tests establishes production AnkiWeb acceptance. Cross-layer integration and archive security regressions are verified; broader accessibility and release acceptance remain in progress. [ROADMAP.md](ROADMAP.md) is authoritative for verified completion.
 
 ## Architecture
 
@@ -29,7 +29,7 @@ cargo run
 cargo test --all-targets
 ```
 
-The default `cargo run` build remains a **read-only source preview**. Opt into the pinned Anki Rust engine and its experimental managed-profile learner workspace with:
+The default `cargo run` build is a **read-only source preview, not the flashcard/study application**. To run local decks, note editing and review sessions, enable the pinned Anki Rust engine's managed-profile learner workspace with:
 
 ```sh
 cargo run --features anki-backend --bin retivus

@@ -438,11 +438,11 @@ impl eframe::App for Retivus {
             ui.label("Anki ecosystem compatibility and versioned external data providers.");
             ui.separator();
             #[cfg(not(feature = "anki-backend"))]
-            ui.weak("Preview mode: validated sources only. Study, editing and review controls are not available in this window yet.");
+            ui.weak("Source preview only. For local decks and studying, relaunch with --features anki-backend --bin retivus.");
             ui.weak("Keyboard: Tab and Shift+Tab move between controls; Enter or Space activates the focused control.");
             ui.label("First data source: Mexilex · es-MX → en");
             #[cfg(not(feature = "anki-backend"))]
-            ui.label("Anki Rust backend: separately feature-gated and under integration; this preview never opens learner collections.");
+            ui.label("The Anki Rust engine can run locally; no AnkiWeb account or synchronization is needed.");
             ui.separator();
             egui::ScrollArea::vertical().show(ui, |ui| {
                 #[cfg(feature = "anki-backend")]
@@ -770,7 +770,10 @@ mod tests {
                 assert!(!app.pending_scale_commit);
             },
         );
-        assert!((ctx.zoom_factor() - 1.4).abs() < 0.001);
+        // egui applies zoom at the start of the next pass.
+        ctx.run(egui::RawInput::default(), |ctx| {
+            assert!((ctx.zoom_factor() - 1.4).abs() < 0.001);
+        });
     }
 
     #[test]
