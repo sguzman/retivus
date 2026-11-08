@@ -319,14 +319,24 @@ impl AnkiBackend {
             return Err("target profile already exists; refusing replacement".into());
         }
 
-        let initial = fs::metadata(source)?;
-        let copied = NamedTempFile::new_in(&root)?;
-        fs::copy(source, copied.path())?;
+        // Pin the bytes to an open descriptor. A path can be replaced with a
+        // different file of the same length and mtime while the copy is in
+        // progress, so metadata from the pathname alone is not enough.
+        let initial_path = fs::symlink_metadata(source)?;
+        let mut input = fs::File::open(source)?;
+        let initial_open = input.metadata()?;
+        if !offline_source_identity_matches(&initial_path, &initial_open)? {
+            return Err("offline collection changed before copy; source may be active".into());
+        }
+        let mut copied = NamedTempFile::new_in(&root)?;
+        let copied_bytes = std::io::copy(&mut input, copied.as_file_mut())?;
         ensure_no_sqlite_sidecars(source)?;
-        let after_copy = fs::metadata(source)?;
-        if initial.len() != after_copy.len()
-            || initial.modified()? != after_copy.modified()?
-            || fs::metadata(copied.path())?.len() != initial.len()
+        let after_open = input.metadata()?;
+        let after_path = fs::symlink_metadata(source)?;
+        if !offline_source_identity_matches(&initial_path, &after_open)?
+            || !offline_source_identity_matches(&initial_path, &after_path)?
+            || copied_bytes != initial_path.len()
+            || copied.as_file().metadata()?.len() != initial_path.len()
         {
             return Err("offline collection changed during copy; source may be active".into());
         }
@@ -938,6 +948,32 @@ fn check_regular(path: &Path, directory: bool) -> BackendResult<()> {
         return Err("expected a real directory or regular file, not a symlink".into());
     }
     Ok(())
+}
+
+/// Compare both the path and the open descriptor during an offline import.
+/// The extra Unix identity fields detect replacement even when length and
+/// modification time are deliberately preserved. This is a best-effort
+/// closed-file check, not an atomic snapshot of a concurrently edited DB.
+fn offline_source_identity_matches(before: &fs::Metadata, after: &fs::Metadata) -> BackendResult<bool> {
+    if !before.is_file()
+        || !after.is_file()
+        || before.len() != after.len()
+        || before.modified()? != after.modified()?
+    {
+        return Ok(false);
+    }
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        if before.dev() != after.dev()
+            || before.ino() != after.ino()
+            || before.ctime() != after.ctime()
+            || before.ctime_nsec() != after.ctime_nsec()
+        {
+            return Ok(false);
+        }
+    }
+    Ok(true)
 }
 
 fn ensure_no_sqlite_sidecars(source: &Path) -> BackendResult<()> {
@@ -1659,6 +1695,34 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
         .is_err());
         assert!(!root.path().join("malformed").exists());
         assert_eq!(fs::read(&damaged).unwrap(), b"not sqlite");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn offline_copy_identity_rejects_same_size_same_mtime_replacement() {
+        let root = tempdir().unwrap();
+        let source = root.path().join("closed.anki2");
+        let replacement = root.path().join("replacement.anki2");
+        fs::write(&source, b"original-source").unwrap();
+        let before = fs::symlink_metadata(&source).unwrap();
+        let opened = fs::File::open(&source).unwrap();
+
+        fs::write(&replacement, b"replaced-source").unwrap();
+        fs::OpenOptions::new()
+            .write(true)
+            .open(&replacement)
+            .unwrap()
+            .set_modified(before.modified().unwrap())
+            .unwrap();
+        fs::rename(&replacement, &source).unwrap();
+        let after = fs::symlink_metadata(&source).unwrap();
+
+        // Size and mtime checks alone accept this changed source.
+        assert_eq!(before.len(), after.len());
+        assert_eq!(before.modified().unwrap(), after.modified().unwrap());
+        assert_eq!(fs::read(&source).unwrap(), b"replaced-source");
+        assert!(offline_source_identity_matches(&before, &opened.metadata().unwrap()).unwrap());
+        assert!(!offline_source_identity_matches(&before, &after).unwrap());
     }
 
     /// Official Anki Desktop collection fixture downloaded via the pinned upstream checkout.
