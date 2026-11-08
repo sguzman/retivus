@@ -19,15 +19,6 @@ pub enum MediaSyncConflictRisk {
     ExplicitlyAcceptPossibleRemoteReplacement,
 }
 
-/// The pinned Anki media engine registers filesystem changes immediately
-/// before network sync. Dirty flags alone can miss a file added, edited, or
-/// removed outside Anki's media manager. Refuse such changes on a profile
-/// with previous sync history *before* allowing that registration to write.
-/// This is deliberately conservative, and never modifies the index.
-/// Hash each clean file against Anki's own recorded checksum. Timestamp-only
-/// checks are insufficient: an external editor can retain the original mtime.
-/// This scans media bytes and may take time on large profiles; it intentionally
-/// neither marks media dirty nor updates the on-disk sync index.
 /// A first media sync has no trustworthy index to compare filenames with,
 /// but it must still refuse symlinks, subdirectories and non-Unicode entries
 /// before Anki registers media or builds the private recovery archive.
@@ -50,6 +41,9 @@ fn refuse_unsafe_initial_media_entries(managed: &Path) -> BackendResult<()> {
     Ok(())
 }
 
+/// Compare file bytes with Anki's stored checksum. Timestamps alone cannot
+/// detect external edits which preserve the original modification time.
+/// Read-only inspection does not update the on-disk media sync index.
 fn matches_index_checksum(path: &Path, checksum: &str) -> BackendResult<bool> {
     let mut file = std::fs::File::open(path)?;
     let mut digest = Sha1::new();
@@ -64,6 +58,10 @@ fn matches_index_checksum(path: &Path, checksum: &str) -> BackendResult<bool> {
     Ok(format!("{:x}", digest.finalize()) == checksum)
 }
 
+/// Detect unindexed and changed media after a previous sync before the
+/// upstream media manager can silently register these local differences.
+/// This checks indexed file content as well as timestamps, deliberately
+/// refusing legitimate pending uploads on a previously synced profile.
 fn refuse_unindexed_or_changed_media(
     managed: &Path,
     db: &rusqlite::Connection,

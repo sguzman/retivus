@@ -85,9 +85,18 @@ fn first_media_sync_refuses_symlink_without_initializing_index_or_contacting_ser
 
     let index = root.path().join("learner/collection.mdb");
     assert!(!index.exists());
-    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
-    assert!(error.contains("unexpected non-regular media entry"), "{error}");
-    assert!(!index.exists(), "offline inspection must not create an index");
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("unexpected non-regular media entry"),
+        "{error}"
+    );
+    assert!(
+        !index.exists(),
+        "offline inspection must not create an index"
+    );
 
     let archive = root.path().join("must-not-write-symlink.zip");
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -107,7 +116,10 @@ fn first_media_sync_refuses_symlink_without_initializing_index_or_contacting_ser
         .contains("unexpected non-regular media entry"));
     assert!(!archive.exists(), "refusal must precede backup and login");
     assert!(!index.exists(), "refusal must precede index initialization");
-    assert_eq!(std::fs::read(&private_file).unwrap(), b"not media for upload");
+    assert_eq!(
+        std::fs::read(&private_file).unwrap(),
+        b"not media for upload"
+    );
 }
 
 #[test]
@@ -115,7 +127,9 @@ fn first_media_sync_with_new_index_refuses_nested_directory_before_backup() {
     let root = tempdir().unwrap();
     let mut backend = AnkiBackend::create_managed_profile(root.path(), "learner").unwrap();
     let media = backend.collection.media().unwrap();
-    media.add_file("regular.txt", b"allowed first upload").unwrap();
+    media
+        .add_file("regular.txt", b"allowed first upload")
+        .unwrap();
     drop(media);
 
     let index = root.path().join("learner/collection.mdb");
@@ -127,8 +141,14 @@ fn first_media_sync_with_new_index_refuses_nested_directory_before_backup() {
     let nested = root.path().join("learner/collection.media/nested");
     std::fs::create_dir(&nested).unwrap();
 
-    let error = backend.inspect_local_media_conflict_risk().unwrap_err().to_string();
-    assert!(error.contains("unexpected non-regular media entry"), "{error}");
+    let error = backend
+        .inspect_local_media_conflict_risk()
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("unexpected non-regular media entry"),
+        "{error}"
+    );
 
     let archive = root.path().join("must-not-write-nested.zip");
     let rt = tokio::runtime::Builder::new_current_thread()
@@ -147,7 +167,10 @@ fn first_media_sync_with_new_index_refuses_nested_directory_before_backup() {
         .to_string()
         .contains("unexpected non-regular media entry"));
     assert!(!archive.exists(), "refusal must precede backup and login");
-    assert_eq!(std::fs::read(root.path().join("learner/collection.media/regular.txt")).unwrap(), b"allowed first upload");
+    assert_eq!(
+        std::fs::read(root.path().join("learner/collection.media/regular.txt")).unwrap(),
+        b"allowed first upload"
+    );
 }
 
 #[test]
