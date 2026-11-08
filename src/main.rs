@@ -132,6 +132,7 @@ impl Theme {
 struct Retivus {
     theme: Theme,
     ui_scale: f32,
+    pending_scale_commit: bool,
     density: Density,
     high_contrast: bool,
     reduced_motion: bool,
@@ -154,6 +155,7 @@ impl Default for Retivus {
         Self {
             theme: Theme::System,
             ui_scale: 1.0,
+            pending_scale_commit: false,
             density: Density::Comfortable,
             high_contrast: false,
             reduced_motion: false,
@@ -270,6 +272,16 @@ impl Retivus {
             Ok(note) => format!("Created study note {note} from selected meaning."),
             Err(error) => format!("Not added to learner profile: {error}"),
         };
+    }
+
+    // Applying zoom while dragging this slider changes its screen coordinates
+    // beneath the pointer. Keep the chosen value visible, but resize the UI
+    // only after the pointer is released (keyboard changes apply immediately).
+    fn apply_pending_ui_scale(&mut self, ctx: &egui::Context) {
+        if self.pending_scale_commit && !ctx.input(|input| input.pointer.any_down()) {
+            ctx.set_zoom_factor(self.ui_scale);
+            self.pending_scale_commit = false;
+        }
     }
 
     fn restore(storage: Option<&dyn eframe::Storage>) -> Self {
@@ -395,7 +407,7 @@ impl eframe::App for Retivus {
                     .add(egui::Slider::new(&mut self.ui_scale, 0.80..=1.50).text("Scale"))
                     .changed()
                 {
-                    ctx.set_zoom_factor(self.ui_scale);
+                    self.pending_scale_commit = true;
                 }
                 if !narrow_toolbar {
                     ui.checkbox(&mut self.high_contrast, "High contrast")
@@ -407,6 +419,7 @@ impl eframe::App for Retivus {
                 }
             });
         });
+        self.apply_pending_ui_scale(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
             if narrow_toolbar {
                 // Separate from the TopBottomPanel clipping scope. This is
@@ -717,6 +730,47 @@ mod tests {
             Retivus::restore(Some(&storage)).density,
             Density::Comfortable
         );
+    }
+
+    #[test]
+    fn dragging_scale_does_not_move_ui_until_pointer_release() {
+        let ctx = egui::Context::default();
+        let mut app = Retivus {
+            ui_scale: 1.4,
+            pending_scale_commit: true,
+            ..Retivus::default()
+        };
+        let pos = egui::pos2(30.0, 10.0);
+        let pointer = |pressed| egui::Event::PointerButton {
+            pos,
+            button: egui::PointerButton::Primary,
+            pressed,
+            modifiers: egui::Modifiers::NONE,
+        };
+        ctx.run(
+            egui::RawInput {
+                events: vec![egui::Event::PointerMoved(pos), pointer(true)],
+                ..egui::RawInput::default()
+            },
+            |ctx| {
+                assert!(ctx.input(|input| input.pointer.any_down()));
+                app.apply_pending_ui_scale(ctx);
+                assert!(app.pending_scale_commit);
+                assert_eq!(ctx.zoom_factor(), 1.0);
+            },
+        );
+        ctx.run(
+            egui::RawInput {
+                events: vec![pointer(false)],
+                ..egui::RawInput::default()
+            },
+            |ctx| {
+                assert!(!ctx.input(|input| input.pointer.any_down()));
+                app.apply_pending_ui_scale(ctx);
+                assert!(!app.pending_scale_commit);
+            },
+        );
+        assert!((ctx.zoom_factor() - 1.4).abs() < 0.001);
     }
 
     #[test]
