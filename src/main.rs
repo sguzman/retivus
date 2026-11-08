@@ -747,7 +747,7 @@ mod tests {
             pressed,
             modifiers: egui::Modifiers::NONE,
         };
-        ctx.run(
+        let _ = ctx.run(
             egui::RawInput {
                 events: vec![egui::Event::PointerMoved(pos), pointer(true)],
                 ..egui::RawInput::default()
@@ -759,7 +759,7 @@ mod tests {
                 assert_eq!(ctx.zoom_factor(), 1.0);
             },
         );
-        ctx.run(
+        let _ = ctx.run(
             egui::RawInput {
                 events: vec![pointer(false)],
                 ..egui::RawInput::default()
@@ -771,7 +771,7 @@ mod tests {
             },
         );
         // egui applies zoom at the start of the next pass.
-        ctx.run(egui::RawInput::default(), |ctx| {
+        let _ = ctx.run(egui::RawInput::default(), |ctx| {
             assert!((ctx.zoom_factor() - 1.4).abs() < 0.001);
         });
     }
