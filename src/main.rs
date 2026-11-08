@@ -5,6 +5,8 @@ use std::io::BufReader;
 
 #[cfg(feature = "anki-backend")]
 mod study_ui;
+#[cfg(target_os = "linux")]
+mod linux_theme;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Theme {
@@ -131,6 +133,8 @@ impl Theme {
 }
 struct Retivus {
     theme: Theme,
+    #[cfg(target_os = "linux")]
+    linux_theme: linux_theme::DesktopTheme,
     ui_scale: f32,
     pending_scale_commit: bool,
     density: Density,
@@ -154,6 +158,8 @@ impl Default for Retivus {
     fn default() -> Self {
         Self {
             theme: Theme::System,
+            #[cfg(target_os = "linux")]
+            linux_theme: linux_theme::DesktopTheme::default(),
             ui_scale: 1.0,
             pending_scale_commit: false,
             density: Density::Comfortable,
@@ -277,6 +283,19 @@ impl Retivus {
     // Applying zoom while dragging this slider changes its screen coordinates
     // beneath the pointer. Keep the chosen value visible, but resize the UI
     // only after the pointer is released (keyboard changes apply immediately).
+    fn effective_theme(&self) -> egui::ThemePreference {
+        #[cfg(target_os = "linux")]
+        if self.theme == Theme::System {
+            if let Some(theme) = self.linux_theme.current() {
+                return match theme {
+                    egui::Theme::Light => egui::ThemePreference::Light,
+                    egui::Theme::Dark => egui::ThemePreference::Dark,
+                };
+            }
+        }
+        self.theme.preference()
+    }
+
     fn apply_pending_ui_scale(&mut self, ctx: &egui::Context) {
         if self.pending_scale_commit && !ctx.input(|input| input.pointer.any_down()) {
             ctx.set_zoom_factor(self.ui_scale);
@@ -363,7 +382,7 @@ impl eframe::App for Retivus {
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Switching back to System must restore live operating-system theme tracking.
-        ctx.set_theme(self.theme.preference());
+        ctx.set_theme(self.effective_theme());
         apply_accessibility_style(ctx, self.density, self.high_contrast, self.reduced_motion);
         let mut narrow_toolbar = false;
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
@@ -609,6 +628,8 @@ fn main() -> eframe::Result<()> {
         Box::new(|cc| {
             brand::apply_to_context(&cc.egui_ctx);
             let mut app = Retivus::restore(cc.storage);
+            #[cfg(target_os = "linux")]
+            app.linux_theme.start(cc.egui_ctx.clone());
             app.krypton_font_loaded = typography::install_local_krypton(&cc.egui_ctx);
             #[cfg(all(debug_assertions, feature = "anki-backend"))]
             if std::env::var("RETIVUS_VISUAL_QA").ok().as_deref() == Some("isolated-2026") {
@@ -701,6 +722,21 @@ mod tests {
                 assert_eq!(ctx.theme(), expected);
             }
         }
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn system_mode_prefers_desktop_portal_and_explicit_modes_override_it() {
+        let mut app = Retivus::default();
+        assert_eq!(app.effective_theme(), egui::ThemePreference::System);
+        app.linux_theme.set_for_test(egui::Theme::Light);
+        assert_eq!(app.effective_theme(), egui::ThemePreference::Light);
+        app.linux_theme.set_for_test(egui::Theme::Dark);
+        assert_eq!(app.effective_theme(), egui::ThemePreference::Dark);
+        app.theme = Theme::Light;
+        assert_eq!(app.effective_theme(), egui::ThemePreference::Light);
+        app.theme = Theme::Dark;
+        assert_eq!(app.effective_theme(), egui::ThemePreference::Dark);
     }
 
     #[test]
