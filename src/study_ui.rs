@@ -184,10 +184,7 @@ impl StudyPanel {
         let canonical_root = match fs::canonicalize(root) {
             Ok(canonical) => canonical,
             Err(error) => {
-                self.status = format!(
-                    "Profile root '{}' could not be opened: {error}",
-                    self.root
-                );
+                self.status = format!("Profile root '{}' could not be opened: {error}", self.root);
                 return;
             }
         };
@@ -1399,7 +1396,11 @@ mod tests {
     fn correcting_failed_profile_location_clears_stale_error_and_creates_profile() {
         let root = tempfile::tempdir().unwrap();
         let mut panel = StudyPanel::default();
-        panel.root = root.path().join("missing-root").to_string_lossy().into_owned();
+        panel.root = root
+            .path()
+            .join("missing-root")
+            .to_string_lossy()
+            .into_owned();
         panel.profile_id = "admin".into();
         panel.connect(true);
         assert!(panel.backend.is_none());
