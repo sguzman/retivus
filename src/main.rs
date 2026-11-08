@@ -3,10 +3,10 @@ use retivus::{brand, source_adapter, typography};
 use std::fs::File;
 use std::io::BufReader;
 
-#[cfg(feature = "anki-backend")]
-mod study_ui;
 #[cfg(target_os = "linux")]
 mod linux_theme;
+#[cfg(feature = "anki-backend")]
+mod study_ui;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Theme {
