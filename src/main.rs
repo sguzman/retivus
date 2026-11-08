@@ -422,7 +422,11 @@ impl eframe::App for Retivus {
                         .selected_text(self.density.name())
                         .show_ui(ui, |ui| {
                             ui.selectable_value(&mut self.density, Density::Compact, "Compact");
-                            ui.selectable_value(&mut self.density, Density::Comfortable, "Comfortable");
+                            ui.selectable_value(
+                                &mut self.density,
+                                Density::Comfortable,
+                                "Comfortable",
+                            );
                         })
                         .response
                         .labelled_by(density_label.id);
