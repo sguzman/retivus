@@ -390,59 +390,59 @@ impl eframe::App for Retivus {
         let focused_study = false;
         let mut narrow_toolbar = false;
         if !focused_study {
-        egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
-            // The headless Sway renderer reserves but doesn't paint a wrapped
-            // second row of this top panel at 720px. Keep the panel to one
-            // row, and render narrow accessibility controls below in the
-            // central panel, where their actual pixels are visible.
-            narrow_toolbar = ui.available_width() < 860.0;
-            ui.horizontal_wrapped(|ui| {
-                ui.label(
-                    egui::RichText::new("Retivus")
-                        .heading()
-                        .color(brand::accent(ctx.theme())),
-                );
-                ui.separator();
-                if self.krypton_font_loaded {
-                    ui.weak("Krypton Nerd Font");
-                }
-                let appearance_label = ui.label("Appearance");
-                egui::ComboBox::from_id_salt("appearance")
-                    .selected_text(self.theme.name())
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.theme, Theme::System, "System");
-                        ui.selectable_value(&mut self.theme, Theme::Light, "Light");
-                        ui.selectable_value(&mut self.theme, Theme::Dark, "Dark");
-                    })
-                    .response
-                    .labelled_by(appearance_label.id);
-                ui.separator();
-                let density_label = ui.label("Density");
-                egui::ComboBox::from_id_salt("density")
-                    .selected_text(self.density.name())
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut self.density, Density::Compact, "Compact");
-                        ui.selectable_value(&mut self.density, Density::Comfortable, "Comfortable");
-                    })
-                    .response
-                    .labelled_by(density_label.id);
-                ui.separator();
-                if ui
-                    .add(egui::Slider::new(&mut self.ui_scale, 0.80..=1.50).text("Scale"))
-                    .changed()
-                {
-                    self.pending_scale_commit = true;
-                }
-                if !narrow_toolbar {
-                    ui.checkbox(&mut self.high_contrast, "High contrast")
-                        .on_hover_text(
-                            "Use high-contrast text and backgrounds in either color scheme.",
-                        );
-                    ui.checkbox(&mut self.reduced_motion, "Reduce motion")
-                        .on_hover_text("Disable standard widget transitions in Retivus.");
-                }
+            egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+                // The headless Sway renderer reserves but doesn't paint a wrapped
+                // second row of this top panel at 720px. Keep the panel to one
+                // row, and render narrow accessibility controls below in the
+                // central panel, where their actual pixels are visible.
+                narrow_toolbar = ui.available_width() < 860.0;
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(
+                        egui::RichText::new("Retivus")
+                            .heading()
+                            .color(brand::accent(ctx.theme())),
+                    );
+                    ui.separator();
+                    if self.krypton_font_loaded {
+                        ui.weak("Krypton Nerd Font");
+                    }
+                    let appearance_label = ui.label("Appearance");
+                    egui::ComboBox::from_id_salt("appearance")
+                        .selected_text(self.theme.name())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.theme, Theme::System, "System");
+                            ui.selectable_value(&mut self.theme, Theme::Light, "Light");
+                            ui.selectable_value(&mut self.theme, Theme::Dark, "Dark");
+                        })
+                        .response
+                        .labelled_by(appearance_label.id);
+                    ui.separator();
+                    let density_label = ui.label("Density");
+                    egui::ComboBox::from_id_salt("density")
+                        .selected_text(self.density.name())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut self.density, Density::Compact, "Compact");
+                            ui.selectable_value(&mut self.density, Density::Comfortable, "Comfortable");
+                        })
+                        .response
+                        .labelled_by(density_label.id);
+                    ui.separator();
+                    if ui
+                        .add(egui::Slider::new(&mut self.ui_scale, 0.80..=1.50).text("Scale"))
+                        .changed()
+                    {
+                        self.pending_scale_commit = true;
+                    }
+                    if !narrow_toolbar {
+                        ui.checkbox(&mut self.high_contrast, "High contrast")
+                            .on_hover_text(
+                                "Use high-contrast text and backgrounds in either color scheme.",
+                            );
+                        ui.checkbox(&mut self.reduced_motion, "Reduce motion")
+                            .on_hover_text("Disable standard widget transitions in Retivus.");
+                    }
+                });
             });
-        });
         }
         self.apply_pending_ui_scale(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {

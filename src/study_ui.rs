@@ -892,13 +892,10 @@ impl StudyPanel {
             .max_height(card_height)
             .show(ui, |ui| {
                 ui.vertical_centered(|ui| {
+                    ui.set_min_height(card_height);
                     ui.add_space((card_height * 0.18).min(85.0));
                     if let Some(card) = &shown_card {
-                        ui.label(
-                            egui::RichText::new(&card.question_html)
-                                .size(25.0)
-                                .strong(),
-                        );
+                        ui.label(egui::RichText::new(&card.question_html).size(25.0).strong());
                         if self.revealed {
                             ui.add_space(20.0);
                             ui.separator();
@@ -919,10 +916,12 @@ impl StudyPanel {
             if shown_card.is_some() {
                 if self.revealed {
                     ui.horizontal(|ui| {
-                        for (rating, name) in
-                            [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")]
+                        for (rating, name) in [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")]
                         {
-                            if ui.add_sized([105.0, 42.0], egui::Button::new(name)).clicked() {
+                            if ui
+                                .add_sized([105.0, 42.0], egui::Button::new(name))
+                                .clicked()
+                            {
                                 self.grade_revealed(rating);
                             }
                         }
