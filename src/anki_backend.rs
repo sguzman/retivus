@@ -954,7 +954,10 @@ fn check_regular(path: &Path, directory: bool) -> BackendResult<()> {
 /// The extra Unix identity fields detect replacement even when length and
 /// modification time are deliberately preserved. This is a best-effort
 /// closed-file check, not an atomic snapshot of a concurrently edited DB.
-fn offline_source_identity_matches(before: &fs::Metadata, after: &fs::Metadata) -> BackendResult<bool> {
+fn offline_source_identity_matches(
+    before: &fs::Metadata,
+    after: &fs::Metadata,
+) -> BackendResult<bool> {
     if !before.is_file()
         || !after.is_file()
         || before.len() != after.len()
