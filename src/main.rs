@@ -384,7 +384,12 @@ impl eframe::App for Retivus {
         // Switching back to System must restore live operating-system theme tracking.
         ctx.set_theme(self.effective_theme());
         apply_accessibility_style(ctx, self.density, self.high_contrast, self.reduced_motion);
+        #[cfg(feature = "anki-backend")]
+        let focused_study = self.study.is_focused_study();
+        #[cfg(not(feature = "anki-backend"))]
+        let focused_study = false;
         let mut narrow_toolbar = false;
+        if !focused_study {
         egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
             // The headless Sway renderer reserves but doesn't paint a wrapped
             // second row of this top panel at 720px. Keep the panel to one
@@ -438,8 +443,14 @@ impl eframe::App for Retivus {
                 }
             });
         });
+        }
         self.apply_pending_ui_scale(ctx);
         egui::CentralPanel::default().show(ctx, |ui| {
+            #[cfg(feature = "anki-backend")]
+            if focused_study {
+                self.study.focused_ui(ui);
+                return;
+            }
             if narrow_toolbar {
                 // Separate from the TopBottomPanel clipping scope. This is
                 // always visible above the scrollable learner workspace.

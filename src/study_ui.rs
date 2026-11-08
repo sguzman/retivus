@@ -80,6 +80,7 @@ pub struct StudyPanel {
     confirm_delete: bool,
     review: Option<ReviewPreview>,
     revealed: bool,
+    focused_study: bool,
     due: (usize, usize, usize),
     status: String,
 }
@@ -836,7 +837,111 @@ impl StudyPanel {
         self.new_deck.clear();
         self.review = None;
         self.revealed = false;
+        self.focused_study = false;
         self.due = (0, 0, 0);
+    }
+
+    pub fn is_focused_study(&self) -> bool {
+        self.focused_study && self.backend.is_some()
+    }
+
+    fn start_focused_study(&mut self) {
+        if self.backend.is_some() {
+            self.refresh_review();
+            self.focused_study = true;
+        }
+    }
+
+    /// A separate study workspace, not a small widget among editing controls.
+    /// The existing Anki backend still owns due queues, grading and persistence.
+    pub fn focused_ui(&mut self, ui: &mut egui::Ui) {
+        if !self.is_focused_study() {
+            return;
+        }
+        ui.horizontal(|ui| {
+            if ui.button("Back to decks").clicked() {
+                self.focused_study = false;
+            }
+            ui.separator();
+            ui.strong("Retivus · Study");
+            let deck_name = self
+                .decks
+                .iter()
+                .find(|(id, _)| Some(*id) == self.deck_id)
+                .map_or("Selected deck", |(_, name)| name.as_str());
+            ui.weak(deck_name);
+        });
+        if !self.focused_study {
+            return;
+        }
+        ui.separator();
+        ui.vertical_centered(|ui| {
+            ui.add_space(12.0);
+            ui.heading("Review");
+            let due = format!(
+                "{} new  ·  {} learning  ·  {} review",
+                self.due.0, self.due.1, self.due.2
+            );
+            live_status(ui, &due);
+        });
+        let available_height = ui.available_height();
+        let card_height = (available_height - 120.0).max(160.0);
+        let shown_card = self.review.clone();
+        egui::ScrollArea::vertical()
+            .id_salt("focused-study-card")
+            .max_height(card_height)
+            .show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space((card_height * 0.18).min(85.0));
+                    if let Some(card) = &shown_card {
+                        ui.label(
+                            egui::RichText::new(&card.question_html)
+                                .size(25.0)
+                                .strong(),
+                        );
+                        if self.revealed {
+                            ui.add_space(20.0);
+                            ui.separator();
+                            ui.add_space(20.0);
+                            ui.label(
+                                egui::RichText::new(inert_review_answer(&card.answer_html))
+                                    .size(24.0),
+                            );
+                        }
+                    } else {
+                        ui.heading("You're caught up for now.");
+                        ui.weak("No cards are currently queued in this deck.");
+                    }
+                });
+            });
+        ui.add_space(10.0);
+        ui.vertical_centered(|ui| {
+            if shown_card.is_some() {
+                if self.revealed {
+                    ui.horizontal(|ui| {
+                        for (rating, name) in
+                            [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")]
+                        {
+                            if ui.add_sized([105.0, 42.0], egui::Button::new(name)).clicked() {
+                                self.grade_revealed(rating);
+                            }
+                        }
+                    });
+                } else if ui
+                    .add_sized([220.0, 44.0], egui::Button::new("Show answer"))
+                    .clicked()
+                {
+                    self.revealed = true;
+                }
+            } else if ui.button("Refresh due queue").clicked() {
+                self.refresh_review();
+            }
+            ui.add_space(8.0);
+            ui.weak("Cards are scheduled locally using Anki's review engine.");
+            if !self.status.is_empty() {
+                ui.label(&self.status);
+            }
+        });
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
@@ -1244,6 +1349,9 @@ impl StudyPanel {
                     self.stats.notes, self.stats.cards, self.stats.review_events
                 ));
                 ui.heading("Study · Anki scheduler");
+                if ui.button("Study in focused view").clicked() {
+                    self.start_focused_study();
+                }
                 ui.horizontal_wrapped(|ui| {
                     let due = format!(
                         "Due: {} new · {} learning · {} review",
@@ -2167,6 +2275,63 @@ mod tests {
         let reopened =
             AnkiBackend::open_managed_profile(root.path(), "populated-accessibility").unwrap();
         assert_eq!(reopened.note_fields(note_id).unwrap(), ["生", "life"]);
+        assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
+        reopened.close().unwrap();
+    }
+
+    #[test]
+    fn focused_study_uses_own_view_and_records_real_anki_review() {
+        use egui_kittest::{kittest::Queryable as _, Harness};
+
+        let root = tempfile::tempdir().unwrap();
+        let mut harness = Harness::new_eframe(|_| crate::Retivus::default());
+        let card_id = {
+            let app = harness.state_mut();
+            app.study.root = root.path().to_string_lossy().into_owned();
+            app.study.profile_id = "focus-review".into();
+            app.study.connect(true);
+            assert!(app.study.backend.is_some(), "{}", app.study.status);
+            app.study
+                .backend
+                .as_mut()
+                .unwrap()
+                .add_basic_note(1, "What is 2 + 2?", "Four")
+                .unwrap();
+            app.study.refresh();
+            app.study.refresh_review();
+            app.study.review.as_ref().unwrap().card_id
+        };
+        harness.set_size(egui::vec2(1024.0, 700.0));
+        harness.run();
+        harness.get_by_label("Study in focused view").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Study in focused view").click();
+        harness.run();
+        assert!(harness.state().study.is_focused_study());
+        harness.get_by_label("Show answer").click();
+        harness.run();
+        assert!(harness.state().study.revealed);
+        harness.get_by_label("Good").click();
+        harness.run();
+        assert!(harness.state().study.is_focused_study());
+        assert_eq!(harness.state().study.stats.review_events, 1);
+        assert_eq!(
+            harness
+                .state()
+                .study
+                .backend
+                .as_ref()
+                .unwrap()
+                .review_event_count(card_id)
+                .unwrap(),
+            1
+        );
+        harness.get_by_label("Back to decks").click();
+        harness.run();
+        assert!(!harness.state().study.is_focused_study());
+        assert_eq!(harness.state().study.stats.review_events, 1);
+        drop(harness);
+        let reopened = AnkiBackend::open_managed_profile(root.path(), "focus-review").unwrap();
         assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
         reopened.close().unwrap();
     }
