@@ -47,21 +47,47 @@ pub fn search_preview(
         return Err("search must contain 1–128 non-whitespace characters".into());
     }
     let needle = needle.to_lowercase();
-    let mut rows = Vec::new();
+    // Keep only twelve candidates while scanning. Exact Spanish headwords
+    // outrank prefixes, substrings, and finally matches in definitions.
+    // Within each rank preserve original source order.
+    let mut ranked: Vec<(u8, usize, SourceRecord)> = Vec::new();
     let mut matching_count = 0;
     let validated_count = adapter.visit(reader, &mut |record| {
-        let matches = record.word.to_lowercase().contains(&needle)
-            || record
-                .senses
-                .iter()
-                .any(|sense| sense.definition.to_lowercase().contains(&needle));
-        if matches {
-            matching_count += 1;
-            if rows.len() < MAX_PREVIEW_ROWS {
-                rows.push(record);
+        let word = record.word.to_lowercase();
+        let rank = if word == needle {
+            Some(0)
+        } else if word.starts_with(&needle) {
+            Some(1)
+        } else if word.contains(&needle) {
+            Some(2)
+        } else if record
+            .senses
+            .iter()
+            .any(|sense| sense.definition.to_lowercase().contains(&needle))
+        {
+            Some(3)
+        } else {
+            None
+        };
+        let Some(rank) = rank else {
+            return;
+        };
+        matching_count += 1;
+        let position = matching_count;
+        if ranked.len() < MAX_PREVIEW_ROWS {
+            ranked.push((rank, position, record));
+        } else if let Some((worst, _)) = ranked
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, row)| (row.0, row.1))
+        {
+            if rank < ranked[worst].0 {
+                ranked[worst] = (rank, position, record);
             }
         }
     })?;
+    ranked.sort_by_key(|row| (row.0, row.1));
+    let rows = ranked.into_iter().map(|(_, _, record)| record).collect();
     Ok(SourceSearch {
         validated_count,
         matching_count,
@@ -131,6 +157,20 @@ mod tests {
         let meanings = search_preview(&adapter(), &mut Cursor::new(data), "life").unwrap();
         assert_eq!(meanings.matching_count, 1);
         assert_eq!(meanings.rows[0].entry_id, "2");
+    }
+
+    #[test]
+    fn exact_word_outranks_earlier_definition_matches_without_extra_rows() {
+        let mut data = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n".to_owned();
+        for i in 0..25 {
+            data.push_str(&format!("other{i}\tother{i}\tnoun\ts{i}\tThe vida story\n"));
+        }
+        data.push_str("exact\tVIDA\tnoun\ts1\tlife\n");
+        let search = search_preview(&adapter(), &mut Cursor::new(data), "vida").unwrap();
+        assert_eq!(search.validated_count, 26);
+        assert_eq!(search.matching_count, 26);
+        assert_eq!(search.rows.len(), MAX_PREVIEW_ROWS);
+        assert_eq!(search.rows[0].entry_id, "exact");
     }
 
     #[test]
