@@ -487,7 +487,8 @@ impl StudyPanel {
                 break;
             }
             digest.update(&buffer[..count]);
-            copy.write_all(&buffer[..count]).map_err(|e| e.to_string())?;
+            copy.write_all(&buffer[..count])
+                .map_err(|e| e.to_string())?;
         }
         let actual = format!("{:x}", digest.finalize());
         if actual != MEXILEX_STUDY_SHA256 {
@@ -3150,7 +3151,15 @@ mod tests {
             let note_id = panel
                 .add_validated_source_to_provider_deck(&adapter, &path, &rows[0], "s1")
                 .unwrap();
-            assert_eq!(panel.backend.as_ref().unwrap().note_fields(note_id).unwrap()[0], word);
+            assert_eq!(
+                panel
+                    .backend
+                    .as_ref()
+                    .unwrap()
+                    .note_fields(note_id)
+                    .unwrap()[0],
+                word
+            );
             let expected = format!("Tarium::{language}::{provider}");
             assert!(panel
                 .decks

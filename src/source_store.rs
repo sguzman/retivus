@@ -662,22 +662,18 @@ mod tests {
     #[test]
     fn attested_snapshot_digest_is_atomic_and_unattested_import_stays_distinct() {
         let mut catalog = SourceCatalog::in_memory().unwrap();
-        let plain =
-            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ts1\tsea\n";
+        let plain = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ts1\tsea\n";
         let digest = "a".repeat(64);
         assert_eq!(
             catalog
-                .import_authenticated_snapshot(
-                    "verified",
-                    &tsv(),
-                    &mut Cursor::new(plain),
-                    &digest
-                )
+                .import_authenticated_snapshot("verified", &tsv(), &mut Cursor::new(plain), &digest)
                 .unwrap(),
             1
         );
         assert_eq!(
-            catalog.authenticated_export_digest("other-dictionary", "verified").unwrap(),
+            catalog
+                .authenticated_export_digest("other-dictionary", "verified")
+                .unwrap(),
             Some(digest)
         );
         let malformed = format!("{plain}1\tduplicate\tnoun\ts2\twrong\n");
@@ -693,7 +689,10 @@ mod tests {
             .authenticated_export_digest("other-dictionary", "late-invalid")
             .unwrap()
             .is_none());
-        assert_eq!(catalog.counts("other-dictionary", "late-invalid").unwrap(), (0, 0));
+        assert_eq!(
+            catalog.counts("other-dictionary", "late-invalid").unwrap(),
+            (0, 0)
+        );
         catalog
             .import_snapshot("plain", &tsv(), &mut Cursor::new(plain))
             .unwrap();
