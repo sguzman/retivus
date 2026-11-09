@@ -155,6 +155,9 @@ struct Retivus {
     high_contrast: bool,
     reduced_motion: bool,
     source_path: String,
+    source_query: String,
+    source_validated: bool,
+    source_search_active: bool,
     import_status: String,
     source_format: SourceFormat,
     source_id: String,
@@ -180,6 +183,9 @@ impl Default for Retivus {
             high_contrast: false,
             reduced_motion: false,
             source_path: String::new(),
+            source_query: String::new(),
+            source_validated: false,
+            source_search_active: false,
             import_status: "No source checked".into(),
             source_format: SourceFormat::Mexilex,
             source_id: String::new(),
@@ -212,11 +218,22 @@ impl Retivus {
         }
     }
 
+    /// Do not expose stale source selections when the file or its contract changes.
+    fn invalidate_source_preview(&mut self) {
+        self.preview.clear();
+        self.selected_sense = None;
+        self.source_validated = false;
+        self.source_search_active = false;
+        self.import_status = "Source changed; validate again".into();
+    }
+
     /// Single validation path shared by the button and real-profile regression.
     /// A failed replacement source must never leave an earlier choice selected.
     fn validate_source_file(&mut self) {
         self.preview.clear();
         self.selected_sense = None;
+        self.source_validated = false;
+        self.source_search_active = false;
         self.import_status = match self.source_adapter() {
             Err(error) => format!("Invalid source descriptor: {error}"),
             Ok(adapter) => match File::open(&self.source_path) {
@@ -226,12 +243,47 @@ impl Retivus {
                     match retivus::preview::validate_preview(adapter.as_ref(), &mut reader) {
                         Ok(result) => {
                             self.preview = result.rows;
+                            self.source_validated = true;
                             format!(
                                 "Valid records: {} · no learner data changed",
                                 result.validated_count
                             )
                         }
                         Err(error) => format!("Validation failed: {error}"),
+                    }
+                }
+            },
+        };
+    }
+
+    /// Search every record but retain no more than twelve matches.
+    /// A changed or invalid source cannot leave an earlier selection active.
+    fn search_source_file(&mut self) {
+        self.preview.clear();
+        self.selected_sense = None;
+        self.source_validated = false;
+        self.source_search_active = false;
+        self.import_status = match self.source_adapter() {
+            Err(error) => format!("Invalid source descriptor: {error}"),
+            Ok(adapter) => match File::open(&self.source_path) {
+                Err(error) => format!("Could not open source: {error}"),
+                Ok(file) => {
+                    let mut reader = BufReader::new(file);
+                    match retivus::preview::search_preview(
+                        adapter.as_ref(),
+                        &mut reader,
+                        &self.source_query,
+                    ) {
+                        Ok(result) => {
+                            self.preview = result.rows;
+                            self.source_validated = true;
+                            self.source_search_active = true;
+                            format!(
+                                "Matches: {} of {} valid records · showing up to 12 · no cards created",
+                                result.matching_count, result.validated_count
+                            )
+                        }
+                        Err(error) => format!("Search failed: {error}"),
                     }
                 }
             },
@@ -517,6 +569,7 @@ impl eframe::App for Retivus {
                 ui.weak("Read-only validation · never creates cards or changes review history");
                 ui.horizontal(|ui| {
                     let format_label = ui.label("Format");
+                    let previous_format = self.source_format;
                     egui::ComboBox::from_id_salt("source-format")
                         .selected_text(match self.source_format {
                             SourceFormat::Mexilex => "Mexilex study JSONL v1",
@@ -536,9 +589,13 @@ impl eframe::App for Retivus {
                         })
                         .response
                         .labelled_by(format_label.id);
+                    if self.source_format != previous_format {
+                        self.invalidate_source_preview();
+                    }
                 });
                 if self.source_format == SourceFormat::GenericTsv {
                     ui.weak("Supply source identifiers and licensing metadata for this import.");
+                    let mut metadata_changed = false;
                     for (label, value) in [
                         ("Provider ID", &mut self.source_id),
                         ("Edition / snapshot", &mut self.source_edition),
@@ -548,24 +605,47 @@ impl eframe::App for Retivus {
                     ] {
                         ui.horizontal(|ui| {
                             let description = ui.label(label);
-                            ui.add(
-                                egui::TextEdit::singleline(value)
-                                    .desired_width(ui.available_width().min(260.0)),
-                            )
-                            .labelled_by(description.id);
+                            metadata_changed |= ui
+                                .add(
+                                    egui::TextEdit::singleline(value)
+                                        .desired_width(ui.available_width().min(260.0)),
+                                )
+                                .labelled_by(description.id)
+                                .changed();
                         });
+                    }
+                    if metadata_changed {
+                        self.invalidate_source_preview();
                     }
                 }
                 ui.horizontal(|ui| {
                     let label = ui.label("File");
-                    ui.add(
-                        egui::TextEdit::singleline(&mut self.source_path)
-                            .desired_width(ui.available_width().min(300.0)),
-                    )
-                    .labelled_by(label.id);
+                    if ui
+                        .add(
+                            egui::TextEdit::singleline(&mut self.source_path)
+                                .desired_width(ui.available_width().min(300.0)),
+                        )
+                        .labelled_by(label.id)
+                        .changed()
+                    {
+                        self.invalidate_source_preview();
+                    }
                 });
                 if ui.button("Validate source").clicked() {
                     self.validate_source_file();
+                }
+                if self.source_validated {
+                    ui.horizontal_wrapped(|ui| {
+                        let label = ui.label("Find word or meaning");
+                        ui.add(
+                            egui::TextEdit::singleline(&mut self.source_query)
+                                .desired_width(ui.available_width().min(280.0)),
+                        )
+                        .labelled_by(label.id);
+                        if ui.button("Search vocabulary").clicked() {
+                            self.search_source_file();
+                        }
+                    });
                 }
                 #[cfg(feature = "anki-backend")]
                 if self.source_format == SourceFormat::GenericTsv
@@ -631,7 +711,11 @@ impl eframe::App for Retivus {
                     ui.heading("Vocabulary preview");
                     ui.colored_label(
                         secondary,
-                        "First 12 validated records · select one specific sense to review or explicitly add",
+                        if self.source_search_active {
+                            "Up to 12 matching records · select one specific sense"
+                        } else {
+                            "First 12 validated records · select one specific sense to review or explicitly add"
+                        },
                     );
                     for record in &self.preview {
                         ui.push_id((&record.provenance.provider_id, &record.entry_id), |ui| {
@@ -1085,6 +1169,51 @@ mod tests {
         harness.set_size(egui::vec2(720.0, 650.0));
         harness.run();
         assert!(harness.state().selected_sense.is_some());
+    }
+
+    #[test]
+    fn gui_search_keeps_twelve_results_and_invalidates_stale_selection() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("words.tsv");
+        let mut input =
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n".to_owned();
+        for n in 0..40 {
+            input.push_str(&format!(
+                "{n}\tword{n}\tnoun\ts{n}\tlife in Mexico\n"
+            ));
+        }
+        std::fs::write(&file, input).unwrap();
+        let mut app = Retivus {
+            source_path: file.to_string_lossy().into_owned(),
+            source_format: SourceFormat::GenericTsv,
+            source_id: "external-fixture".into(),
+            source_edition: "v1".into(),
+            source_language: "es-MX".into(),
+            definition_language: "en".into(),
+            license_notice: "Test fixture".into(),
+            ..Retivus::default()
+        };
+        app.validate_source_file();
+        assert!(app.source_validated);
+        assert_eq!(app.preview.len(), 12);
+        app.selected_sense = SelectedSense::from_record(&app.preview[0], "s0");
+        assert!(app.selected_sense.is_some());
+        app.source_query = "WORD2".into();
+        app.search_source_file();
+        assert_eq!(app.preview.len(), 11);
+        assert_eq!(app.preview[0].entry_id, "2");
+        assert!(app.source_search_active);
+        assert!(app.import_status.contains("Matches: 11 of 40"));
+        assert!(app.selected_sense.is_none());
+        app.source_query = "no-match".into();
+        app.search_source_file();
+        assert!(app.source_validated);
+        assert!(app.preview.is_empty());
+        assert!(app.import_status.contains("Matches: 0 of 40"));
+        app.source_path = root.path().join("missing").to_string_lossy().into_owned();
+        app.invalidate_source_preview();
+        assert!(!app.source_validated);
+        assert!(!app.source_search_active);
     }
 
     #[test]
