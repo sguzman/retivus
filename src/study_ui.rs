@@ -117,6 +117,25 @@ fn review_card_text_color(dark_mode: bool) -> egui::Color32 {
     }
 }
 
+// Secondary text must remain legible across dark/light appearance, too.
+fn focused_review_secondary_color(dark_mode: bool) -> egui::Color32 {
+    if dark_mode {
+        egui::Color32::from_gray(190)
+    } else {
+        egui::Color32::from_gray(75)
+    }
+}
+
+// Compute the four-button row's left inset, using the available width rather
+// than relying on egui::Ui::vertical_centered to center its nested horizontal row.
+fn rating_row_geometry(available_width: f32, spacing: f32) -> (f32, f32) {
+    let button_width = ((available_width - 3.0 * spacing) / 4.0)
+        .min(105.0)
+        .max(64.0);
+    let row_width = 4.0 * button_width + 3.0 * spacing;
+    (button_width, ((available_width - row_width) * 0.5).max(0.0))
+}
+
 fn live_status(ui: &mut egui::Ui, text: &str) {
     let response = ui.label(text);
     ui.ctx().accesskit_node_builder(response.id, |node| {
@@ -942,13 +961,18 @@ impl StudyPanel {
                 self.focused_study = false;
             }
             ui.separator();
-            ui.strong("Retivus · Study");
+            let dark_mode = ui.visuals().dark_mode;
+            ui.label(
+                egui::RichText::new("Retivus · Study")
+                    .strong()
+                    .color(review_card_text_color(dark_mode)),
+            );
             let deck_name = self
                 .decks
                 .iter()
                 .find(|(id, _)| Some(*id) == self.deck_id)
                 .map_or("Selected deck", |(_, name)| name.as_str());
-            ui.weak(deck_name);
+            ui.colored_label(focused_review_secondary_color(dark_mode), deck_name);
         });
         if !self.focused_study {
             return;
@@ -956,7 +980,10 @@ impl StudyPanel {
         ui.separator();
         ui.vertical_centered(|ui| {
             ui.add_space(12.0);
-            ui.heading("Review");
+            ui.heading(
+                egui::RichText::new("Review")
+                    .color(review_card_text_color(ui.visuals().dark_mode)),
+            );
             let due = format!(
                 "{} new  ·  {} learning  ·  {} review",
                 self.due.0, self.due.1, self.due.2
@@ -1002,10 +1029,13 @@ impl StudyPanel {
             if shown_card.is_some() {
                 if self.revealed {
                     ui.horizontal(|ui| {
+                        let (width, inset) =
+                            rating_row_geometry(ui.available_width(), ui.spacing().item_spacing.x);
+                        ui.add_space(inset);
                         for (rating, name) in [(1, "Again"), (2, "Hard"), (3, "Good"), (4, "Easy")]
                         {
                             if ui
-                                .add_sized([105.0, 42.0], egui::Button::new(name))
+                                .add_sized([width, 42.0], egui::Button::new(name))
                                 .clicked()
                             {
                                 self.grade_revealed(rating);
@@ -1022,9 +1052,15 @@ impl StudyPanel {
                 self.refresh_review();
             }
             ui.add_space(8.0);
-            ui.weak("Cards are scheduled locally using Anki's review engine.");
+            ui.colored_label(
+                focused_review_secondary_color(ui.visuals().dark_mode),
+                "Cards are scheduled locally using Anki's review engine.",
+            );
             if !self.status.is_empty() {
-                ui.label(&self.status);
+                ui.colored_label(
+                    focused_review_secondary_color(ui.visuals().dark_mode),
+                    &self.status,
+                );
             }
         });
     }
@@ -2436,6 +2472,23 @@ mod tests {
         assert_eq!(reopened.note_fields(note_id).unwrap(), ["生", "life"]);
         assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
         reopened.close().unwrap();
+    }
+
+    #[test]
+    fn focused_review_header_and_rating_row_follow_theme_and_centering() {
+        assert_eq!(focused_review_secondary_color(true), egui::Color32::from_gray(190));
+        assert_eq!(focused_review_secondary_color(false), egui::Color32::from_gray(75));
+        for (available, gap) in [(940.0, 6.0), (380.0, 6.0), (280.0, 4.0)] {
+            let (width, inset) = rating_row_geometry(available, gap);
+            let total = width * 4.0 + 3.0 * gap;
+            assert!(inset >= 0.0);
+            if total <= available {
+                assert!((inset * 2.0 + total - available).abs() < 0.01);
+            }
+        }
+        let (width, inset) = rating_row_geometry(940.0, 6.0);
+        assert_eq!(width, 105.0);
+        assert!(inset > 200.0);
     }
 
     #[test]
