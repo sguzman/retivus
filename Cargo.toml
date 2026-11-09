@@ -19,6 +19,8 @@ reqwest = { version = "0.12.28", default-features = false, optional = true }
 eframe = { version = "0.33", default-features = false, features = ["accesskit", "default_fonts", "glow", "persistence", "wayland", "x11"] }
 serde_json = "1"
 rusqlite = { version = "0.36.0", features = ["bundled"] }
+# Authenticate immutable published source exports before learner catalog staging.
+sha2 = "=0.10.9"
 # Match Anki media-index SHA-1 checksums without mutating its sync database.
 sha1 = { version = "=0.10.7", optional = true }
 ttf-parser = "0.25"
