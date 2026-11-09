@@ -601,7 +601,8 @@ impl AnkiBackend {
         if let Some(id) = self.existing_source_note_id(candidate)? {
             return Err(format!(
                 "this exact source meaning is already note {id}; no duplicate card created"
-            ).into());
+            )
+            .into());
         }
         let notetype = self
             .collection
@@ -2131,11 +2132,16 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             .contains(&live.source_tag()));
         assert_ne!(life.source_tag(), live.source_tag());
         assert_eq!(backend.existing_source_note_id(&life).unwrap(), Some(first));
-        assert_eq!(backend.existing_source_note_id(&live).unwrap(), Some(second));
+        assert_eq!(
+            backend.existing_source_note_id(&live).unwrap(),
+            Some(second)
+        );
         let prior = backend.collection_stats().unwrap();
         let duplicate_error = backend.add_source_candidate(deck_id, &life).unwrap_err();
         assert!(
-            duplicate_error.to_string().contains("no duplicate card created"),
+            duplicate_error
+                .to_string()
+                .contains("no duplicate card created"),
             "{duplicate_error}"
         );
         assert_eq!(backend.collection_stats().unwrap().notes, prior.notes);
@@ -2159,7 +2165,10 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             .note_tags(second)
             .unwrap()
             .contains(&live.source_tag()));
-        assert_eq!(reopened.existing_source_note_id(&life).unwrap(), Some(first));
+        assert_eq!(
+            reopened.existing_source_note_id(&life).unwrap(),
+            Some(first)
+        );
         assert!(reopened.add_source_candidate(deck_id, &life).is_err());
         assert_eq!(reopened.collection_stats().unwrap().notes, 2);
         reopened.close().unwrap();
