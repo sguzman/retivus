@@ -18,8 +18,10 @@ The included STATUS.txt intentionally says NOT REVIEWED - DO NOT RELEASE.
 The packet is not a compliance certificate or release authorization.
 The full archives are separate GitHub Actions artifacts: the reviewer must
 download both, independently calculate their hashes and inspect their
-actual contents. Retain the artifacts privately if necessary before the
-normal seven-day GitHub artifact retention expires.
+actual contents. The binary, corresponding source and reviewer packet artifacts are retained
+for 30 days by the release workflows (subject to repository retention policy).
+Download and preserve all three together before they expire; GitHub Actions
+artifacts are temporary evidence, not permanent project archives.
 
 ## Required independent decisions
 
