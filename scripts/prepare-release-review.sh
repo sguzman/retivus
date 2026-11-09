@@ -56,7 +56,7 @@ binary_hash="$(sha256sum "$binary" | cut -d' ' -f1)"
 source_hash="$(sha256sum "$source_archive" | cut -d' ' -f1)"
 lock_hash="$(sha256sum "$binary_dir/Cargo.lock" | cut -d' ' -f1)"
 run_id="not recorded (local packet)"
-if [[ -n "$GITHUB_RUN_ID" ]]; then
+if [[ -n "${GITHUB_RUN_ID:-}" ]]; then
   run_id="$GITHUB_RUN_ID"
 fi
 umask 077
