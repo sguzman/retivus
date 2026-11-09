@@ -708,9 +708,43 @@ impl StudyPanel {
         };
     }
 
-    /// Use one guarded path for both the grade buttons and automated UI-state tests.
-    /// Import a validated source into a durable provider catalog before an
-    /// explicit sense can become a learner note. No homograph guessing.
+    /// Use one deterministic Anki deck per lexical language and source.
+    /// Delimiters and path-like names are refused, not silently normalized
+    /// into a different or colliding provider identity.
+    fn provider_deck_name(info: &retivus::source_adapter::SourceInfo) -> Result<String, String> {
+        info.validate()?;
+        for (label, value) in [
+            ("provider", info.provider_id.as_str()),
+            ("language", info.lexical_language.as_str()),
+        ] {
+            if value.len() > 64
+                || !value
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'.' | b'-' | b'_'))
+            {
+                return Err(format!("unsafe {label} identifier for Tarium deck name"));
+            }
+        }
+        Ok(format!(
+            "Tarium::{}::{}",
+            info.lexical_language, info.provider_id
+        ))
+    }
+
+    /// The learner GUI creates/reuses only the chosen provider's deck, AFTER
+    /// checking the exact immutable source sense. It never bulk-creates notes.
+    pub fn add_validated_source_to_provider_deck(
+        &mut self,
+        adapter: &dyn SourceAdapter,
+        source_path: &Path,
+        record: &SourceRecord,
+        sense_id: &str,
+    ) -> Result<i64, String> {
+        self.add_validated_source_choice_impl(adapter, source_path, record, sense_id, true)
+    }
+
+    /// The explicit-deck bridge remains available to integration callers;
+    /// provider-specific naming is applied by the native learner GUI.
     pub fn add_validated_source_choice(
         &mut self,
         adapter: &dyn SourceAdapter,
@@ -718,7 +752,24 @@ impl StudyPanel {
         record: &SourceRecord,
         sense_id: &str,
     ) -> Result<i64, String> {
-        let deck_id = self.deck_id.ok_or("choose a learner deck first")?;
+        self.add_validated_source_choice_impl(adapter, source_path, record, sense_id, false)
+    }
+
+    /// Import a validated source into a durable catalog before an individual
+    /// selected sense may become an Anki note. Never guess a homograph.
+    fn add_validated_source_choice_impl(
+        &mut self,
+        adapter: &dyn SourceAdapter,
+        source_path: &Path,
+        record: &SourceRecord,
+        sense_id: &str,
+        provider_deck: bool,
+    ) -> Result<i64, String> {
+        let explicit_deck_id = if provider_deck {
+            None
+        } else {
+            Some(self.deck_id.ok_or("choose a learner deck first")?)
+        };
         if self.backend.is_none() {
             return Err("open a Retivus-managed profile first".into());
         }
@@ -735,7 +786,10 @@ impl StudyPanel {
             .iter()
             .find(|sense| sense.sense_id == sense_id)
             .ok_or("selected sense no longer exists")?;
-        let snapshot = if self.snapshot_id.trim().is_empty() {
+        let is_mexilex = adapter.format_id() == "mexilex-study-jsonl-v1";
+        let snapshot = if is_mexilex {
+            "lex-v0.3.0".to_owned()
+        } else if self.snapshot_id.trim().is_empty() {
             record.provenance.edition.clone()
         } else {
             self.snapshot_id.trim().to_owned()
@@ -750,7 +804,6 @@ impl StudyPanel {
             definition: sense.definition.clone(),
         };
         let catalog_file = self.managed_catalog_path()?;
-        let is_mexilex = adapter.format_id() == "mexilex-study-jsonl-v1";
         let mut catalog = match fs::symlink_metadata(&catalog_file) {
             Ok(_) => SourceCatalog::open_existing(&catalog_file)?,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
@@ -782,14 +835,32 @@ impl StudyPanel {
         if actual != expected {
             return Err("source selection differs from the immutable imported snapshot".into());
         }
+        let (deck_id, deck_name) = if provider_deck {
+            let name = Self::provider_deck_name(&actual.provenance)?;
+            let deck_id = self
+                .backend
+                .as_mut()
+                .ok_or("learner profile closed during import")?
+                .create_deck(&name)
+                .map_err(|e| e.to_string())?;
+            (deck_id, Some(name))
+        } else {
+            (explicit_deck_id.ok_or("choose a learner deck first")?, None)
+        };
         let note_id = self
             .backend
             .as_mut()
             .ok_or("learner profile closed during import")?
             .add_source_candidate(deck_id, &actual)
             .map_err(|e| e.to_string())?;
-        self.status =
-            format!("Created note {note_id} from an exact source sense; provenance saved.");
+        if provider_deck {
+            self.deck_id = Some(deck_id);
+        }
+        self.status = if let Some(deck) = deck_name {
+            format!("Created note {note_id} in {deck}; exact source sense and provenance saved.")
+        } else {
+            format!("Created note {note_id} from an exact source sense; provenance saved.")
+        };
         self.refresh();
         self.refresh_review();
         Ok(note_id)
@@ -2949,6 +3020,83 @@ mod tests {
         let reopened = AnkiBackend::open_managed_profile(root.path(), "shutdown").unwrap();
         assert_eq!(reopened.note_fields(note_id).unwrap(), ["vida", "life"]);
         reopened.close().unwrap();
+    }
+
+    #[test]
+    fn separate_language_providers_create_only_explicit_cards_in_own_decks() {
+        use retivus::source_adapter::{SourceInfo, StudyTsvV1};
+        use std::io::Cursor;
+
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "provider-decks".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+
+        for (provider, language, word) in [
+            ("japanese-tarium", "ja", "海"),
+            ("mexican-tarium", "es-MX", "mar"),
+        ] {
+            let adapter = StudyTsvV1::new(SourceInfo {
+                provider_id: provider.into(),
+                edition: "v1".into(),
+                lexical_language: language.into(),
+                definition_language: "en".into(),
+                license_notice: "Synthetic original fixture".into(),
+            })
+            .unwrap();
+            let path = root.path().join(format!("{provider}.tsv"));
+            let data = format!(
+                "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n{provider}\t{word}\tnoun\ts1\tsea\n"
+            );
+            fs::write(&path, &data).unwrap();
+            let mut rows = Vec::new();
+            adapter
+                .visit(&mut BufReader::new(Cursor::new(data)), &mut |row| {
+                    rows.push(row)
+                })
+                .unwrap();
+            assert_eq!(panel.stats.notes, 0.max(panel.stats.notes));
+            let note_id = panel
+                .add_validated_source_to_provider_deck(&adapter, &path, &rows[0], "s1")
+                .unwrap();
+            assert_eq!(panel.backend.as_ref().unwrap().note_fields(note_id).unwrap()[0], word);
+            let expected = format!("Tarium::{language}::{provider}");
+            assert!(panel
+                .decks
+                .iter()
+                .any(|(id, name)| Some(*id) == panel.deck_id && name == &expected));
+        }
+        let decks = panel
+            .decks
+            .iter()
+            .filter(|(_, name)| name.starts_with("Tarium::") && name.matches("::").count() == 2)
+            .count();
+        assert_eq!(decks, 2, "only the two source-specific leaf decks exist");
+        assert_eq!(panel.stats.notes, 2);
+        assert_eq!(panel.stats.review_events, 0);
+        panel.close();
+    }
+
+    #[test]
+    fn unsafe_provider_names_cannot_create_confusing_deck_paths() {
+        use retivus::source_adapter::SourceInfo;
+        let base = SourceInfo {
+            provider_id: "other::Default".into(),
+            edition: "v1".into(),
+            lexical_language: "es-MX".into(),
+            definition_language: "en".into(),
+            license_notice: "Test fixture".into(),
+        };
+        assert!(StudyPanel::provider_deck_name(&base).is_err());
+        let mut changed = base;
+        changed.provider_id = "another-source".into();
+        changed.lexical_language = "es-MX".into();
+        assert_eq!(
+            StudyPanel::provider_deck_name(&changed).unwrap(),
+            "Tarium::es-MX::another-source"
+        );
     }
 
     #[test]
