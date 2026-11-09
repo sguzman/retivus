@@ -313,7 +313,7 @@ impl Retivus {
         let density = storage.and_then(|value| value.get_string(DENSITY_STORAGE_KEY));
         let high_contrast = storage.and_then(|value| value.get_string(HIGH_CONTRAST_STORAGE_KEY));
         let reduced_motion = storage.and_then(|value| value.get_string(REDUCED_MOTION_STORAGE_KEY));
-        let mut app = Self {
+        let app = Self {
             theme: Theme::from_stored(theme.as_deref()),
             ui_scale: parse_scale(scale.as_deref()),
             density: Density::from_stored(density.as_deref()),
@@ -322,10 +322,14 @@ impl Retivus {
             ..Self::default()
         };
         #[cfg(feature = "anki-backend")]
-        app.study.restore_profile_selection(
-            storage.and_then(|value| value.get_string(PROFILE_ROOT_STORAGE_KEY)),
-            storage.and_then(|value| value.get_string(PROFILE_ID_STORAGE_KEY)),
-        );
+        let app = {
+            let mut app = app;
+            app.study.restore_profile_selection(
+                storage.and_then(|value| value.get_string(PROFILE_ROOT_STORAGE_KEY)),
+                storage.and_then(|value| value.get_string(PROFILE_ID_STORAGE_KEY)),
+            );
+            app
+        };
         app
     }
 }
