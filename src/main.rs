@@ -780,7 +780,10 @@ mod tests {
             });
             let _ = ctx.run(egui::RawInput::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| {
-                    assert_eq!(source_preview_text_colors(ui.visuals().dark_mode).0, expected);
+                    assert_eq!(
+                        source_preview_text_colors(ui.visuals().dark_mode).0,
+                        expected
+                    );
                 });
             });
         }
