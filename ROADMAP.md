@@ -2,7 +2,7 @@
 
 **Scope freeze:** general-purpose Rust/egui spaced repetition with demonstrable Anki interoperability **and** independently versioned external data sources. [Product definition](docs/product.md). The [architecture gate](docs/architecture.md) decides how to reuse Anki's Rust backend without guessing. All weights represent **whole-project acceptance**, not arbitrary percentages of code written.
 
-**Verified progress:** **89%** of 100% (previous 87%, current 89%, **Δ +2 percentage points** this continuation). Verified package interoperability, source-neutral provider integration, FSRS persistence, archive privacy, and cross-layer end-to-end regressions are green. Owner-approved local-only v1 scope explicitly defers AnkiWeb sync without claiming it works; physical accessibility and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
+**Verified progress:** **89%** of 100% (previous 87%, current 89%, **Δ +2 percentage points** this continuation). Verified package interoperability, source-neutral provider integration, FSRS persistence, archive privacy, and cross-layer end-to-end regressions are green. Owner-approved local-only v1 scope explicitly defers AnkiWeb sync without claiming it works; physical desktop keyboard/layout QA and release acceptance remain pending. Milestone weights distribute work across all eight milestones.
 
 **Status key:** ✅ verified complete · 🟡 active · ⏳ pending · 🚫 blocked. Each numbered line is one independently checkable work item; an item contributes its full specified weight only after its acceptance passes. No partial credit for drafts.
 
@@ -20,7 +20,7 @@
 ## Current continuation — 2026-11-09 (89%, Δ +0 percentage points)
 
 - ✅ **M3/M5 verified scope hardening, no additional acceptance credit:** Published Mexilex `lex-v0.3.0` source files now undergo a pinned SHA-256 check and immutable copy before the local per-profile catalog transaction records a verification attestation. Importing the full 124,444-entry / 155,586-sense source snapshot does **not** create cards. The native learner explicitly creates only the selected verified sense in a separate `Tarium::<lexical_language>::<provider_id>` deck; future language sources use the same provider-neutral mechanism. Existing `Default` cards and reviews remain separate. The source preview/search is still capped at **12 rows**, with exact Spanish word matches ranked before definition matches. [Rust foundation 42558445949](https://github.com/sguzman/retivus/actions/runs/42558445949), [end-to-end 42558445923](https://github.com/sguzman/retivus/actions/runs/42558445923), and [full published provider verification 42557748037](https://github.com/sguzman/retivus/actions/runs/42557748037) passed; physical user QA of the new source-to-card workflow is pending.
-- ⏳ **Unchanged release gates:** human physical Wayland/Orca acceptance (M6.4) and independent actual-artifact licensing/release signoff (M7). Remote AnkiWeb sync remains a separately approved post-v1 scope, not production validated.
+- ⏳ **Revised, owner-confirmed v1 QA scope (2026-11-09):** M6.4 requires real Wayland keyboard/focus, narrow/wide scaling, contrast/motion and review/restart behavior, plus the existing automated smoke. **Orca or another screen reader is not required** for v1 acceptance; historical Orca investigation remains optional technical work, not a gate or a task imposed on the owner. This supersedes earlier Orca-mandatory statements in historical checkpoints without claiming that screen-reader support is fully verified. Independent actual-artifact licensing/release signoff (M7) remains required. AnkiWeb sync remains explicitly post-v1.
 
 ## Current continuation — 2026-11-08 (89%, Δ +2 percentage points)
 
@@ -132,7 +132,7 @@
 - ✅ **M6.1 🧪 Repeatable fixtures/CI for backend, provider, scheduler and .apkg** — **3%**. Acceptance: End-to-end regression tests green. Depends on: M2,M3,M4. **verified complete.**
 - ✅ **M6.2 ⚡ Large dataset streaming, search and memory benchmarks** — **3%**. Acceptance: 124444-record Mexilex load without unbounded UI RAM. Depends on: M3.2,M5.3. **verified complete.**
 - ✅ **M6.3 🛡️ Corrupt/malicious archive, Unicode, media path and credential guards** — **3%**. Acceptance: Adversarial tests block zip slip, malformed data and leaks. Depends on: M4.1,M3.2. **verified complete.**
-- ⏳ **M6.4 ♿ Keyboard, screen scaling, focus and accessibility regression** — **3%**. Acceptance: Real system QA checklist and automated smoke pass. Depends on: M5.6. **pending.**
+- ⏳ **M6.4 ♿ Keyboard, screen scaling, focus and native UI regression** — **3%**. Acceptance: On a real Wayland desktop, the actual installed learner passes keyboard navigation/focus, narrow and wide window layout, contrast/reduced-motion controls, review/undo and restart persistence; existing automated native UI smoke passes. An Orca or other screen-reader test is optional and **not** a v1 acceptance gate. Depends on: M5.6. **pending human QA.**
 
 ### 🚀 M7: Release, installation and handoff (8% of project)
 

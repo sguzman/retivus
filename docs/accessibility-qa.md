@@ -1,6 +1,18 @@
 # Native accessibility QA — development acceptance checklist
 
-This document scopes **M6.4** against Retivus's actual Rust/egui desktop UI. Automation is necessary but does not replace a screen-reader or assistive-technology evaluation. Keep unverified items pending.
+This document scopes **M6.4** against Retivus's actual Rust/egui desktop UI. The owner clarified on 2026-11-09 that Orca was never an approved personal-QA or v1 release requirement. Historical screen-reader investigation remains documented below but is **optional and outside M6.4 acceptance**. Do not infer verified screen-reader behavior from headless tests.
+
+## Current M6.4 v1 acceptance — physical native UI, no screen reader required
+
+Use the already installed Anki-enabled Retivus on the owner's real Wayland desktop; do not reinstall the app or touch an ordinary Anki profile just for QA. Record the tested app/build revision when available. Existing automated native smoke and keyboard regressions must pass, but only a human can sign off on the real-workstation behavior:
+
+1. Open the existing, separate Retivus-owned learner profile and its existing Tarium provider deck. Confirm no cards were bulk-created merely by importing a provider source.
+2. Exercise one ordinary card's reveal, grading and undo, then close and reopen the same managed profile. Confirm the expected card, due state and review history persist.
+3. Navigate the main review and source-selection controls by keyboard (including forward and reverse focus), and check both narrow (~720×650) and wide (~1080×800) windows for clipping, hidden actions or unexpected focus changes.
+4. Inspect System/Light/Dark appearance, high contrast and reduced motion, especially legible text and controls in dark mode. Capture only a reproducible issue description or a voluntarily shared screenshot; never export private learner history for this checklist.
+5. Mark M6.4 complete only after the actual owner reports these checks passing and the automated smoke stays green. An observed defect keeps M6.4 pending until fixed and retested.
+
+**Optional assistive-technology research:** the Orca debug harness and existing issue #1 can continue as a separate nonblocking accessibility investigation, only with an opt-in tester. They do not change v1 completion percentages and no one should be asked to install Orca for normal QA.
 
 ## Native platform accessibility bridge
 
@@ -12,7 +24,7 @@ Retivus disables eframe default features to control its native build. Its explic
 
 The strict [Orca screen-reader CI run 41888204577](https://github.com/sguzman/retivus/actions/runs/41888204577) **passed on both Ubuntu 24.04 and ubuntu-latest** at `f738602`. In isolated Xvfb sessions, a real Retivus button activation changed the externally inspected AT-SPI status, and actual Orca Speech Dispatcher output recorded both the changed source-validation announcement and five named controls. The test does not pass on mere accessible-event delivery or a screenshot. [Rust foundation 41888204791](https://github.com/sguzman/retivus/actions/runs/41888204791) passed at the same commit.
 
-The separately required **real physical Wayland + Orca evaluation** remains unperformed and is **M6.4 0/3**: review/conflict scenes, due-card and changing status speech, actual keyboard accessibility, high contrast, reduced motion, and narrow/wide layouts require personally heard and observed evidence. Headless speech dispatch is not proof of physical audible output.
+The earlier roadmap treated a **real physical Wayland + Orca evaluation** as mandatory and unperformed. That requirement was **withdrawn for v1 by the owner on 2026-11-09**; M6.4 still has **0/3** points pending the current native keyboard/layout/review QA checklist above. Headless speech dispatch is not proof of physical audible output.
 
 The physical harness was hardened in [fbed4f2](https://github.com/sguzman/retivus/commit/fbed4f24b56ca374144e81adc3e2e89d8bfd269a), [5e0d06c](https://github.com/sguzman/retivus/commit/5e0d06cd00d90580c183c4244d13f5959a50c35b), and [9eea254](https://github.com/sguzman/retivus/commit/9eea254681acd9d10dc05801d0e392921d84bd74). It checks for a running Orca process and an explicit human confirmation of heard speech, records the tested binary's SHA-256, refuses a binary replaced during the session, and marks interrupted sessions incomplete. A separate structural auditor rejects malformed, missing, duplicated, or skipped scenario rows. [Foundation CI 41897680655](https://github.com/sguzman/retivus/actions/runs/41897680655) passed its shell contract, synthetic audit regressions, Rust checks and GUI smoke. These tests do **not** authenticate a human report or grant M6.4 acceptance.
 

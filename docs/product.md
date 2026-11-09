@@ -19,7 +19,7 @@
 
 ## Release boundary
 
-A 100% first stable release requires the complete selected roadmap, including real Anki package interoperability and one production-ready external-provider import and upgrade flow, persistent review scheduling, tested GUI, packaging, and an appropriate license. Automatic AnkiWeb sync is only accepted if upstream compatibility and account safety tests pass. The owner explicitly chose the documented **post-v1 classification** on 2026-11-08; therefore this is **not a v1 dependency** and is not represented as validated. The physical accessibility and release gates remain mandatory.
+A 100% first stable release requires the complete selected roadmap, including real Anki package interoperability and one production-ready external-provider import and upgrade flow, persistent review scheduling, tested GUI, packaging, and an appropriate license. Automatic AnkiWeb sync is only accepted if upstream compatibility and account safety tests pass. The owner explicitly chose the documented **post-v1 classification** on 2026-11-08; therefore this is **not a v1 dependency** and is not represented as validated. Real-workstation keyboard, focus, scaling, contrast/reduced-motion and review/restart usability QA remains mandatory, as do licensing and release acceptance. Per the owner's 2026-11-09 clarification, installing or using Orca is **not** a prerequisite for user QA or v1 release. Independent screen-reader evaluation may proceed separately if explicitly requested and must not be represented as verified without evidence.
 
 ## Exclusions
 
