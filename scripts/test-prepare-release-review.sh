@@ -32,13 +32,13 @@ if bash "$script" "$binary_dir" "$source_dir" "$commit" "$output" >/dev/null 2>&
   exit 1
 fi
 # Reject ambiguous binary archives, without creating an output.
-cp "$binary" "$binary_dir/another-retivus-0.1.0-linux-x86_64.tar.zst"
+cp "$binary" "$binary_dir/retivus-0.2.0-linux-x86_64.tar.zst"
 if bash "$script" "$binary_dir" "$source_dir" "$commit" "$root/ambiguous" >/dev/null 2>&1; then
   echo 'Accepted ambiguous archive' >&2
   exit 1
 fi
 test ! -e "$root/ambiguous"
-rm "$binary_dir/another-retivus-0.1.0-linux-x86_64.tar.zst"
+rm "$binary_dir/retivus-0.2.0-linux-x86_64.tar.zst"
 # Reject a tampered archive even when its sidecar is still present.
 printf 'tampering\n' >> "$binary"
 if bash "$script" "$binary_dir" "$source_dir" "$commit" "$root/tampered" >/dev/null 2>&1; then
