@@ -94,6 +94,16 @@ impl Density {
     }
 }
 
+// The source preview uses theme-explicit text colors. Strong labels were
+// almost black against the dark panel in the native UI.
+fn source_preview_text_colors(dark_mode: bool) -> (egui::Color32, egui::Color32) {
+    if dark_mode {
+        (egui::Color32::WHITE, egui::Color32::from_gray(195))
+    } else {
+        (egui::Color32::BLACK, egui::Color32::from_gray(75))
+    }
+}
+
 fn parse_scale(value: Option<&str>) -> f32 {
     value
         .and_then(|raw| raw.parse::<f32>().ok())
@@ -586,12 +596,24 @@ impl eframe::App for Retivus {
                 });
                 if let Some(chosen) = self.selected_sense.clone() {
                     ui.group(|ui| {
+                        let (foreground, secondary) =
+                            source_preview_text_colors(ui.visuals().dark_mode);
                         ui.heading("Selected source meaning");
-                        ui.strong(format!("{} → {}", chosen.word, chosen.definition));
-                        ui.weak(format!(
-                            "Provider {} · edition {} · entry {} · sense {}",
-                            chosen.provider_id, chosen.edition, chosen.entry_id, chosen.sense_id
-                        ));
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{} → {}",
+                                chosen.word, chosen.definition
+                            ))
+                            .strong()
+                            .color(foreground),
+                        );
+                        ui.colored_label(
+                            secondary,
+                            format!(
+                                "Provider {} · edition {} · entry {} · sense {}",
+                                chosen.provider_id, chosen.edition, chosen.entry_id, chosen.sense_id
+                            ),
+                        );
                         #[cfg(not(feature = "anki-backend"))]
                         ui.label("Preview only. Enable the Anki backend to create study notes from validated source senses.");
                         #[cfg(feature = "anki-backend")]
@@ -603,19 +625,28 @@ impl eframe::App for Retivus {
                     });
                 }
                 if !self.preview.is_empty() {
+                    let (foreground, secondary) =
+                        source_preview_text_colors(ui.visuals().dark_mode);
                     ui.separator();
                     ui.heading("Vocabulary preview");
-                    ui.weak("First 12 validated records · select one specific sense to review or explicitly add");
+                    ui.colored_label(
+                        secondary,
+                        "First 12 validated records · select one specific sense to review or explicitly add",
+                    );
                     for record in &self.preview {
                         ui.push_id((&record.provenance.provider_id, &record.entry_id), |ui| {
                             ui.group(|ui| {
                                 ui.horizontal(|ui| {
-                                    ui.strong(&record.word);
-                                    ui.weak(&record.part_of_speech);
+                                    ui.label(
+                                        egui::RichText::new(&record.word)
+                                            .strong()
+                                            .color(foreground),
+                                    );
+                                    ui.colored_label(secondary, &record.part_of_speech);
                                 });
                                 for sense in record.senses.iter().take(3) {
                                     ui.horizontal_wrapped(|ui| {
-                                        ui.label(&sense.definition);
+                                        ui.colored_label(foreground, &sense.definition);
                                         if ui.small_button("Select sense").clicked() {
                                             self.selected_sense =
                                                 SelectedSense::from_record(record, &sense.sense_id);
@@ -628,7 +659,7 @@ impl eframe::App for Retivus {
                                         |ui| {
                                             for sense in record.senses.iter().skip(3) {
                                                 ui.horizontal_wrapped(|ui| {
-                                                    ui.label(&sense.definition);
+                                                    ui.colored_label(foreground, &sense.definition);
                                                     if ui.small_button("Select sense").clicked() {
                                                         self.selected_sense =
                                                             SelectedSense::from_record(
@@ -725,6 +756,33 @@ mod tests {
             };
             eframe::App::save(&mut first, &mut storage);
             assert_eq!(Retivus::restore(Some(&storage)).theme, theme);
+        }
+    }
+
+    #[test]
+    fn source_preview_text_colors_follow_light_and_dark_themes() {
+        assert_eq!(
+            source_preview_text_colors(true),
+            (egui::Color32::WHITE, egui::Color32::from_gray(195))
+        );
+        assert_eq!(
+            source_preview_text_colors(false),
+            (egui::Color32::BLACK, egui::Color32::from_gray(75))
+        );
+        for (theme, expected) in [
+            (egui::Theme::Dark, egui::Color32::WHITE),
+            (egui::Theme::Light, egui::Color32::BLACK),
+        ] {
+            let ctx = egui::Context::default();
+            ctx.set_theme(match theme {
+                egui::Theme::Dark => egui::ThemePreference::Dark,
+                egui::Theme::Light => egui::ThemePreference::Light,
+            });
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    assert_eq!(source_preview_text_colors(ui.visuals().dark_mode).0, expected);
+                });
+            });
         }
     }
 
