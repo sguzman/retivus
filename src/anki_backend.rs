@@ -557,6 +557,37 @@ impl AnkiBackend {
         Ok(note.id.0)
     }
 
+    /// Find an exact source identity without relying on word spelling, deck,
+    /// or the bounded 50-note UI browser. The SQL substring narrows candidates;
+    /// exact decoded Anki tags decide identity, avoiding hex-prefix collisions.
+    pub fn existing_source_note_id(
+        &self,
+        candidate: &SourceCardCandidate,
+    ) -> BackendResult<Option<i64>> {
+        let tag = candidate.source_tag();
+        let mut statement = self
+            .collection
+            .storage
+            .db()
+            .prepare("SELECT id FROM notes WHERE instr(tags, ?1) > 0 ORDER BY id")?;
+        let candidates = statement.query_map([&tag], |row| row.get::<_, i64>(0))?;
+        let mut exact = None;
+        for id in candidates {
+            let id = id?;
+            if let Some(note) = self.collection.storage.get_note(NoteId(id))? {
+                if note.tags.iter().any(|existing| existing == &tag) {
+                    if exact.is_some() {
+                        return Err(
+                            "multiple notes already carry this exact source identity; resolve the existing conflict before adding".into()
+                        );
+                    }
+                    exact = Some(id);
+                }
+            }
+        }
+        Ok(exact)
+    }
+
     /// Materialize only a user-selected source sense. The separate source
     /// catalog remains read-only; Anki owns the new note, cards and review state.
     pub fn add_source_candidate(
@@ -566,6 +597,11 @@ impl AnkiBackend {
     ) -> BackendResult<i64> {
         if candidate.word.trim().is_empty() || candidate.definition.trim().is_empty() {
             return Err("selected source word and definition must be nonempty".into());
+        }
+        if let Some(id) = self.existing_source_note_id(candidate)? {
+            return Err(format!(
+                "this exact source meaning is already note {id}; no duplicate card created"
+            ).into());
         }
         let notetype = self
             .collection
@@ -2094,9 +2130,25 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             .unwrap()
             .contains(&live.source_tag()));
         assert_ne!(life.source_tag(), live.source_tag());
+        assert_eq!(backend.existing_source_note_id(&life).unwrap(), Some(first));
+        assert_eq!(backend.existing_source_note_id(&live).unwrap(), Some(second));
+        let prior = backend.collection_stats().unwrap();
+        let duplicate_error = backend.add_source_candidate(deck_id, &life).unwrap_err();
+        assert!(
+            duplicate_error.to_string().contains("no duplicate card created"),
+            "{duplicate_error}"
+        );
+        assert_eq!(backend.collection_stats().unwrap().notes, prior.notes);
+        assert_eq!(backend.collection_stats().unwrap().cards, prior.cards);
+        // A longer hex identity shares the exact prefix of the earlier tag
+        // but must not be mistaken for the same source sense.
+        let mut separate = life.clone();
+        separate.sense_id = "one-extra".into();
+        assert!(separate.source_tag().starts_with(&life.source_tag()));
+        assert_eq!(backend.existing_source_note_id(&separate).unwrap(), None);
         backend.close().unwrap();
 
-        let reopened = AnkiBackend::open_managed_profile(tmp.path(), "source").unwrap();
+        let mut reopened = AnkiBackend::open_managed_profile(tmp.path(), "source").unwrap();
         assert_eq!(reopened.note_fields(first).unwrap(), ["生", "life"]);
         assert_eq!(reopened.note_fields(second).unwrap(), ["生", "to live"]);
         assert!(reopened
@@ -2107,6 +2159,9 @@ width="2" height="2"><rect width="2" height="2" fill="black"/></svg>"#;
             .note_tags(second)
             .unwrap()
             .contains(&live.source_tag()));
+        assert_eq!(reopened.existing_source_note_id(&life).unwrap(), Some(first));
+        assert!(reopened.add_source_candidate(deck_id, &life).is_err());
+        assert_eq!(reopened.collection_stats().unwrap().notes, 2);
         reopened.close().unwrap();
     }
 
