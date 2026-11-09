@@ -44,6 +44,9 @@ jobs:
           test -s data/study/release-manifest.json
           node -e 'const m=require("./data/study/release-manifest.json");if(m.format_version!==1||m.project!=="mexilex"||m.version!=="0.3.0"||m.lexical_language!=="es-MX"||m.definition_language!=="en"||!m.source_git_commit)process.exit(1)'
           test "$(wc -l < data/study/study.jsonl)" -eq 124444
+          # This digest identifies the uncompressed immutable JSONL itself,
+          # so the native GUI can refuse locally regenerated/unverified data.
+          sha256sum data/study/study.jsonl
       - name: Stream-validate all real study records with Retivus
         run: |
           cargo run --bin check-source -- data/study/study.jsonl | tee data/validation-result.txt
