@@ -846,12 +846,15 @@ mod tests {
     #[test]
     fn last_successful_profile_is_restored_without_automatically_opening_it() {
         let root = tempfile::tempdir().unwrap();
+        let backend =
+            retivus::anki_backend::AnkiBackend::create_managed_profile(root.path(), "daily")
+                .unwrap();
+        backend.close().unwrap();
         let mut app = Retivus::default();
-        app.study.root = root.path().to_string_lossy().into_owned();
-        app.study.profile_id = "daily".into();
-        app.study.connect(true);
-        assert!(app.study.is_connected());
-        app.study.close();
+        app.study.restore_profile_selection(
+            Some(root.path().to_string_lossy().into_owned()),
+            Some("daily".into()),
+        );
 
         let mut storage = TestStorage::default();
         eframe::App::save(&mut app, &mut storage);
