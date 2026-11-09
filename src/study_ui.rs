@@ -3183,7 +3183,10 @@ mod tests {
             let error = panel
                 .add_validated_source_to_provider_deck(&adapter, &path, &rows[0], "s1")
                 .unwrap_err();
-            assert!(error.contains("no duplicate card or deck created"), "{error}");
+            assert!(
+                error.contains("no duplicate card or deck created"),
+                "{error}"
+            );
             assert_eq!(panel.decks, decks_before);
             assert_eq!(panel.stats, stats_before);
         }
