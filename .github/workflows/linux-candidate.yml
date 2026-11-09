@@ -9,6 +9,8 @@ on:
       - scripts/audit-license-files.sh
       - scripts/audit-parent-notices.sh
       - scripts/check-source-parity.sh
+      - scripts/prepare-release-review.sh
+      - scripts/test-prepare-release-review.sh
       - Cargo.toml
       - Cargo.lock
       - scripts/package-linux.sh
@@ -248,69 +250,15 @@ jobs:
           set -euo pipefail
           binary_dir="$RUNNER_TEMP/binary"
           source_dir="$RUNNER_TEMP/source"
-          # actions/upload-artifact keeps dist/ beneath the download root
-          # when Cargo.lock is included at the repository top level.
-          # Reject missing or ambiguous archives instead of hashing "".
-          mapfile -t binary_candidates < <(
-            find "$binary_dir" -type f -name 'retivus-*-linux-x86_64.tar.zst' -print
-          )
-          mapfile -t source_candidates < <(
-            find "$source_dir" -type f -name "retivus-source-$GITHUB_SHA.tar.zst" -print
-          )
-          if (( ${#binary_candidates[@]} != 1 || ${#source_candidates[@]} != 1 )); then
-            echo 'Expected exactly one binary and one corresponding-source archive' >&2
-            exit 1
-          fi
-          binary="${binary_candidates[0]}"
-          source="${source_candidates[0]}"
+          binary="$(find "$binary_dir" -type f -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
           test -s "$binary"
-          test -s "$source"
-          test -s "$binary_dir/Cargo.lock"
-          # The preceding parity job step already verified both sidecars,
-          # exact commit/lockfile, source parity and all notice inventories.
-          packet="$RUNNER_TEMP/retivus-release-review"
-          mkdir -m 700 "$packet"
-          printf 'NOT REVIEWED - DO NOT RELEASE\n' > "$packet/STATUS.txt"
-          for name in SOURCE-AUDIT.txt THIRD-PARTY-SOURCES.tsv LICENSE-FILE-AUDIT.tsv \
-            PARENT-NOTICE-REVIEW.tsv LINUX-TARGET-DEPENDENCIES.tsv LINUX-TARGET-NOTICE-REVIEW.tsv; do
-            cp "$source_dir/$name" "$packet/$name"
-          done
-          {
-            echo '# Retivus independent release review - NOT APPROVED'
-            echo
-            echo "Retivus commit: $GITHUB_SHA"
-            echo "GitHub Actions run: $GITHUB_RUN_ID"
-            echo "Binary candidate: $(basename "$binary")"
-            sha256sum "$binary"
-            echo "Vendored corresponding-source candidate: $(basename "$source")"
-            sha256sum "$source"
-            echo 'Candidate Cargo.lock SHA-256:'
-            sha256sum "$binary_dir/Cargo.lock"
-            echo
-            echo 'Automated archive checksum and binary/source parity checks passed.'
-            echo 'No third-party notice sufficiency or legal disposition is implied.'
-            echo 'Physical Wayland/Orca M6.4 acceptance remains separate.'
-            echo 'This ledger is UNREVIEWED and does not authorize a tag/release.'
-            echo
-            echo 'Reviewer name/affiliation: UNASSIGNED'
-            echo 'UTC review date: UNRECORDED'
-            echo 'Independently reverified archive hashes: NO'
-            echo 'AGPL/Anki/MIT notice and corresponding-source review: PENDING'
-            echo 'Linux-target and all-platform dependency review: PENDING'
-            echo 'dispatch 0.2.0 author-companion MIT decision: PENDING'
-            echo 'htmlescape 0.3.1 Debian independent attribution: PENDING'
-            echo 'hexf-parse 0.2.1 Debian CC0 evidence: PENDING'
-            echo 'Other upstream/parent notices and provider data rights: PENDING'
-            echo 'Physical Wayland/Orca evidence: NONE'
-            echo 'Install/upgrade/recovery on same archives: PENDING'
-            echo 'Reviewer disposition/accepted exceptions: NO RELEASE'
-            echo 'Owner approval and public release decision: NOT GRANTED'
-          } > "$packet/REVIEW.md"
-          (cd "$packet" && sha256sum \
-            SOURCE-AUDIT.txt THIRD-PARTY-SOURCES.tsv LICENSE-FILE-AUDIT.tsv \
-            PARENT-NOTICE-REVIEW.tsv LINUX-TARGET-DEPENDENCIES.tsv \
-            LINUX-TARGET-NOTICE-REVIEW.tsv REVIEW.md > PACKET-SHA256SUMS)
-          grep -Fx 'NOT REVIEWED - DO NOT RELEASE' "$packet/STATUS.txt"
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          tar --zstd -xf "$binary" -C "$tmp"
+          root="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d -name 'retivus-*-linux-x86_64' -print -quit)"
+          test -s "$root/share/doc/retivus/source/scripts/prepare-release-review.sh"
+          bash "$root/share/doc/retivus/source/scripts/prepare-release-review.sh" \
+            "$binary_dir" "$source_dir" "$GITHUB_SHA" "$RUNNER_TEMP/retivus-release-review"
       - name: Retain unsigned independent release review packet
         uses: actions/upload-artifact@v4
         with:

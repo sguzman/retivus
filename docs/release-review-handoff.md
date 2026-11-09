@@ -39,3 +39,5 @@ normal seven-day GitHub artifact retention expires.
 
 No roadmap credit or approval is earned by generating this packet. Nothing
 in this document authorizes a tag, production release or legal disposition.
+
+The packet writer is `scripts/prepare-release-review.sh`; its fail-closed archive and unsigned-status behavior is checked using *synthetic* fixtures by `scripts/test-prepare-release-review.sh` in the Linux installer contract workflow. This test does not replace real artifact parity, the independent offline-source rebuild, or any human acceptance gate.

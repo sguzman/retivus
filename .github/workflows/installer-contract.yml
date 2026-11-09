@@ -6,6 +6,8 @@ on:
       - scripts/install-linux-candidate.sh
       - scripts/uninstall-linux-candidate.sh
       - scripts/test-installer-contract.sh
+      - scripts/prepare-release-review.sh
+      - scripts/test-prepare-release-review.sh
   workflow_dispatch:
 permissions:
   contents: read
@@ -20,5 +22,9 @@ jobs:
           bash -n scripts/install-linux-candidate.sh
           bash -n scripts/uninstall-linux-candidate.sh
           bash -n scripts/test-installer-contract.sh
+          bash -n scripts/prepare-release-review.sh
+          bash -n scripts/test-prepare-release-review.sh
       - name: Run isolated update, rollback, symlink and data-preservation matrix
         run: bash scripts/test-installer-contract.sh
+      - name: Test unsigned release-review packet safety using synthetic archives
+        run: bash scripts/test-prepare-release-review.sh
