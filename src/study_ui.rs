@@ -3034,10 +3034,13 @@ mod tests {
         panel.connect(true);
         assert!(panel.backend.is_some(), "{}", panel.status);
 
-        for (provider, language, word) in [
+        for (index, (provider, language, word)) in [
             ("japanese-tarium", "ja", "海"),
             ("mexican-tarium", "es-MX", "mar"),
-        ] {
+        ]
+        .into_iter()
+        .enumerate()
+        {
             let adapter = StudyTsvV1::new(SourceInfo {
                 provider_id: provider.into(),
                 edition: "v1".into(),
@@ -3057,7 +3060,7 @@ mod tests {
                     rows.push(row)
                 })
                 .unwrap();
-            assert_eq!(panel.stats.notes, 0.max(panel.stats.notes));
+            assert_eq!(panel.stats.notes, index);
             let note_id = panel
                 .add_validated_source_to_provider_deck(&adapter, &path, &rows[0], "s1")
                 .unwrap();
