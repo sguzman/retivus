@@ -1158,6 +1158,30 @@ mod tests {
         // Actual AccessKit role+name, not only the visual label text:
         // AT-SPI requires this changing name for a live announcement.
         let _ = harness.get_by_role_and_label(egui::accesskit::Role::Status, &status_name);
+
+        // Drive the actual search controls; no flashcard or private history
+        // changes occur during read-only vocabulary lookup.
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Find word or meaning")
+            .scroll_to_me();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Find word or meaning")
+            .focus();
+        harness.run();
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "Find word or meaning")
+            .type_text("bridge");
+        harness.run();
+        harness.get_by_label("Search vocabulary").scroll_to_me();
+        harness.run();
+        harness.get_by_label("Search vocabulary").click();
+        harness.run();
+        assert_eq!(harness.state().preview.len(), 1);
+        assert!(harness.state().import_status.contains("Matches: 1 of 1"));
+        assert!(harness.state().source_search_active);
+        assert!(harness.state().selected_sense.is_none());
+
         harness.get_by_label("Select sense").scroll_to_me();
         harness.run();
         harness.get_by_label("Select sense").click();

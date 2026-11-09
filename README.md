@@ -36,6 +36,8 @@ cargo run --features anki-backend --bin retivus
 cargo test --features anki-backend --bin retivus
 ```
 
+The source validation screen also offers a **read-only word/definition search** after validation. Searches check the full source but retain at most **12 matching records** in the GUI; they never bulk-create flashcards, and changing the file or provider clears stale selections. Adding a Mexilex sense as a study card still requires a verified release snapshot in the managed source catalog.
+
 The learner workspace never automatically opens your ordinary Anki profile. Choose an existing profile root and a separate Retivus profile ID, then explicitly create/open it. Review grades and undo use the pinned Anki scheduler. Package import/export accepts explicitly chosen absolute `.apkg` paths, checks archives before importing, and refuses export overwrites. Imports and exports each exclude personal review/scheduling history by default, with separate explicit opt-ins. The preview can stage exact senses from a user-described generic TSV source into the profile's SQLite source catalog; raw Mexilex JSONL is **preview-only** until its release archive has been independently checksum/rights-verified and imported into that catalog. Source identities are never guessed from word spellings. Rendered card HTML is currently shown as inert text, not executed as a web page. This is a development feature, **not** a finished release or AnkiWeb sync client.
 
 ## License
