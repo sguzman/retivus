@@ -17,6 +17,11 @@
 | 🧪 M6 Integration hardening, performance and correctness | 12% | 9% | 🟡 |
 | 🚀 M7 Release, installation and handoff | 8% | 0% | ⏳ |
 
+## Current continuation — 2026-11-09 (89%, Δ +0 percentage points)
+
+- ✅ **M3/M5 verified scope hardening, no additional acceptance credit:** Published Mexilex `lex-v0.3.0` source files now undergo a pinned SHA-256 check and immutable copy before the local per-profile catalog transaction records a verification attestation. Importing the full 124,444-entry / 155,586-sense source snapshot does **not** create cards. The native learner explicitly creates only the selected verified sense in a separate `Tarium::<lexical_language>::<provider_id>` deck; future language sources use the same provider-neutral mechanism. Existing `Default` cards and reviews remain separate. The source preview/search is still capped at **12 rows**, with exact Spanish word matches ranked before definition matches. [Rust foundation 42558445949](https://github.com/sguzman/retivus/actions/runs/42558445949), [end-to-end 42558445923](https://github.com/sguzman/retivus/actions/runs/42558445923), and [full published provider verification 42557748037](https://github.com/sguzman/retivus/actions/runs/42557748037) passed; physical user QA of the new source-to-card workflow is pending.
+- ⏳ **Unchanged release gates:** human physical Wayland/Orca acceptance (M6.4) and independent actual-artifact licensing/release signoff (M7). Remote AnkiWeb sync remains a separately approved post-v1 scope, not production validated.
+
 ## Current continuation — 2026-11-08 (89%, Δ +2 percentage points)
 
 - ✅ **M4.5 🌐 (+2 pp, owner-approved scope classification, NOT remote sync acceptance):** The owner explicitly confirmed that Retivus may be a **local-only** application and that AnkiWeb was not an intended prerequisite for the first release (2026-11-08). Per M4.5's pre-existing alternative acceptance path, classify **AnkiWeb collection/media synchronization and credential handling as post-v1**. No AnkiWeb production compatibility is claimed, and no remote sync acceptance tests were performed. V1 still uses Anki's local Rust collection/scheduler and verified offline Anki package exchange. Remote sync code is experimental and must not be described as safe for production. **M4.5 2/2 by approved post-v1 classification; M4 17/17; overall 89%.**
