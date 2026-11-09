@@ -2486,11 +2486,11 @@ mod tests {
         harness.get_by_label("Select sense").click();
         harness.run();
         harness
-            .get_by_label("Add selected meaning to learner deck")
+            .get_by_label("Add selected meaning to Tarium deck")
             .scroll_to_me();
         harness.run();
         harness
-            .get_by_label("Add selected meaning to learner deck")
+            .get_by_label("Add selected meaning to Tarium deck")
             .click();
         harness.run();
         assert_eq!(harness.state().study.stats.notes, 1);

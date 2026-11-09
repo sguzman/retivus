@@ -407,13 +407,15 @@ impl AnkiBackend {
 
     /// Existing deck names come from the pinned upstream Anki collection engine.
     pub fn list_decks(&mut self) -> BackendResult<Vec<(i64, String)>> {
-        let tree = self.collection.deck_tree(None)?;
-        let mut pending = tree.children;
-        let mut decks = Vec::new();
-        while let Some(node) = pending.pop() {
-            decks.push((node.deck_id, node.name));
-            pending.extend(node.children);
-        }
+        // The tree node's display name is only the leaf segment. For nested
+        // Tarium decks, the UI and tests need their complete Anki path so two
+        // sources with the same leaf name cannot look identical.
+        let mut decks = self
+            .collection
+            .get_all_deck_names(false)?
+            .into_iter()
+            .map(|(id, name)| (id.0, name))
+            .collect::<Vec<_>>();
         decks.sort_by(|left, right| left.1.cmp(&right.1));
         Ok(decks)
     }
