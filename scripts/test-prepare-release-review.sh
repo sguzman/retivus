@@ -39,6 +39,28 @@ if bash "$script" "$binary_dir" "$source_dir" "$commit" "$root/ambiguous" >/dev/
 fi
 test ! -e "$root/ambiguous"
 rm "$binary_dir/retivus-0.2.0-linux-x86_64.tar.zst"
+# Reject a sidecar that checksums an unrelated file instead of the archive.
+for archive in "$binary" "$source_archive"; do
+  evidence_dir="$(dirname "$archive")"
+  printf 'unrelated evidence\n' > "$evidence_dir/unrelated.txt"
+  (cd "$evidence_dir" && sha256sum unrelated.txt > "$(basename "$archive").sha256")
+  output_bad="$root/misbound-$(basename "$archive")"
+  if bash "$script" "$binary_dir" "$source_dir" "$commit" "$output_bad" >/dev/null 2>&1; then
+    echo "Accepted a sidecar for an unrelated file: $archive" >&2
+    exit 1
+  fi
+  test ! -e "$output_bad"
+  (cd "$evidence_dir" && sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256")
+done
+# Reject a sidecar with an extra otherwise-valid checksum line.
+printf '%s\n' 'extra entry' > "$binary_dir/dist/extra.txt"
+(cd "$binary_dir/dist" && sha256sum extra.txt >> "$(basename "$binary").sha256")
+if bash "$script" "$binary_dir" "$source_dir" "$commit" "$root/extra-sidecar" >/dev/null 2>&1; then
+  echo 'Accepted an extraneous checksum entry' >&2
+  exit 1
+fi
+test ! -e "$root/extra-sidecar"
+(cd "$binary_dir/dist" && sha256sum "$(basename "$binary")" > "$(basename "$binary").sha256")
 # Reject a tampered archive even when its sidecar is still present.
 printf 'tampering\n' >> "$binary"
 if bash "$script" "$binary_dir" "$source_dir" "$commit" "$root/tampered" >/dev/null 2>&1; then

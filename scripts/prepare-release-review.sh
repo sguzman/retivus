@@ -43,7 +43,13 @@ for archive in "$binary" "$source_archive"; do
     echo "Missing non-symlinked checksum sidecar: $sidecar" >&2
     exit 1
   }
-  (cd "$(dirname "$archive")" && sha256sum --check "$(basename "$sidecar")") >/dev/null
+  # A valid checksum for an unrelated file must not attest this archive.
+  # Require exactly the canonical one-line digest and paired archive name.
+  expected_sidecar="$(cd "$(dirname "$archive")" && sha256sum "$(basename "$archive")")"
+  if [[ "$(cat "$sidecar")" != "$expected_sidecar" ]]; then
+    echo "Checksum sidecar does not attest its archive: $sidecar" >&2
+    exit 1
+  fi
 done
 for name in SOURCE-AUDIT.txt THIRD-PARTY-SOURCES.tsv LICENSE-FILE-AUDIT.tsv \
   PARENT-NOTICE-REVIEW.tsv LINUX-TARGET-DEPENDENCIES.tsv LINUX-TARGET-NOTICE-REVIEW.tsv; do
