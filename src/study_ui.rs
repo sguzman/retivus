@@ -107,6 +107,16 @@ fn inert_review_answer(html: &str) -> &str {
         .map_or(html, |(_, answer)| answer.trim())
 }
 
+// Explicit card foreground avoids dark-mode contrast regressions when the
+// system preference changes or an egui RichText style overrides the default.
+fn review_card_text_color(dark_mode: bool) -> egui::Color32 {
+    if dark_mode {
+        egui::Color32::WHITE
+    } else {
+        egui::Color32::BLACK
+    }
+}
+
 fn live_status(ui: &mut egui::Ui, text: &str) {
     let response = ui.label(text);
     ui.ctx().accesskit_node_builder(response.id, |node| {
@@ -964,14 +974,21 @@ impl StudyPanel {
                     ui.set_min_height(card_height);
                     ui.add_space((card_height * 0.18).min(85.0));
                     if let Some(card) = &shown_card {
-                        ui.label(egui::RichText::new(&card.question_html).size(25.0).strong());
+                        let foreground = review_card_text_color(ui.visuals().dark_mode);
+                        ui.label(
+                            egui::RichText::new(&card.question_html)
+                                .size(25.0)
+                                .strong()
+                                .color(foreground),
+                        );
                         if self.revealed {
                             ui.add_space(20.0);
                             ui.separator();
                             ui.add_space(20.0);
                             ui.label(
                                 egui::RichText::new(inert_review_answer(&card.answer_html))
-                                    .size(24.0),
+                                    .size(24.0)
+                                    .color(foreground),
                             );
                         }
                     } else {
@@ -2419,6 +2436,27 @@ mod tests {
         assert_eq!(reopened.note_fields(note_id).unwrap(), ["生", "life"]);
         assert_eq!(reopened.review_event_count(card_id).unwrap(), 1);
         reopened.close().unwrap();
+    }
+
+    #[test]
+    fn focused_review_card_text_contrasts_with_both_system_themes() {
+        assert_eq!(review_card_text_color(true), egui::Color32::WHITE);
+        assert_eq!(review_card_text_color(false), egui::Color32::BLACK);
+        for (theme, expected) in [
+            (egui::Theme::Dark, egui::Color32::WHITE),
+            (egui::Theme::Light, egui::Color32::BLACK),
+        ] {
+            let ctx = egui::Context::default();
+            ctx.set_theme(match theme {
+                egui::Theme::Dark => egui::ThemePreference::Dark,
+                egui::Theme::Light => egui::ThemePreference::Light,
+            });
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| {
+                    assert_eq!(review_card_text_color(ui.visuals().dark_mode), expected);
+                });
+            });
+        }
     }
 
     #[test]
