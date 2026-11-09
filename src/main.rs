@@ -1175,12 +1175,9 @@ mod tests {
     fn gui_search_keeps_twelve_results_and_invalidates_stale_selection() {
         let root = tempfile::tempdir().unwrap();
         let file = root.path().join("words.tsv");
-        let mut input =
-            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n".to_owned();
+        let mut input = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n".to_owned();
         for n in 0..40 {
-            input.push_str(&format!(
-                "{n}\tword{n}\tnoun\ts{n}\tlife in Mexico\n"
-            ));
+            input.push_str(&format!("{n}\tword{n}\tnoun\ts{n}\tlife in Mexico\n"));
         }
         std::fs::write(&file, input).unwrap();
         let mut app = Retivus {

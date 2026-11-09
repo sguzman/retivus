@@ -109,9 +109,7 @@ mod tests {
         let mut data = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n".to_owned();
         data.push_str("unmatched\tzorro\tnoun\ts1\tfox\n");
         for i in 0..35 {
-            data.push_str(&format!(
-                "entry{i}\tBanqueta{i}\tnoun\ts{i}\tsidewalk\n"
-            ));
+            data.push_str(&format!("entry{i}\tBanqueta{i}\tnoun\ts{i}\tsidewalk\n"));
         }
         data.push_str("last\tcalle\tnoun\ts1\tStreet or sidewalk\n");
         let search = search_preview(&adapter(), &mut Cursor::new(data), "BANQUETA").unwrap();
@@ -137,11 +135,11 @@ mod tests {
 
     #[test]
     fn search_refuses_blank_or_overlong_terms_and_late_invalid_records() {
-        let valid = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tvida\tnoun\ts1\tlife\n";
+        let valid =
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tvida\tnoun\ts1\tlife\n";
         assert!(search_preview(&adapter(), &mut Cursor::new(valid), "   ").is_err());
         assert!(search_preview(&adapter(), &mut Cursor::new(valid), &"a".repeat(129)).is_err());
         let invalid = format!("{valid}1\tduplicate\tnoun\ts2\tlate error\n");
         assert!(search_preview(&adapter(), &mut Cursor::new(invalid), "vida").is_err());
     }
-
 }
