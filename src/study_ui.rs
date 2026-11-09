@@ -43,6 +43,9 @@ impl BrowseScope {
 pub struct StudyPanel {
     root: String,
     profile_id: String,
+    // UI preference only; cards, credentials and review data are never saved here.
+    last_root: String,
+    last_profile_id: String,
     active_root: Option<PathBuf>,
     active_profile_id: Option<String>,
     package: String,
@@ -169,6 +172,72 @@ impl StudyPanel {
         Ok(())
     }
 
+    fn valid_profile_id(id: &str) -> bool {
+        !id.is_empty()
+            && id.len() <= 64
+            && id
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_')
+    }
+
+    fn existing_profile_ids(root: &Path) -> Vec<String> {
+        let Ok(entries) = fs::read_dir(root) else {
+            return Vec::new();
+        };
+        let mut result = Vec::new();
+        for entry in entries.flatten() {
+            let Ok(id) = entry.file_name().into_string() else {
+                continue;
+            };
+            if !Self::valid_profile_id(&id)
+                || !entry.file_type().is_ok_and(|kind| kind.is_dir())
+            {
+                continue;
+            }
+            if fs::symlink_metadata(entry.path().join("collection.anki2"))
+                .is_ok_and(|meta| meta.file_type().is_file())
+            {
+                result.push(id);
+            }
+        }
+        result.sort_unstable();
+        result
+    }
+
+    pub fn restore_profile_selection(&mut self, root: Option<String>, id: Option<String>) {
+        if let (Some(root), Some(id)) = (root, id) {
+            if Path::new(&root).is_absolute() && Self::valid_profile_id(&id) {
+                self.root = root.clone();
+                self.profile_id = id.clone();
+                self.last_root = root;
+                self.last_profile_id = id;
+                return;
+            }
+        }
+        // Recognize the pre-persistence folder of existing installations.
+        if let Some(home) = std::env::var_os("HOME") {
+            let previous = PathBuf::from(home).join("Retivus-profiles");
+            if previous.is_dir() {
+                self.root = previous.to_string_lossy().into_owned();
+            }
+        }
+    }
+
+    pub fn last_successful_profile(&self) -> Option<(&str, &str)> {
+        if self.last_root.is_empty() || self.last_profile_id.is_empty() {
+            None
+        } else {
+            Some((&self.last_root, &self.last_profile_id))
+        }
+    }
+
+    fn remember_active_profile(&mut self) {
+        if let (Some(root), Some(id)) = (&self.active_root, &self.active_profile_id) {
+            self.last_root = root.to_string_lossy().into_owned();
+            self.last_profile_id = id.clone();
+        }
+    }
+
     /// The status of a prior failed open/create attempt is no longer relevant
     /// after changing either part of the requested profile location.
     fn profile_location_changed(&mut self) {
@@ -199,6 +268,7 @@ impl StudyPanel {
                 self.active_root = Some(canonical_root);
                 self.active_profile_id = Some(self.profile_id.clone());
                 self.backend = Some(backend);
+                self.remember_active_profile();
                 self.status = format!("Opened Retivus-managed profile {}.", self.profile_id);
                 self.refresh();
                 self.refresh_review();
@@ -244,6 +314,7 @@ impl StudyPanel {
                 self.profile_id = self.restore_profile_id.clone();
                 self.active_profile_id = Some(self.profile_id.clone());
                 self.backend = Some(backend);
+                self.remember_active_profile();
                 self.status = format!(
                     "Private recovery opened as new Retivus profile {}. Original profiles were not replaced.",
                     self.profile_id
@@ -947,7 +1018,7 @@ impl StudyPanel {
         egui::CollapsingHeader::new("Learner workspace · managed Anki collections")
             .default_open(true)
             .show(ui, |ui| {
-            ui.label("Choose an existing root directory and a Retivus profile ID. No ordinary Anki profile is opened automatically.");
+            ui.label("Choose a Retivus profile. Last used profile is remembered, but never opened automatically.");
             ui.horizontal_wrapped(|ui| {
                 let root_label = ui.label("Profile root");
                 if ui
@@ -971,6 +1042,31 @@ impl StudyPanel {
                 {
                     self.profile_location_changed();
                 }
+            });
+            ui.add_enabled_ui(self.backend.is_none(), |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let label = ui.label("Existing profiles");
+                    let response = egui::ComboBox::from_id_salt("retivus-existing-profile")
+                        .selected_text(if self.profile_id.is_empty() {
+                            "Select a profile"
+                        } else {
+                            &self.profile_id
+                        })
+                        .show_ui(ui, |ui| {
+                            let choices = Self::existing_profile_ids(Path::new(&self.root));
+                            if choices.is_empty() {
+                                ui.weak("No profiles in this root");
+                            }
+                            for id in choices {
+                                ui.selectable_value(&mut self.profile_id, id.clone(), id);
+                            }
+                        })
+                        .response
+                        .labelled_by(label.id);
+                    if response.changed() {
+                        self.profile_location_changed();
+                    }
+                });
             });
             ui.horizontal_wrapped(|ui| {
                 let snapshot_label = ui.label("Source snapshot ID");
@@ -1497,6 +1593,51 @@ mod tests {
         assert!(BrowseScope::Conflicts.matches(&corrupt));
         assert!(BrowseScope::Conflicts.matches(&duplicate));
         assert!(!BrowseScope::SourceLinked.matches(&corrupt));
+    }
+
+    #[test]
+    fn profile_picker_lists_real_owned_directories_without_symlinks() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "test".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        panel.close();
+        fs::create_dir(root.path().join("unowned")).unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink(root.path().join("test"), root.path().join("link"))
+            .unwrap();
+        assert_eq!(StudyPanel::existing_profile_ids(root.path()), vec!["test"]);
+    }
+
+    #[test]
+    fn restoring_profile_choice_does_not_open_collection_or_erase_cards() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "test".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let note_id = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .add_basic_note(1, "front", "back")
+            .unwrap();
+        panel.close();
+        let (saved_root, saved_id) = panel.last_successful_profile().unwrap();
+        let mut reopened = StudyPanel::default();
+        reopened.restore_profile_selection(Some(saved_root.into()), Some(saved_id.into()));
+        assert_eq!(reopened.root, saved_root);
+        assert_eq!(reopened.profile_id, saved_id);
+        assert!(!reopened.is_connected());
+        reopened.connect(false);
+        assert_eq!(
+            reopened.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            ["front", "back"]
+        );
+        reopened.close();
     }
 
     #[test]
