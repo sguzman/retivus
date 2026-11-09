@@ -922,6 +922,19 @@ impl StudyPanel {
         if actual != expected {
             return Err("source selection differs from the immutable imported snapshot".into());
         }
+        // Check the *entire persisted collection*, not just the currently
+        // displayed notes, before creating even an empty provider deck.
+        if let Some(id) = self
+            .backend
+            .as_ref()
+            .ok_or("learner profile closed during import")?
+            .existing_source_note_id(&actual)
+            .map_err(|e| e.to_string())?
+        {
+            return Err(format!(
+                "this exact source meaning is already note {id}; no duplicate card or deck created"
+            ));
+        }
         let (deck_id, deck_name) = if provider_deck {
             let name = Self::provider_deck_name(&actual.provenance)?;
             let deck_id = self
@@ -3165,6 +3178,14 @@ mod tests {
                 .decks
                 .iter()
                 .any(|(id, name)| Some(*id) == panel.deck_id && name == &expected));
+            let decks_before = panel.decks.clone();
+            let stats_before = panel.stats;
+            let error = panel
+                .add_validated_source_to_provider_deck(&adapter, &path, &rows[0], "s1")
+                .unwrap_err();
+            assert!(error.contains("no duplicate card or deck created"), "{error}");
+            assert_eq!(panel.decks, decks_before);
+            assert_eq!(panel.stats, stats_before);
         }
         let decks = panel
             .decks
