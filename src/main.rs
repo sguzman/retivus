@@ -642,7 +642,13 @@ impl eframe::App for Retivus {
                                 .desired_width(ui.available_width().min(280.0)),
                         )
                         .labelled_by(label.id);
-                        if ui.button("Search vocabulary").clicked() {
+                        if ui
+                            .add_enabled(
+                                !self.source_query.trim().is_empty(),
+                                egui::Button::new("Search vocabulary"),
+                            )
+                            .clicked()
+                        {
                             self.search_source_file();
                         }
                     });
