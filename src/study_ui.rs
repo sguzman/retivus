@@ -189,9 +189,7 @@ impl StudyPanel {
             let Ok(id) = entry.file_name().into_string() else {
                 continue;
             };
-            if !Self::valid_profile_id(&id)
-                || !entry.file_type().is_ok_and(|kind| kind.is_dir())
-            {
+            if !Self::valid_profile_id(&id) || !entry.file_type().is_ok_and(|kind| kind.is_dir()) {
                 continue;
             }
             if fs::symlink_metadata(entry.path().join("collection.anki2"))
@@ -1606,8 +1604,7 @@ mod tests {
         panel.close();
         fs::create_dir(root.path().join("unowned")).unwrap();
         #[cfg(unix)]
-        std::os::unix::fs::symlink(root.path().join("test"), root.path().join("link"))
-            .unwrap();
+        std::os::unix::fs::symlink(root.path().join("test"), root.path().join("link")).unwrap();
         assert_eq!(StudyPanel::existing_profile_ids(root.path()), vec!["test"]);
     }
 
@@ -1634,7 +1631,12 @@ mod tests {
         assert!(!reopened.is_connected());
         reopened.connect(false);
         assert_eq!(
-            reopened.backend.as_ref().unwrap().note_fields(note_id).unwrap(),
+            reopened
+                .backend
+                .as_ref()
+                .unwrap()
+                .note_fields(note_id)
+                .unwrap(),
             ["front", "back"]
         );
         reopened.close();
