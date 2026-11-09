@@ -11,6 +11,7 @@ All meaningful product changes will be recorded here. Detailed implementation st
 - A deterministic regression with two independently edited notes sharing one whole-second modification timestamp confirms divergent client content even after successful upstream normal-sync responses. Independent private recovery ZIPs restore both edits; automatic conflict detection/reconciliation and production AnkiWeb acceptance remain open.
 
 ### Fixed
+- Prevent duplicate source-linked flashcards when a user selects the same Mexilex/Tarium meaning more than once, including after restarting the learner. The Anki backend checks the exact four-part source identity across the entire persisted collection rather than the bounded note browser, refuses duplicates even across decks, and leaves existing review history untouched. GUI provider-deck and backend reopening regressions passed in [Rust foundation 42660215514](https://github.com/sguzman/retivus/actions/runs/42660215514) and [Anki end-to-end 42660215657](https://github.com/sguzman/retivus/actions/runs/42660215657); no additional formal roadmap credit.
 - Defer application-wide egui zoom until the scale slider's pointer interaction ends so the slider no longer changes its own coordinates during dragging. A pointer-release regression test was added and the preview screen now tells users how to launch the local learner. CI verification and physical slider dogfooding are still pending.
 
 ### Added
