@@ -53,6 +53,10 @@ const SCALE_STORAGE_KEY: &str = "retivus.ui-scale.v1";
 const DENSITY_STORAGE_KEY: &str = "retivus.density.v1";
 const HIGH_CONTRAST_STORAGE_KEY: &str = "retivus.high-contrast.v1";
 const REDUCED_MOTION_STORAGE_KEY: &str = "retivus.reduced-motion.v1";
+#[cfg(feature = "anki-backend")]
+const PROFILE_ROOT_STORAGE_KEY: &str = "retivus.last-profile-root.v1";
+#[cfg(feature = "anki-backend")]
+const PROFILE_ID_STORAGE_KEY: &str = "retivus.last-profile-id.v1";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Density {
@@ -309,14 +313,20 @@ impl Retivus {
         let density = storage.and_then(|value| value.get_string(DENSITY_STORAGE_KEY));
         let high_contrast = storage.and_then(|value| value.get_string(HIGH_CONTRAST_STORAGE_KEY));
         let reduced_motion = storage.and_then(|value| value.get_string(REDUCED_MOTION_STORAGE_KEY));
-        Self {
+        let mut app = Self {
             theme: Theme::from_stored(theme.as_deref()),
             ui_scale: parse_scale(scale.as_deref()),
             density: Density::from_stored(density.as_deref()),
             high_contrast: high_contrast.as_deref() == Some("true"),
             reduced_motion: reduced_motion.as_deref() == Some("true"),
             ..Self::default()
-        }
+        };
+        #[cfg(feature = "anki-backend")]
+        app.study.restore_profile_selection(
+            storage.and_then(|value| value.get_string(PROFILE_ROOT_STORAGE_KEY)),
+            storage.and_then(|value| value.get_string(PROFILE_ID_STORAGE_KEY)),
+        );
+        app
     }
 }
 
@@ -378,6 +388,11 @@ impl eframe::App for Retivus {
         storage.set_string(DENSITY_STORAGE_KEY, self.density.stored().into());
         storage.set_string(HIGH_CONTRAST_STORAGE_KEY, self.high_contrast.to_string());
         storage.set_string(REDUCED_MOTION_STORAGE_KEY, self.reduced_motion.to_string());
+        #[cfg(feature = "anki-backend")]
+        if let Some((root, id)) = self.study.last_successful_profile() {
+            storage.set_string(PROFILE_ROOT_STORAGE_KEY, root.to_owned());
+            storage.set_string(PROFILE_ID_STORAGE_KEY, id.to_owned());
+        }
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -825,6 +840,25 @@ mod tests {
         let _ = ctx.run(egui::RawInput::default(), |ctx| {
             assert!((ctx.zoom_factor() - 1.4).abs() < 0.001);
         });
+    }
+
+    #[cfg(feature = "anki-backend")]
+    #[test]
+    fn last_successful_profile_is_restored_without_automatically_opening_it() {
+        let root = tempfile::tempdir().unwrap();
+        let mut app = Retivus::default();
+        app.study.root = root.path().to_string_lossy().into_owned();
+        app.study.profile_id = "daily".into();
+        app.study.connect(true);
+        assert!(app.study.is_connected());
+        app.study.close();
+
+        let mut storage = TestStorage::default();
+        eframe::App::save(&mut app, &mut storage);
+        let restored = Retivus::restore(Some(&storage));
+        assert_eq!(restored.study.profile_id, "daily");
+        assert_eq!(restored.study.root, root.path().to_string_lossy());
+        assert!(!restored.study.is_connected());
     }
 
     #[test]
