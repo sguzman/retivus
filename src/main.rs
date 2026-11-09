@@ -863,8 +863,9 @@ mod tests {
         let mut storage = TestStorage::default();
         eframe::App::save(&mut app, &mut storage);
         let restored = Retivus::restore(Some(&storage));
-        assert_eq!(restored.study.profile_id, "daily");
-        assert_eq!(restored.study.root, root.path().to_string_lossy());
+        let (saved_root, saved_id) = restored.study.last_successful_profile().unwrap();
+        assert_eq!(saved_id, "daily");
+        assert_eq!(saved_root, root.path().to_string_lossy());
         assert!(!restored.study.is_connected());
     }
 
