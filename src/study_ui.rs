@@ -981,8 +981,7 @@ impl StudyPanel {
         ui.vertical_centered(|ui| {
             ui.add_space(12.0);
             ui.heading(
-                egui::RichText::new("Review")
-                    .color(review_card_text_color(ui.visuals().dark_mode)),
+                egui::RichText::new("Review").color(review_card_text_color(ui.visuals().dark_mode)),
             );
             let due = format!(
                 "{} new  ·  {} learning  ·  {} review",
@@ -2476,8 +2475,14 @@ mod tests {
 
     #[test]
     fn focused_review_header_and_rating_row_follow_theme_and_centering() {
-        assert_eq!(focused_review_secondary_color(true), egui::Color32::from_gray(190));
-        assert_eq!(focused_review_secondary_color(false), egui::Color32::from_gray(75));
+        assert_eq!(
+            focused_review_secondary_color(true),
+            egui::Color32::from_gray(190)
+        );
+        assert_eq!(
+            focused_review_secondary_color(false),
+            egui::Color32::from_gray(75)
+        );
         for (available, gap) in [(940.0, 6.0), (380.0, 6.0), (280.0, 4.0)] {
             let (width, inset) = rating_row_geometry(available, gap);
             let total = width * 4.0 + 3.0 * gap;
