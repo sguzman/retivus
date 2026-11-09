@@ -248,9 +248,24 @@ jobs:
           set -euo pipefail
           binary_dir="$RUNNER_TEMP/binary"
           source_dir="$RUNNER_TEMP/source"
-          binary="$(find "$binary_dir" -maxdepth 1 -type f -name 'retivus-*-linux-x86_64.tar.zst' -print -quit)"
-          source="$(find "$source_dir" -maxdepth 1 -type f -name "retivus-source-$GITHUB_SHA.tar.zst" -print -quit)"
-          test -s "$binary" && test -s "$source" && test -s "$binary_dir/Cargo.lock"
+          # actions/upload-artifact keeps dist/ beneath the download root
+          # when Cargo.lock is included at the repository top level.
+          # Reject missing or ambiguous archives instead of hashing "".
+          mapfile -t binary_candidates < <(
+            find "$binary_dir" -type f -name 'retivus-*-linux-x86_64.tar.zst' -print
+          )
+          mapfile -t source_candidates < <(
+            find "$source_dir" -type f -name "retivus-source-$GITHUB_SHA.tar.zst" -print
+          )
+          if (( ${#binary_candidates[@]} != 1 || ${#source_candidates[@]} != 1 )); then
+            echo 'Expected exactly one binary and one corresponding-source archive' >&2
+            exit 1
+          fi
+          binary="${binary_candidates[0]}"
+          source="${source_candidates[0]}"
+          test -s "$binary"
+          test -s "$source"
+          test -s "$binary_dir/Cargo.lock"
           # The preceding parity job step already verified both sidecars,
           # exact commit/lockfile, source parity and all notice inventories.
           packet="$RUNNER_TEMP/retivus-release-review"
