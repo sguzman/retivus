@@ -131,6 +131,13 @@ impl SourceCatalog {
                    license_notice TEXT NOT NULL,
                    PRIMARY KEY(provider, snapshot)
                  );
+                 CREATE TABLE IF NOT EXISTS verified_exports (
+                   provider TEXT NOT NULL,
+                   snapshot TEXT NOT NULL,
+                   sha256 TEXT NOT NULL,
+                   PRIMARY KEY(provider, snapshot),
+                   FOREIGN KEY(provider, snapshot) REFERENCES snapshots(provider, snapshot)
+                 );
                  CREATE TABLE IF NOT EXISTS entries (
                    provider TEXT NOT NULL,
                    snapshot TEXT NOT NULL,
@@ -179,6 +186,32 @@ impl SourceCatalog {
         snapshot: &str,
         adapter: &dyn SourceAdapter,
         reader: &mut dyn BufRead,
+    ) -> Result<usize, String> {
+        self.import_snapshot_with_digest(snapshot, adapter, reader, None)
+    }
+
+    /// Record the digest of an independently authenticated source export
+    /// atomically with its rows. The CALLER must validate the digest against
+    /// a trusted published checksum before invoking this method.
+    pub fn import_authenticated_snapshot(
+        &mut self,
+        snapshot: &str,
+        adapter: &dyn SourceAdapter,
+        reader: &mut dyn BufRead,
+        sha256: &str,
+    ) -> Result<usize, String> {
+        if sha256.len() != 64 || !sha256.bytes().all(|b| b.is_ascii_hexdigit()) {
+            return Err("verified source digest must be a SHA-256 hex string".into());
+        }
+        self.import_snapshot_with_digest(snapshot, adapter, reader, Some(sha256))
+    }
+
+    fn import_snapshot_with_digest(
+        &mut self,
+        snapshot: &str,
+        adapter: &dyn SourceAdapter,
+        reader: &mut dyn BufRead,
+        attested_digest: Option<&str>,
     ) -> Result<usize, String> {
         if snapshot.trim().is_empty() || snapshot.len() > 128 {
             return Err("snapshot identifier must be nonempty and at most 128 bytes".into());
@@ -257,8 +290,32 @@ impl SourceCatalog {
         if let Some(error) = insert_failure {
             return Err(error);
         }
+        if let Some(digest) = attested_digest {
+            tx.execute(
+                "INSERT INTO verified_exports (provider, snapshot, sha256) VALUES (?1, ?2, ?3)",
+                params![info.provider_id, snapshot, digest],
+            )
+            .map_err(|e| format!("could not record verified source digest: {e}"))?;
+        }
         tx.commit().map_err(|e| e.to_string())?;
         Ok(count)
+    }
+
+    /// Only independently verified imports carry an attestation. A snapshot
+    /// imported via the low-level CLI without checksum checking returns None.
+    pub fn authenticated_export_digest(
+        &self,
+        provider: &str,
+        snapshot: &str,
+    ) -> Result<Option<String>, String> {
+        self.connection
+            .query_row(
+                "SELECT sha256 FROM verified_exports WHERE provider=?1 AND snapshot=?2",
+                params![provider, snapshot],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())
     }
 
     /// Fetch one entry by immutable provider/snapshot/entry identity.
@@ -601,6 +658,50 @@ mod tests {
     }
 
     const HEADER: &str = "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n";
+
+    #[test]
+    fn attested_snapshot_digest_is_atomic_and_unattested_import_stays_distinct() {
+        let mut catalog = SourceCatalog::in_memory().unwrap();
+        let plain =
+            "entry_id\tword\tpart_of_speech\tsense_id\tdefinition\n1\tmar\tnoun\ts1\tsea\n";
+        let digest = "a".repeat(64);
+        assert_eq!(
+            catalog
+                .import_authenticated_snapshot(
+                    "verified",
+                    &tsv(),
+                    &mut Cursor::new(plain),
+                    &digest
+                )
+                .unwrap(),
+            1
+        );
+        assert_eq!(
+            catalog.authenticated_export_digest("other-dictionary", "verified").unwrap(),
+            Some(digest)
+        );
+        let malformed = format!("{plain}1\tduplicate\tnoun\ts2\twrong\n");
+        assert!(catalog
+            .import_authenticated_snapshot(
+                "late-invalid",
+                &tsv(),
+                &mut Cursor::new(malformed),
+                &"b".repeat(64)
+            )
+            .is_err());
+        assert!(catalog
+            .authenticated_export_digest("other-dictionary", "late-invalid")
+            .unwrap()
+            .is_none());
+        assert_eq!(catalog.counts("other-dictionary", "late-invalid").unwrap(), (0, 0));
+        catalog
+            .import_snapshot("plain", &tsv(), &mut Cursor::new(plain))
+            .unwrap();
+        assert!(catalog
+            .authenticated_export_digest("other-dictionary", "plain")
+            .unwrap()
+            .is_none());
+    }
 
     #[test]
     fn imports_multiple_independent_providers_and_retains_homograph_ids() {
