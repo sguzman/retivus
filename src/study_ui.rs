@@ -4,9 +4,17 @@ use eframe::egui;
 use retivus::anki_backend::{AnkiBackend, CollectionStats, NoteRow, ReviewPreview};
 use retivus::source_adapter::{SourceAdapter, SourceRecord};
 use retivus::source_store::{SnapshotSenseChange, SourceCardCandidate, SourceCatalog};
+use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::BufReader;
+use std::io::{BufReader, Read, Seek, Write};
 use std::path::{Path, PathBuf};
+
+// The SHA-256 was obtained from the upstream lex-v0.3.0 release only after
+// CI verified the published package's official SHA256SUMS and its manifest.
+// Hashes apply to uncompressed study.jsonl content, not a tarball.
+const MEXILEX_SNAPSHOT: &str = "lex-v0.3.0";
+const MEXILEX_STUDY_SHA256: &str =
+    "c4e3f721a9f4004645ff7e1adfa5c628bfee870d0f46975732baafed03f3ea86";
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum BrowseScope {
@@ -457,6 +465,74 @@ impl StudyPanel {
         Ok(dir.join("source-catalog.sqlite3"))
     }
 
+    /// Copy and authenticate the exact published Mexilex export into a private
+    /// temporary file BEFORE creating/mutating the source catalog. The pinned
+    /// snapshot is then imported in one SQLite transaction with its attestation.
+    /// No flashcards, decks or review history are created by this operation.
+    pub fn stage_verified_mexilex_snapshot(&mut self, path: &Path) -> Result<usize, String> {
+        let catalog_path = self.managed_catalog_path()?;
+        let file_info = fs::symlink_metadata(path).map_err(|e| e.to_string())?;
+        if !file_info.file_type().is_file() || file_info.file_type().is_symlink() {
+            return Err("Mexilex export must be a regular file, not a symlink".into());
+        }
+        let mut source = fs::File::open(path).map_err(|e| e.to_string())?;
+        // Use the immutable copied bytes for both hashing and parsing, not
+        // a second read of a potentially changing path.
+        let mut copy = tempfile::tempfile().map_err(|e| e.to_string())?;
+        let mut digest = Sha256::new();
+        let mut buffer = [0u8; 65536];
+        loop {
+            let count = source.read(&mut buffer).map_err(|e| e.to_string())?;
+            if count == 0 {
+                break;
+            }
+            digest.update(&buffer[..count]);
+            copy.write_all(&buffer[..count]).map_err(|e| e.to_string())?;
+        }
+        let actual = format!("{:x}", digest.finalize());
+        if actual != MEXILEX_STUDY_SHA256 {
+            return Err(format!(
+                "Mexilex export checksum differs from published {MEXILEX_SNAPSHOT}; use the verified release study.jsonl, not an unverified or newer export"
+            ));
+        }
+        copy.rewind().map_err(|e| e.to_string())?;
+        let mut catalog = match fs::symlink_metadata(&catalog_path) {
+            Ok(_) => SourceCatalog::open_existing(&catalog_path)?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                SourceCatalog::create_new(&catalog_path)?
+            }
+            Err(error) => return Err(error.to_string()),
+        };
+        let previous = catalog.authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?;
+        if previous.as_deref() == Some(MEXILEX_STUDY_SHA256) {
+            let (entries, senses) = catalog.counts("mexilex", MEXILEX_SNAPSHOT)?;
+            if entries != 124444 || senses != 155586 {
+                return Err("verified Mexilex catalog has unexpected entry/sense counts".into());
+            }
+            self.status = format!(
+                "Mexilex {MEXILEX_SNAPSHOT} already verified: {entries} words, {senses} senses; no cards created."
+            );
+            return Ok(entries as usize);
+        }
+        if previous.is_some() || catalog.counts("mexilex", MEXILEX_SNAPSHOT)?.0 != 0 {
+            return Err("a Mexilex snapshot with this ID exists without the expected verification; refusing to overwrite or trust it".into());
+        }
+        let count = catalog.import_authenticated_snapshot(
+            MEXILEX_SNAPSHOT,
+            &retivus::source_adapter::MexilexV1::default(),
+            &mut BufReader::new(copy),
+            MEXILEX_STUDY_SHA256,
+        )?;
+        let (entries, senses) = catalog.counts("mexilex", MEXILEX_SNAPSHOT)?;
+        if count != 124444 || entries != 124444 || senses != 155586 {
+            return Err("verified source catalog imported unexpected record totals".into());
+        }
+        self.status = format!(
+            "Imported verified Mexilex {MEXILEX_SNAPSHOT}: {entries} entries and {senses} senses. No cards or reviews created."
+        );
+        Ok(count)
+    }
+
     /// Stage a complete, validated generic source snapshot for future explicit
     /// sense selection and version comparison. Never creates or grades cards.
     /// Mexilex release ingestion remains guarded by external checksum checks.
@@ -788,7 +864,7 @@ impl StudyPanel {
             .ok_or("selected sense no longer exists")?;
         let is_mexilex = adapter.format_id() == "mexilex-study-jsonl-v1";
         let snapshot = if is_mexilex {
-            "lex-v0.3.0".to_owned()
+            MEXILEX_SNAPSHOT.to_owned()
         } else if self.snapshot_id.trim().is_empty() {
             record.provenance.edition.clone()
         } else {
@@ -814,6 +890,16 @@ impl StudyPanel {
             }
             Err(error) => return Err(error.to_string()),
         };
+        if is_mexilex
+            && catalog
+                .authenticated_export_digest(&origin.provider_id, &snapshot)?
+                .as_deref()
+                != Some(MEXILEX_STUDY_SHA256)
+        {
+            return Err(
+                "Mexilex requires an independently verified release snapshot in this learner profile's catalog".into(),
+            );
+        }
         if catalog
             .lookup_entry(&origin.provider_id, &snapshot, &record.entry_id)?
             .is_none()
@@ -3100,6 +3186,33 @@ mod tests {
             StudyPanel::provider_deck_name(&changed).unwrap(),
             "Tarium::es-MX::another-source"
         );
+    }
+
+    #[test]
+    fn unverified_mexilex_jsonl_cannot_touch_catalog_or_create_decks() {
+        let root = tempfile::tempdir().unwrap();
+        let mut panel = StudyPanel::default();
+        panel.root = root.path().to_string_lossy().into_owned();
+        panel.profile_id = "checksum-protected".into();
+        panel.connect(true);
+        assert!(panel.backend.is_some(), "{}", panel.status);
+        let source = root.path().join("unverified.jsonl");
+        fs::write(&source, b"{\"source\":\"mexilex\"}\n").unwrap();
+        let before = panel.decks.clone();
+        let err = panel.stage_verified_mexilex_snapshot(&source).unwrap_err();
+        assert!(err.contains("checksum differs"), "{err}");
+        assert!(!panel.managed_catalog_path().unwrap().exists());
+        assert_eq!(panel.decks, before);
+        assert_eq!(panel.stats.notes, 0);
+        assert_eq!(panel.stats.review_events, 0);
+        #[cfg(unix)]
+        {
+            let symlink = root.path().join("linked-source.jsonl");
+            std::os::unix::fs::symlink(&source, &symlink).unwrap();
+            assert!(panel.stage_verified_mexilex_snapshot(&symlink).is_err());
+            assert!(!panel.managed_catalog_path().unwrap().exists());
+        }
+        panel.close();
     }
 
     #[test]
