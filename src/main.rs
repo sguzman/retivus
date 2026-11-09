@@ -291,6 +291,26 @@ impl Retivus {
     }
 
     #[cfg(feature = "anki-backend")]
+    fn stage_verified_mexilex_to_study(&mut self) {
+        let result = (|| {
+            if self.source_format != SourceFormat::Mexilex {
+                return Err("choose Mexilex study JSONL v1 first".into());
+            }
+            if !self.source_validated {
+                return Err("validate the Mexilex source first".into());
+            }
+            self.study
+                .stage_verified_mexilex_snapshot(std::path::Path::new(&self.source_path))
+        })();
+        self.import_status = match result {
+            Ok(count) => format!(
+                "Mexilex lex-v0.3.0 source catalog ready: {count} verified entries · no flashcards created"
+            ),
+            Err(error) => format!("Verified Mexilex import refused: {error}"),
+        };
+    }
+
+    #[cfg(feature = "anki-backend")]
     fn stage_validated_source_to_study(&mut self) {
         let result = (|| {
             if self.source_format != SourceFormat::GenericTsv {
@@ -333,7 +353,7 @@ impl Retivus {
                 })
                 .ok_or("selected source sense is not in validated preview")?;
             let adapter = self.source_adapter()?;
-            self.study.add_validated_source_choice(
+            self.study.add_validated_source_to_provider_deck(
                 adapter.as_ref(),
                 std::path::Path::new(&self.source_path),
                 record,
@@ -341,7 +361,10 @@ impl Retivus {
             )
         })();
         self.import_status = match result {
-            Ok(note) => format!("Created study note {note} from selected meaning."),
+            Ok(note) => {
+                self.selected_sense = None;
+                format!("Created study note {note} in its Tarium source deck.")
+            }
             Err(error) => format!("Not added to learner profile: {error}"),
         };
     }
@@ -654,6 +677,21 @@ impl eframe::App for Retivus {
                     });
                 }
                 #[cfg(feature = "anki-backend")]
+                if self.source_format == SourceFormat::Mexilex {
+                    ui.horizontal_wrapped(|ui| {
+                        if ui
+                            .add_enabled(
+                                self.study.is_connected() && self.source_validated,
+                                egui::Button::new("Import verified Mexilex release (no cards)"),
+                            )
+                            .clicked()
+                        {
+                            self.stage_verified_mexilex_to_study();
+                        }
+                        ui.weak("Only the published lex-v0.3.0 study.jsonl SHA-256 is accepted.");
+                    });
+                }
+                #[cfg(feature = "anki-backend")]
                 if self.source_format == SourceFormat::GenericTsv
                     && ui
                         .add_enabled(
@@ -703,9 +741,17 @@ impl eframe::App for Retivus {
                         #[cfg(not(feature = "anki-backend"))]
                         ui.label("Preview only. Enable the Anki backend to create study notes from validated source senses.");
                         #[cfg(feature = "anki-backend")]
-                        ui.label("Add this sense only to an explicitly opened Retivus learner profile and selected deck.");
+                        ui.label(
+                            "Add only this sense to its Tarium language/provider deck in your opened learner profile.",
+                        );
                         #[cfg(feature = "anki-backend")]
-                        if ui.button("Add selected meaning to learner deck").clicked() {
+                        if ui
+                            .add_enabled(
+                                self.study.is_connected(),
+                                egui::Button::new("Add selected meaning to Tarium deck"),
+                            )
+                            .clicked()
+                        {
                             self.add_selected_sense_to_study();
                         }
                     });
