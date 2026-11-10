@@ -154,6 +154,7 @@ impl SourceCatalog {
                    entry_id TEXT NOT NULL,
                    sense_id TEXT NOT NULL,
                    definition TEXT NOT NULL,
+                   source_ordinal INTEGER NOT NULL DEFAULT -1,
                    PRIMARY KEY(provider, snapshot, entry_id, sense_id),
                    FOREIGN KEY(provider, snapshot, entry_id)
                      REFERENCES entries(provider, snapshot, entry_id)
@@ -173,6 +174,32 @@ impl SourceCatalog {
                    FOREIGN KEY(provider, to_snapshot, to_entry, to_sense)
                      REFERENCES senses(provider, snapshot, entry_id, sense_id)
                  );",
+            )
+            .map_err(|e| e.to_string())?;
+        // Existing Retivus catalogs predate source_ordinal. Their sense rows
+        // were inserted in original JSONL array order; preserve that order
+        // permanently rather than sorting opaque sense IDs alphabetically.
+        let has_ordinal: i64 = connection
+            .query_row(
+                "SELECT COUNT(*) FROM pragma_table_info('senses') WHERE name='source_ordinal'",
+                [],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        if has_ordinal == 0 {
+            connection
+                .execute_batch("ALTER TABLE senses ADD COLUMN source_ordinal INTEGER NOT NULL DEFAULT -1")
+                .map_err(|e| e.to_string())?;
+        }
+        connection
+            .execute_batch(
+                "UPDATE senses AS target SET source_ordinal = (
+                    SELECT COUNT(*) - 1 FROM senses AS prior
+                    WHERE prior.provider=target.provider
+                      AND prior.snapshot=target.snapshot
+                      AND prior.entry_id=target.entry_id
+                      AND prior.rowid <= target.rowid
+                ) WHERE target.source_ordinal < 0",
             )
             .map_err(|e| e.to_string())?;
         Ok(Self { connection })
@@ -245,8 +272,8 @@ impl SourceCatalog {
                 .map_err(|e| e.to_string())?;
             let mut senses = tx
                 .prepare(
-                    "INSERT INTO senses (provider, snapshot, entry_id, sense_id, definition)
-                      VALUES (?1, ?2, ?3, ?4, ?5)",
+                    "INSERT INTO senses (provider, snapshot, entry_id, sense_id, definition, source_ordinal)
+                      VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
                 )
                 .map_err(|e| e.to_string())?;
             adapter.visit(reader, &mut |record: SourceRecord| {
@@ -272,13 +299,14 @@ impl SourceCatalog {
                     insert_failure = Some(format!("failed to insert source entry: {error}"));
                     return;
                 }
-                for sense in record.senses {
+                for (ordinal, sense) in record.senses.into_iter().enumerate() {
                     if let Err(error) = senses.execute(params![
                         info.provider_id,
                         snapshot,
                         record.entry_id,
                         sense.sense_id,
-                        sense.definition
+                        sense.definition,
+                        ordinal as i64
                     ]) {
                         insert_failure = Some(format!("failed to insert source sense: {error}"));
                         return;
@@ -365,7 +393,7 @@ impl SourceCatalog {
             .prepare(
                 "SELECT sense_id, definition FROM senses
                  WHERE provider=?1 AND snapshot=?2 AND entry_id=?3
-                 ORDER BY sense_id",
+                 ORDER BY source_ordinal, sense_id",
             )
             .map_err(|e| e.to_string())?;
         let senses = stmt
@@ -391,6 +419,56 @@ impl SourceCatalog {
             part_of_speech,
             senses,
         }))
+    }
+
+    /// Read a bounded, deterministic page of first meanings from the
+    /// immutable source catalog. The keyset cursor never loads all entries.
+    /// Unlike opaque sense IDs, source_ordinal reflects the JSONL order.
+    pub fn first_meaning_page(
+        &self,
+        provider: &str,
+        snapshot: &str,
+        after_entry_id: &str,
+        limit: usize,
+    ) -> Result<Vec<SourceCardCandidate>, String> {
+        if !(1..=256).contains(&limit) {
+            return Err("first-meaning page limit must be 1..=256".into());
+        }
+        let mut query = self
+            .connection
+            .prepare(
+                "SELECT e.entry_id, e.word, e.part_of_speech, e.source_edition,
+                        s.sense_id, s.definition,
+                        x.lexical_language, x.definition_language, x.license_notice
+                 FROM entries e
+                 JOIN snapshots x ON x.provider=e.provider AND x.snapshot=e.snapshot
+                 JOIN senses s ON s.provider=e.provider AND s.snapshot=e.snapshot
+                    AND s.entry_id=e.entry_id AND s.source_ordinal=0
+                 WHERE e.provider=?1 AND e.snapshot=?2 AND e.entry_id>?3
+                 ORDER BY e.entry_id LIMIT ?4",
+            )
+            .map_err(|e| e.to_string())?;
+        let rows = query
+            .query_map(params![provider, snapshot, after_entry_id, limit as i64], |r| {
+                Ok(SourceCardCandidate {
+                    entry_id: r.get(0)?,
+                    word: r.get(1)?,
+                    part_of_speech: r.get(2)?,
+                    provenance: SourceInfo {
+                        provider_id: provider.to_owned(),
+                        edition: r.get(3)?,
+                        lexical_language: r.get(6)?,
+                        definition_language: r.get(7)?,
+                        license_notice: r.get(8)?,
+                    },
+                    sense_id: r.get(4)?,
+                    definition: r.get(5)?,
+                    snapshot: snapshot.to_owned(),
+                })
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())
     }
 
     /// Resolve one explicit sense before a learner chooses to create a card.
@@ -645,6 +723,43 @@ mod tests {
     use crate::source_adapter::{MexilexV1, SourceInfo, StudyTsvV1};
     use std::io::Cursor;
     use tempfile::tempdir;
+
+    #[test]
+    fn ordered_first_definition_pages_and_legacy_catalog_migrate_safely() {
+        let data = [
+            r#"{"format_version":1,"source":"mexilex","source_edition":"enwiktionary","lexical_language":"es-MX","definition_language":"en","entry_id":"entry-1","word":"vida","part_of_speech":"noun","senses":[{"id":"z-last-lexically","definition_en":"life"},{"id":"a-first-lexically","definition_en":"living"}]}"#,
+            r#"{"format_version":1,"source":"mexilex","source_edition":"enwiktionary","lexical_language":"es-MX","definition_language":"en","entry_id":"entry-2","word":"veneno","part_of_speech":"noun","senses":[{"id":"only","definition_en":"poison"}]}"#,
+        ].join("\n");
+        let mut catalog = SourceCatalog::in_memory().unwrap();
+        catalog.import_snapshot("sample", &MexilexV1::default(), &mut Cursor::new(data)).unwrap();
+        let pages = catalog.first_meaning_page("mexilex", "sample", "", 1).unwrap();
+        assert_eq!(pages.len(), 1);
+        assert_eq!(pages[0].sense_id, "z-last-lexically");
+        assert_eq!(pages[0].definition, "life");
+        let next = catalog.first_meaning_page("mexilex", "sample", &pages[0].entry_id, 2).unwrap();
+        assert_eq!(next.len(), 1);
+        assert_eq!(next[0].word, "veneno");
+        assert!(catalog.first_meaning_page("mexilex", "sample", &next[0].entry_id, 2).unwrap().is_empty());
+        assert!(catalog.first_meaning_page("mexilex", "sample", "", 257).is_err());
+
+        // Simulate a catalog created before the explicit ordinal column.
+        let tmp = tempdir().unwrap();
+        let old = tmp.path().join("legacy.sqlite3");
+        let db = rusqlite::Connection::open(&old).unwrap();
+        db.execute_batch("CREATE TABLE senses (
+          provider TEXT NOT NULL, snapshot TEXT NOT NULL, entry_id TEXT NOT NULL,
+          sense_id TEXT NOT NULL, definition TEXT NOT NULL,
+          PRIMARY KEY(provider, snapshot, entry_id, sense_id));
+          INSERT INTO senses VALUES ('mexilex','sample','entry-1','z','first');
+          INSERT INTO senses VALUES ('mexilex','sample','entry-1','a','second');").unwrap();
+        drop(db);
+        let migrated = SourceCatalog::open_existing(&old).unwrap();
+        let senses = migrated.connection.prepare(
+            "SELECT sense_id FROM senses ORDER BY source_ordinal"
+        ).unwrap().query_map([], |r| r.get::<_, String>(0)).unwrap()
+            .collect::<Result<Vec<_>, _>>().unwrap();
+        assert_eq!(senses, ["z", "a"]);
+    }
 
     fn tsv() -> StudyTsvV1 {
         StudyTsvV1::new(SourceInfo {
