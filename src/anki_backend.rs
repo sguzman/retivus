@@ -11,6 +11,7 @@ use anki::scheduler::answering::{CardAnswer, Rating};
 use anki::search::SearchNode;
 use anki::timestamp::TimestampMillis;
 use rusqlite::OpenFlags;
+use std::collections::HashSet;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -390,6 +391,39 @@ impl AnkiBackend {
         Ok(())
     }
 
+    /// Read Anki's effective per-deck new/review caps without changing the
+    /// shared deck-config preset. Parent deck limits may further constrain the
+    /// visible queue, just as they do in Anki Desktop.
+    pub fn deck_daily_limits(&mut self, deck_id: i64) -> BackendResult<(u32, u32)> {
+        let deck = self.collection.get_deck(DeckId(deck_id))?
+            .ok_or("requested deck does not exist")?;
+        let normal = deck.normal()?;
+        let config = self.collection.get_deck_config(
+            deck.config_id().ok_or("expected a normal deck")?, true
+        )?.ok_or("Anki deck configuration unavailable")?;
+        Ok((
+            normal.new_limit.unwrap_or(config.inner.new_per_day),
+            normal.review_limit.unwrap_or(config.inner.reviews_per_day),
+        ))
+    }
+
+    /// Persist deck-specific overrides through Anki's native undoable deck
+    /// transaction, rather than changing the shared preset of other decks.
+    pub fn set_deck_daily_limits(
+        &mut self, deck_id: i64, new_per_day: u32, reviews_per_day: u32
+    ) -> BackendResult<()> {
+        if new_per_day > 9999 || reviews_per_day > 9999 {
+            return Err("daily limits must be between 0 and 9999".into());
+        }
+        let mut deck = self.collection.get_deck(DeckId(deck_id))?
+            .ok_or("requested deck does not exist")?.as_ref().clone();
+        let normal = deck.normal_mut()?;
+        normal.new_limit = Some(new_per_day);
+        normal.review_limit = Some(reviews_per_day);
+        self.collection.update_deck(&mut deck)?;
+        Ok(())
+    }
+
     pub fn add_basic_note(&mut self, deck_id: i64, front: &str, back: &str) -> BackendResult<i64> {
         if front.trim().is_empty() || back.trim().is_empty() {
             return Err("front and back must not be blank".into());
@@ -588,6 +622,49 @@ impl AnkiBackend {
         Ok(exact)
     }
 
+    /// Index existing source identities ONCE before an opt-in generation run.
+    /// A bounded batch must check this set before calling the fast insertion
+    /// path, avoiding O(cards²) rescanning of Anki's notes table.
+    pub fn source_identity_tags(&self) -> BackendResult<HashSet<String>> {
+        let mut statement = self.collection.storage.db()
+            .prepare("SELECT tags FROM notes")?;
+        let tags = statement.query_map([], |row| row.get::<_, String>(0))?;
+        let mut identities = HashSet::new();
+        for value in tags {
+            for tag in value?.split_whitespace() {
+                if tag.starts_with("retivus::source::") {
+                    identities.insert(tag.to_owned());
+                }
+            }
+        }
+        Ok(identities)
+    }
+
+    /// Fast path is usable only after the generator's one-time complete
+    /// identity preflight and matching per-candidate set check. The normal
+    /// single-note path below continues to perform its own duplicate scan.
+    pub fn add_prechecked_source_candidate(
+        &mut self, deck_id: i64, candidate: &SourceCardCandidate
+    ) -> BackendResult<i64> {
+        self.insert_source_candidate(deck_id, candidate)
+    }
+
+    fn insert_source_candidate(
+        &mut self, deck_id: i64, candidate: &SourceCardCandidate
+    ) -> BackendResult<i64> {
+        if candidate.word.trim().is_empty() || candidate.definition.trim().is_empty() {
+            return Err("source word and definition must not be blank".into());
+        }
+        let notetype = self.collection.get_notetype_by_name("Basic")?
+            .ok_or("Anki collection does not contain Basic note type")?;
+        let mut note = notetype.new_note();
+        note.set_field(0, &candidate.word)?;
+        note.set_field(1, &candidate.definition)?;
+        note.tags.push(candidate.source_tag());
+        self.collection.add_note(&mut note, DeckId(deck_id))?;
+        Ok(note.id.0)
+    }
+
     /// Materialize only a user-selected source sense. The separate source
     /// catalog remains read-only; Anki owns the new note, cards and review state.
     pub fn add_source_candidate(
@@ -604,16 +681,7 @@ impl AnkiBackend {
             )
             .into());
         }
-        let notetype = self
-            .collection
-            .get_notetype_by_name("Basic")?
-            .ok_or("Anki collection does not contain Basic note type")?;
-        let mut note = notetype.new_note();
-        note.set_field(0, &candidate.word)?;
-        note.set_field(1, &candidate.definition)?;
-        note.tags.push(candidate.source_tag());
-        self.collection.add_note(&mut note, DeckId(deck_id))?;
-        Ok(note.id.0)
+        self.insert_source_candidate(deck_id, candidate)
     }
 
     /// Apply only a user-approved, exact one-to-one source reconciliation.
