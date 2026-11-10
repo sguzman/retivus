@@ -395,12 +395,15 @@ impl AnkiBackend {
     /// shared deck-config preset. Parent deck limits may further constrain the
     /// visible queue, just as they do in Anki Desktop.
     pub fn deck_daily_limits(&mut self, deck_id: i64) -> BackendResult<(u32, u32)> {
-        let deck = self.collection.get_deck(DeckId(deck_id))?
+        let deck = self
+            .collection
+            .get_deck(DeckId(deck_id))?
             .ok_or("requested deck does not exist")?;
         let normal = deck.normal()?;
-        let config = self.collection.get_deck_config(
-            deck.config_id().ok_or("expected a normal deck")?, true
-        )?.ok_or("Anki deck configuration unavailable")?;
+        let config = self
+            .collection
+            .get_deck_config(deck.config_id().ok_or("expected a normal deck")?, true)?
+            .ok_or("Anki deck configuration unavailable")?;
         Ok((
             normal.new_limit.unwrap_or(config.inner.new_per_day),
             normal.review_limit.unwrap_or(config.inner.reviews_per_day),
@@ -410,13 +413,20 @@ impl AnkiBackend {
     /// Persist deck-specific overrides through Anki's native undoable deck
     /// transaction, rather than changing the shared preset of other decks.
     pub fn set_deck_daily_limits(
-        &mut self, deck_id: i64, new_per_day: u32, reviews_per_day: u32
+        &mut self,
+        deck_id: i64,
+        new_per_day: u32,
+        reviews_per_day: u32,
     ) -> BackendResult<()> {
         if new_per_day > 9999 || reviews_per_day > 9999 {
             return Err("daily limits must be between 0 and 9999".into());
         }
-        let mut deck = self.collection.get_deck(DeckId(deck_id))?
-            .ok_or("requested deck does not exist")?.as_ref().clone();
+        let mut deck = self
+            .collection
+            .get_deck(DeckId(deck_id))?
+            .ok_or("requested deck does not exist")?
+            .as_ref()
+            .clone();
         let normal = deck.normal_mut()?;
         normal.new_limit = Some(new_per_day);
         normal.review_limit = Some(reviews_per_day);
@@ -626,7 +636,10 @@ impl AnkiBackend {
     /// A bounded batch must check this set before calling the fast insertion
     /// path, avoiding O(cards²) rescanning of Anki's notes table.
     pub fn source_identity_tags(&self) -> BackendResult<HashSet<String>> {
-        let mut statement = self.collection.storage.db()
+        let mut statement = self
+            .collection
+            .storage
+            .db()
             .prepare("SELECT tags FROM notes")?;
         let tags = statement.query_map([], |row| row.get::<_, String>(0))?;
         let mut identities = HashSet::new();
@@ -644,18 +657,24 @@ impl AnkiBackend {
     /// identity preflight and matching per-candidate set check. The normal
     /// single-note path below continues to perform its own duplicate scan.
     pub fn add_prechecked_source_candidate(
-        &mut self, deck_id: i64, candidate: &SourceCardCandidate
+        &mut self,
+        deck_id: i64,
+        candidate: &SourceCardCandidate,
     ) -> BackendResult<i64> {
         self.insert_source_candidate(deck_id, candidate)
     }
 
     fn insert_source_candidate(
-        &mut self, deck_id: i64, candidate: &SourceCardCandidate
+        &mut self,
+        deck_id: i64,
+        candidate: &SourceCardCandidate,
     ) -> BackendResult<i64> {
         if candidate.word.trim().is_empty() || candidate.definition.trim().is_empty() {
             return Err("source word and definition must not be blank".into());
         }
-        let notetype = self.collection.get_notetype_by_name("Basic")?
+        let notetype = self
+            .collection
+            .get_notetype_by_name("Basic")?
             .ok_or("Anki collection does not contain Basic note type")?;
         let mut note = notetype.new_note();
         note.set_field(0, &candidate.word)?;
@@ -1161,9 +1180,17 @@ mod tests {
             part_of_speech: "noun".into(),
             definition: "life".into(),
         };
-        assert!(!backend.source_identity_tags().unwrap().contains(&candidate.source_tag()));
-        backend.add_prechecked_source_candidate(deck, &candidate).unwrap();
-        assert!(backend.source_identity_tags().unwrap().contains(&candidate.source_tag()));
+        assert!(!backend
+            .source_identity_tags()
+            .unwrap()
+            .contains(&candidate.source_tag()));
+        backend
+            .add_prechecked_source_candidate(deck, &candidate)
+            .unwrap();
+        assert!(backend
+            .source_identity_tags()
+            .unwrap()
+            .contains(&candidate.source_tag()));
         assert!(backend.add_source_candidate(deck, &candidate).is_err());
         assert_eq!(backend.collection_stats().unwrap().notes, 1);
     }

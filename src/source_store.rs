@@ -188,7 +188,9 @@ impl SourceCatalog {
             .map_err(|e| e.to_string())?;
         if has_ordinal == 0 {
             connection
-                .execute_batch("ALTER TABLE senses ADD COLUMN source_ordinal INTEGER NOT NULL DEFAULT -1")
+                .execute_batch(
+                    "ALTER TABLE senses ADD COLUMN source_ordinal INTEGER NOT NULL DEFAULT -1",
+                )
                 .map_err(|e| e.to_string())?;
         }
         connection
@@ -449,23 +451,26 @@ impl SourceCatalog {
             )
             .map_err(|e| e.to_string())?;
         let rows = query
-            .query_map(params![provider, snapshot, after_entry_id, limit as i64], |r| {
-                Ok(SourceCardCandidate {
-                    entry_id: r.get(0)?,
-                    word: r.get(1)?,
-                    part_of_speech: r.get(2)?,
-                    provenance: SourceInfo {
-                        provider_id: provider.to_owned(),
-                        edition: r.get(3)?,
-                        lexical_language: r.get(6)?,
-                        definition_language: r.get(7)?,
-                        license_notice: r.get(8)?,
-                    },
-                    sense_id: r.get(4)?,
-                    definition: r.get(5)?,
-                    snapshot: snapshot.to_owned(),
-                })
-            })
+            .query_map(
+                params![provider, snapshot, after_entry_id, limit as i64],
+                |r| {
+                    Ok(SourceCardCandidate {
+                        entry_id: r.get(0)?,
+                        word: r.get(1)?,
+                        part_of_speech: r.get(2)?,
+                        provenance: SourceInfo {
+                            provider_id: provider.to_owned(),
+                            edition: r.get(3)?,
+                            lexical_language: r.get(6)?,
+                            definition_language: r.get(7)?,
+                            license_notice: r.get(8)?,
+                        },
+                        sense_id: r.get(4)?,
+                        definition: r.get(5)?,
+                        snapshot: snapshot.to_owned(),
+                    })
+                },
+            )
             .map_err(|e| e.to_string())?;
         rows.collect::<Result<Vec<_>, _>>()
             .map_err(|e| e.to_string())
@@ -731,33 +736,51 @@ mod tests {
             r#"{"format_version":1,"source":"mexilex","source_edition":"enwiktionary","lexical_language":"es-MX","definition_language":"en","entry_id":"entry-2","word":"veneno","part_of_speech":"noun","senses":[{"id":"only","definition_en":"poison"}]}"#,
         ].join("\n");
         let mut catalog = SourceCatalog::in_memory().unwrap();
-        catalog.import_snapshot("sample", &MexilexV1::default(), &mut Cursor::new(data)).unwrap();
-        let pages = catalog.first_meaning_page("mexilex", "sample", "", 1).unwrap();
+        catalog
+            .import_snapshot("sample", &MexilexV1::default(), &mut Cursor::new(data))
+            .unwrap();
+        let pages = catalog
+            .first_meaning_page("mexilex", "sample", "", 1)
+            .unwrap();
         assert_eq!(pages.len(), 1);
         assert_eq!(pages[0].sense_id, "z-last-lexically");
         assert_eq!(pages[0].definition, "life");
-        let next = catalog.first_meaning_page("mexilex", "sample", &pages[0].entry_id, 2).unwrap();
+        let next = catalog
+            .first_meaning_page("mexilex", "sample", &pages[0].entry_id, 2)
+            .unwrap();
         assert_eq!(next.len(), 1);
         assert_eq!(next[0].word, "veneno");
-        assert!(catalog.first_meaning_page("mexilex", "sample", &next[0].entry_id, 2).unwrap().is_empty());
-        assert!(catalog.first_meaning_page("mexilex", "sample", "", 257).is_err());
+        assert!(catalog
+            .first_meaning_page("mexilex", "sample", &next[0].entry_id, 2)
+            .unwrap()
+            .is_empty());
+        assert!(catalog
+            .first_meaning_page("mexilex", "sample", "", 257)
+            .is_err());
 
         // Simulate a catalog created before the explicit ordinal column.
         let tmp = tempdir().unwrap();
         let old = tmp.path().join("legacy.sqlite3");
         let db = rusqlite::Connection::open(&old).unwrap();
-        db.execute_batch("CREATE TABLE senses (
+        db.execute_batch(
+            "CREATE TABLE senses (
           provider TEXT NOT NULL, snapshot TEXT NOT NULL, entry_id TEXT NOT NULL,
           sense_id TEXT NOT NULL, definition TEXT NOT NULL,
           PRIMARY KEY(provider, snapshot, entry_id, sense_id));
           INSERT INTO senses VALUES ('mexilex','sample','entry-1','z','first');
-          INSERT INTO senses VALUES ('mexilex','sample','entry-1','a','second');").unwrap();
+          INSERT INTO senses VALUES ('mexilex','sample','entry-1','a','second');",
+        )
+        .unwrap();
         drop(db);
         let migrated = SourceCatalog::open_existing(&old).unwrap();
-        let senses = migrated.connection.prepare(
-            "SELECT sense_id FROM senses ORDER BY source_ordinal"
-        ).unwrap().query_map([], |r| r.get::<_, String>(0)).unwrap()
-            .collect::<Result<Vec<_>, _>>().unwrap();
+        let senses = migrated
+            .connection
+            .prepare("SELECT sense_id FROM senses ORDER BY source_ordinal")
+            .unwrap()
+            .query_map([], |r| r.get::<_, String>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
         assert_eq!(senses, ["z", "a"]);
     }
 

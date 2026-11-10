@@ -437,9 +437,7 @@ impl StudyPanel {
 
     fn save_daily_limits(&mut self) {
         if let (Some(backend), Some(id)) = (&mut self.backend, self.deck_id) {
-            match backend.set_deck_daily_limits(
-                id, self.daily_new_limit, self.daily_review_limit
-            ) {
+            match backend.set_deck_daily_limits(id, self.daily_new_limit, self.daily_review_limit) {
                 Ok(()) => {
                     self.status = "Anki deck-specific daily limits saved.".into();
                     self.refresh_review();
@@ -457,8 +455,11 @@ impl StudyPanel {
         let result = (|| -> Result<usize, String> {
             let path = self.managed_catalog_path()?;
             let catalog = SourceCatalog::open_existing(&path)?;
-            if catalog.authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?
-                .as_deref() != Some(MEXILEX_STUDY_SHA256) {
+            if catalog
+                .authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?
+                .as_deref()
+                != Some(MEXILEX_STUDY_SHA256)
+            {
                 return Err("import the verified Mexilex release into this profile first".into());
             }
             let (entries, senses) = catalog.counts("mexilex", MEXILEX_SNAPSHOT)?;
@@ -483,20 +484,27 @@ impl StudyPanel {
     }
 
     fn start_first_definition_generation(&mut self) {
-        if !self.generation_confirmed || self.generation_plan.is_none()
-            || self.generation.is_some() {
+        if !self.generation_confirmed || self.generation_plan.is_none() || self.generation.is_some()
+        {
             self.generation_status = "Preview and confirm the plan before starting.".into();
             return;
         }
         // Recheck the authenticated source immediately before mutations.
         self.preview_first_definition_generation();
-        let Some(total) = self.generation_plan else { return; };
+        let Some(total) = self.generation_plan else {
+            return;
+        };
         let outcome = (|| -> Result<(i64, HashSet<String>), String> {
-            let backend = self.backend.as_mut().ok_or("open a managed profile first")?;
+            let backend = self
+                .backend
+                .as_mut()
+                .ok_or("open a managed profile first")?;
             let source_tags = backend.source_identity_tags().map_err(|e| e.to_string())?;
-            let deck = backend.create_deck("Tarium::es-MX::mexilex")
+            let deck = backend
+                .create_deck("Tarium::es-MX::mexilex")
                 .map_err(|e| e.to_string())?;
-            backend.set_deck_daily_limits(deck, self.daily_new_limit, self.daily_review_limit)
+            backend
+                .set_deck_daily_limits(deck, self.daily_new_limit, self.daily_review_limit)
                 .map_err(|e| e.to_string())?;
             Ok((deck, source_tags))
         })();
@@ -521,23 +529,28 @@ impl StudyPanel {
     /// One bounded batch per GUI repaint. UI remains responsive and committed
     /// cards survive cancellation, restart or a later safe resume.
     fn advance_first_definition_generation(&mut self) {
-        let Some(mut job) = self.generation.take() else { return; };
+        let Some(mut job) = self.generation.take() else {
+            return;
+        };
         let result = (|| -> Result<bool, String> {
             let catalog = SourceCatalog::open_existing(&self.managed_catalog_path()?)?;
-            if catalog.authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?
-                .as_deref() != Some(MEXILEX_STUDY_SHA256) {
+            if catalog
+                .authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?
+                .as_deref()
+                != Some(MEXILEX_STUDY_SHA256)
+            {
                 return Err("verified source attestation changed during generation".into());
             }
-            let batch = catalog.first_meaning_page(
-                "mexilex", MEXILEX_SNAPSHOT, &job.last_entry_id, 64
-            )?;
+            let batch =
+                catalog.first_meaning_page("mexilex", MEXILEX_SNAPSHOT, &job.last_entry_id, 64)?;
             let backend = self.backend.as_mut().ok_or("learner profile closed")?;
             for candidate in &batch {
                 let tag = candidate.source_tag();
                 if job.source_tags.contains(&tag) {
                     job.skipped += 1;
                 } else {
-                    backend.add_prechecked_source_candidate(job.deck_id, candidate)
+                    backend
+                        .add_prechecked_source_candidate(job.deck_id, candidate)
                         .map_err(|e| format!("entry {}: {e}", candidate.entry_id))?;
                     job.source_tags.insert(tag);
                     job.created += 1;
