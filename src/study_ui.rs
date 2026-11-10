@@ -1243,6 +1243,9 @@ impl StudyPanel {
                 Err(error) => format!("Profile close reported an error: {error}"),
             };
         }
+        self.generation = None;
+        self.generation_plan = None;
+        self.generation_confirmed = false;
         self.active_root = None;
         self.active_profile_id = None;
         self.decks.clear();
@@ -1409,6 +1412,12 @@ impl StudyPanel {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
+        if self.generation.is_some() {
+            self.advance_first_definition_generation();
+            if self.generation.is_some() {
+                ui.ctx().request_repaint();
+            }
+        }
         egui::CollapsingHeader::new("Learner workspace · managed Anki collections")
             .default_open(true)
             .show(ui, |ui| {
@@ -1477,7 +1486,7 @@ impl StudyPanel {
                     if ui.button("Create new profile").clicked() { self.connect(true); }
                     if ui.button("Open owned profile").clicked() { self.connect(false); }
                 });
-                if ui.add_enabled(self.backend.is_some(), egui::Button::new("Close profile")).clicked() {
+                if ui.add_enabled(self.backend.is_some() && self.generation.is_none(), egui::Button::new("Close profile")).clicked() {
                     self.close();
                 }
                 if ui
@@ -1535,6 +1544,65 @@ impl StudyPanel {
             if self.backend.is_some() {
                 ui.separator();
                 ui.heading("Decks and notes");
+                egui::CollapsingHeader::new("Daily study limits · Anki scheduler")
+                    .show(ui, |ui| {
+                        ui.label("Limits apply to the selected deck, not the entire collection. Parent decks can further restrict the queue.");
+                        ui.horizontal_wrapped(|ui| {
+                            ui.label("New per day");
+                            ui.add(egui::DragValue::new(&mut self.daily_new_limit).range(0..=9999));
+                            ui.label("Reviews per day");
+                            ui.add(egui::DragValue::new(&mut self.daily_review_limit).range(0..=9999));
+                            if ui.add_enabled(
+                                self.generation.is_none() && self.deck_id.is_some(),
+                                egui::Button::new("Save selected deck limits"),
+                            ).clicked() {
+                                self.save_daily_limits();
+                            }
+                        });
+                    });
+                egui::CollapsingHeader::new("Generate Mexilex first-definition deck")
+                    .show(ui, |ui| {
+                        ui.label("One Spanish word → first English definition per lexical entry. Exact source identities prevent duplicates, including homographs.");
+                        ui.weak("Requires the imported checksum-verified Mexilex lex-v0.3.0 catalog in this profile. The 12-row preview limit is unaffected.");
+                        if self.generation.is_none() {
+                            if ui.button("Preview 124,444-entry generation plan").clicked() {
+                                self.preview_first_definition_generation();
+                            }
+                            if let Some(total) = self.generation_plan {
+                                ui.label(format!("{total} entries will be considered. Already-created source cards will be skipped."));
+                                ui.checkbox(
+                                    &mut self.generation_confirmed,
+                                    "Confirm: add missing first-definition cards to Tarium::es-MX::mexilex",
+                                );
+                                if ui.add_enabled(
+                                    self.generation_confirmed,
+                                    egui::Button::new("Generate first-definition deck"),
+                                ).clicked() {
+                                    self.start_first_definition_generation();
+                                }
+                            }
+                        } else {
+                            let job = self.generation.as_ref().unwrap();
+                            ui.add(egui::ProgressBar::new(
+                                job.processed as f32 / job.total.max(1) as f32
+                            ).show_percentage().text(format!(
+                                "{} / {} · {} created · {} skipped",
+                                job.processed, job.total, job.created, job.skipped
+                            )));
+                            if ui.button("Cancel generation (keep created cards)").clicked() {
+                                self.generation = None;
+                                self.generation_plan = None;
+                                self.generation_confirmed = false;
+                                self.generation_status =
+                                    "Generation stopped. Created cards remain intact; re-preview to safely resume.".into();
+                                self.refresh();
+                                self.refresh_review();
+                            }
+                        }
+                        if !self.generation_status.is_empty() {
+                            ui.label(&self.generation_status);
+                        }
+                    });
                 ui.horizontal_wrapped(|ui| {
                     let previous_deck = self.deck_id;
                     let active_deck_label = ui.label("Active deck");
@@ -1549,6 +1617,7 @@ impl StudyPanel {
                         .response
                         .labelled_by(active_deck_label.id);
                     if self.deck_id != previous_deck {
+                        self.load_daily_limits();
                         self.refresh_review();
                     }
                     ui.add(egui::TextEdit::singleline(&mut self.new_deck).hint_text("New deck name").desired_width(200.0));
