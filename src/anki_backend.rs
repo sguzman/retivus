@@ -399,7 +399,10 @@ impl AnkiBackend {
             .collection
             .get_deck(DeckId(deck_id))?
             .ok_or("requested deck does not exist")?;
-        let normal = deck.normal()?;
+        let normal = match &deck.kind {
+            anki::decks::DeckKind::Normal(normal) => normal,
+            _ => return Err("expected a normal deck".into()),
+        };
         let config = self
             .collection
             .get_deck_config(deck.config_id().ok_or("expected a normal deck")?, true)?
@@ -427,7 +430,10 @@ impl AnkiBackend {
             .ok_or("requested deck does not exist")?
             .as_ref()
             .clone();
-        let normal = deck.normal_mut()?;
+        let normal = match &mut deck.kind {
+            anki::decks::DeckKind::Normal(normal) => normal,
+            _ => return Err("expected a normal deck".into()),
+        };
         normal.new_limit = Some(new_per_day);
         normal.review_limit = Some(reviews_per_day);
         self.collection.update_deck(&mut deck)?;
