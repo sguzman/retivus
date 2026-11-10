@@ -1579,10 +1579,28 @@ impl StudyPanel {
                         ui.weak("Requires the imported checksum-verified Mexilex lex-v0.3.0 catalog in this profile. The 12-row preview limit is unaffected.");
                         if self.generation.is_none() {
                             if ui.button("Preview 124,444-entry generation plan").clicked() {
+                                let mexilex_id = self.decks.iter()
+                                    .find(|(_, name)| name == "Tarium::es-MX::mexilex")
+                                    .map(|(id, _)| *id);
+                                let caps = mexilex_id.and_then(|id| {
+                                    self.backend.as_mut()?.deck_daily_limits(id).ok()
+                                }).unwrap_or((20, 200));
+                                self.daily_new_limit = caps.0;
+                                self.daily_review_limit = caps.1;
                                 self.preview_first_definition_generation();
                             }
                             if let Some(total) = self.generation_plan {
                                 ui.label(format!("{total} entries will be considered. Already-created source cards will be skipped."));
+                                ui.horizontal_wrapped(|ui| {
+                                    ui.label("New cards/day");
+                                    ui.add(egui::DragValue::new(&mut self.daily_new_limit).range(0..=9999));
+                                    ui.label("Reviews/day");
+                                    ui.add(egui::DragValue::new(&mut self.daily_review_limit).range(0..=9999));
+                                });
+                                ui.weak(format!(
+                                    "Daily new-card cap is Anki's setting (up to {} new over 7 days). Parent deck caps may be stricter.",
+                                    self.daily_new_limit.saturating_mul(7)
+                                ));
                                 ui.checkbox(
                                     &mut self.generation_confirmed,
                                     "Confirm: add missing first-definition cards to Tarium::es-MX::mexilex",
