@@ -3724,20 +3724,27 @@ mod tests {
         // Synthetic private catalog. This low-level fixture stamps a digest
         // deliberately; only the production staging entry point is permitted
         // to authenticate real Mexilex exports against published bytes.
-        let mut catalog = SourceCatalog::create_new(&panel.managed_catalog_path().unwrap()).unwrap();
+        let mut catalog =
+            SourceCatalog::create_new(&panel.managed_catalog_path().unwrap()).unwrap();
         let source = [
             r#"{"format_version":1,"source":"mexilex","source_edition":"enwiktionary","lexical_language":"es-MX","definition_language":"en","entry_id":"a","word":"vida","part_of_speech":"noun","senses":[{"id":"z","definition_en":"life"},{"id":"b","definition_en":"living"}]}"#,
             r#"{"format_version":1,"source":"mexilex","source_edition":"enwiktionary","lexical_language":"es-MX","definition_language":"en","entry_id":"b","word":"veneno","part_of_speech":"noun","senses":[{"id":"s1","definition_en":"poison"}]}"#,
         ].join("\n");
-        catalog.import_authenticated_snapshot(
-            MEXILEX_SNAPSHOT,
-            &retivus::source_adapter::MexilexV1::default(),
-            &mut BufReader::new(std::io::Cursor::new(source)),
-            MEXILEX_STUDY_SHA256,
-        ).unwrap();
+        catalog
+            .import_authenticated_snapshot(
+                MEXILEX_SNAPSHOT,
+                &retivus::source_adapter::MexilexV1::default(),
+                &mut BufReader::new(std::io::Cursor::new(source)),
+                MEXILEX_STUDY_SHA256,
+            )
+            .unwrap();
         drop(catalog);
-        let deck_id = panel.backend.as_mut().unwrap()
-            .create_deck("Tarium::es-MX::mexilex").unwrap();
+        let deck_id = panel
+            .backend
+            .as_mut()
+            .unwrap()
+            .create_deck("Tarium::es-MX::mexilex")
+            .unwrap();
         panel.generation = Some(FirstDefinitionJob {
             deck_id,
             total: 2,
@@ -3749,20 +3756,38 @@ mod tests {
         });
         panel.advance_first_definition_generation();
         assert!(panel.generation.is_none());
-        assert!(panel.generation_status.contains("2 new cards"), "{}", panel.generation_status);
+        assert!(
+            panel.generation_status.contains("2 new cards"),
+            "{}",
+            panel.generation_status
+        );
         let backend = panel.backend.as_mut().unwrap();
         let rows = backend.browse_notes("", 10).unwrap();
         assert_eq!(rows.len(), 2);
-        let mut pairs = rows.iter().map(|row| {
-            let fields = backend.note_fields(row.id).unwrap();
-            (fields[0].clone(), fields[1].clone())
-        }).collect::<Vec<_>>();
+        let mut pairs = rows
+            .iter()
+            .map(|row| {
+                let fields = backend.note_fields(row.id).unwrap();
+                (fields[0].clone(), fields[1].clone())
+            })
+            .collect::<Vec<_>>();
         pairs.sort();
-        assert_eq!(pairs, [("veneno".into(), "poison".into()), ("vida".into(), "life".into())]);
+        assert_eq!(
+            pairs,
+            [
+                ("veneno".into(), "poison".into()),
+                ("vida".into(), "life".into())
+            ]
+        );
 
         panel.close();
         panel.connect(false);
-        let seen = panel.backend.as_ref().unwrap().source_identity_tags().unwrap();
+        let seen = panel
+            .backend
+            .as_ref()
+            .unwrap()
+            .source_identity_tags()
+            .unwrap();
         assert_eq!(seen.len(), 2);
         panel.generation = Some(FirstDefinitionJob {
             deck_id,
@@ -3774,9 +3799,23 @@ mod tests {
             source_tags: seen,
         });
         panel.advance_first_definition_generation();
-        assert!(panel.generation_status.contains("0 new cards, 2 already present"),
-                "{}", panel.generation_status);
-        assert_eq!(panel.backend.as_ref().unwrap().collection_stats().unwrap().notes, 2);
+        assert!(
+            panel
+                .generation_status
+                .contains("0 new cards, 2 already present"),
+            "{}",
+            panel.generation_status
+        );
+        assert_eq!(
+            panel
+                .backend
+                .as_ref()
+                .unwrap()
+                .collection_stats()
+                .unwrap()
+                .notes,
+            2
+        );
         panel.close();
     }
 
