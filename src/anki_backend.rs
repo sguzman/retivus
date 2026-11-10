@@ -1136,6 +1136,38 @@ mod tests {
     use anki::storage::SchemaVersion;
     use tempfile::tempdir;
 
+    #[test]
+    fn bulk_source_identity_index_and_native_deck_limits_are_isolated() {
+        let mut backend = AnkiBackend::in_memory().unwrap();
+        let deck = backend.create_deck("Tarium::es-MX::mexilex").unwrap();
+        assert_eq!(backend.deck_daily_limits(deck).unwrap(), (20, 200));
+        backend.set_deck_daily_limits(deck, 7, 30).unwrap();
+        assert_eq!(backend.deck_daily_limits(deck).unwrap(), (7, 30));
+        assert_eq!(backend.deck_daily_limits(1).unwrap(), (20, 200));
+        assert!(backend.set_deck_daily_limits(deck, 10000, 30).is_err());
+
+        let candidate = SourceCardCandidate {
+            provenance: crate::source_adapter::SourceInfo {
+                provider_id: "mexilex".into(),
+                edition: "enwiktionary".into(),
+                lexical_language: "es-MX".into(),
+                definition_language: "en".into(),
+                license_notice: "synthetic test data".into(),
+            },
+            snapshot: "synthetic".into(),
+            entry_id: "word-1".into(),
+            sense_id: "z".into(),
+            word: "vida".into(),
+            part_of_speech: "noun".into(),
+            definition: "life".into(),
+        };
+        assert!(!backend.source_identity_tags().unwrap().contains(&candidate.source_tag()));
+        backend.add_prechecked_source_candidate(deck, &candidate).unwrap();
+        assert!(backend.source_identity_tags().unwrap().contains(&candidate.source_tag()));
+        assert!(backend.add_source_candidate(deck, &candidate).is_err());
+        assert_eq!(backend.collection_stats().unwrap().notes, 1);
+    }
+
     /// These public assets are downloaded by CI at pinned commits and validated
     /// by their Git blob hashes; no third-party binaries are bundled in Retivus.
     #[test]
