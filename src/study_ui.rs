@@ -5,6 +5,7 @@ use retivus::anki_backend::{AnkiBackend, CollectionStats, NoteRow, ReviewPreview
 use retivus::source_adapter::{SourceAdapter, SourceRecord};
 use retivus::source_store::{SnapshotSenseChange, SourceCardCandidate, SourceCatalog};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::fs;
 use std::io::{BufReader, Read, Seek, Write};
 use std::path::{Path, PathBuf};
@@ -47,6 +48,18 @@ impl BrowseScope {
     }
 }
 
+/// A resumable, opt-in first-definition run. A cancellation stops after the
+/// current bounded batch; already committed Anki notes are never deleted.
+struct FirstDefinitionJob {
+    deck_id: i64,
+    total: usize,
+    processed: usize,
+    created: usize,
+    skipped: usize,
+    last_entry_id: String,
+    source_tags: HashSet<String>,
+}
+
 #[derive(Default)]
 pub struct StudyPanel {
     root: String,
@@ -69,6 +82,12 @@ pub struct StudyPanel {
     decks: Vec<(i64, String)>,
     deck_id: Option<i64>,
     new_deck: String,
+    daily_new_limit: u32,
+    daily_review_limit: u32,
+    generation_plan: Option<usize>,
+    generation_confirmed: bool,
+    generation: Option<FirstDefinitionJob>,
+    generation_status: String,
     front: String,
     back: String,
     query: String,
@@ -383,6 +402,7 @@ impl StudyPanel {
                         .map(|(id, _)| *id);
                 }
                 self.notes = notes;
+                self.load_daily_limits();
                 self.source_report.clear();
                 if self
                     .selected_note
@@ -402,6 +422,159 @@ impl StudyPanel {
                 self.front.clear();
                 self.back.clear();
                 self.status = format!("Could not browse profile: {error}");
+            }
+        }
+    }
+
+    fn load_daily_limits(&mut self) {
+        if let (Some(backend), Some(id)) = (&mut self.backend, self.deck_id) {
+            if let Ok((new, review)) = backend.deck_daily_limits(id) {
+                self.daily_new_limit = new;
+                self.daily_review_limit = review;
+            }
+        }
+    }
+
+    fn save_daily_limits(&mut self) {
+        if let (Some(backend), Some(id)) = (&mut self.backend, self.deck_id) {
+            match backend.set_deck_daily_limits(
+                id, self.daily_new_limit, self.daily_review_limit
+            ) {
+                Ok(()) => {
+                    self.status = "Anki deck-specific daily limits saved.".into();
+                    self.refresh_review();
+                }
+                Err(error) => self.status = format!("Could not save daily limits: {error}"),
+            }
+        }
+    }
+
+    /// Previewing never writes notes, changes limits or creates a deck.
+    /// Only the exact independently authenticated catalog may produce a plan.
+    fn preview_first_definition_generation(&mut self) {
+        self.generation_plan = None;
+        self.generation_confirmed = false;
+        let result = (|| -> Result<usize, String> {
+            let path = self.managed_catalog_path()?;
+            let catalog = SourceCatalog::open_existing(&path)?;
+            if catalog.authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?
+                .as_deref() != Some(MEXILEX_STUDY_SHA256) {
+                return Err("import the verified Mexilex release into this profile first".into());
+            }
+            let (entries, senses) = catalog.counts("mexilex", MEXILEX_SNAPSHOT)?;
+            if entries != 124444 || senses != 155586 {
+                return Err("Mexilex snapshot counts do not match the verified release".into());
+            }
+            let first = catalog.first_meaning_page("mexilex", MEXILEX_SNAPSHOT, "", 1)?;
+            if first.is_empty() {
+                return Err("verified source catalog contains no first meanings".into());
+            }
+            Ok(entries as usize)
+        })();
+        match result {
+            Ok(total) => {
+                self.generation_plan = Some(total);
+                self.generation_status = format!(
+                    "Plan: {total} lexical entries, one first English definition per entry.                      Existing source-tagged notes will be skipped; no cards created yet."
+                );
+            }
+            Err(error) => self.generation_status = format!("Plan unavailable: {error}"),
+        }
+    }
+
+    fn start_first_definition_generation(&mut self) {
+        if !self.generation_confirmed || self.generation_plan.is_none()
+            || self.generation.is_some() {
+            self.generation_status = "Preview and confirm the plan before starting.".into();
+            return;
+        }
+        // Recheck the authenticated source immediately before mutations.
+        self.preview_first_definition_generation();
+        let Some(total) = self.generation_plan else { return; };
+        let outcome = (|| -> Result<(i64, HashSet<String>), String> {
+            let backend = self.backend.as_mut().ok_or("open a managed profile first")?;
+            let source_tags = backend.source_identity_tags().map_err(|e| e.to_string())?;
+            let deck = backend.create_deck("Tarium::es-MX::mexilex")
+                .map_err(|e| e.to_string())?;
+            backend.set_deck_daily_limits(deck, self.daily_new_limit, self.daily_review_limit)
+                .map_err(|e| e.to_string())?;
+            Ok((deck, source_tags))
+        })();
+        match outcome {
+            Ok((deck_id, source_tags)) => {
+                self.generation = Some(FirstDefinitionJob {
+                    deck_id,
+                    total,
+                    processed: 0,
+                    created: 0,
+                    skipped: 0,
+                    last_entry_id: String::new(),
+                    source_tags,
+                });
+                self.generation_status =
+                    "Generation started. You may cancel or close the app; rerunning skips existing cards.".into();
+            }
+            Err(error) => self.generation_status = format!("Generation refused: {error}"),
+        }
+    }
+
+    /// One bounded batch per GUI repaint. UI remains responsive and committed
+    /// cards survive cancellation, restart or a later safe resume.
+    fn advance_first_definition_generation(&mut self) {
+        let Some(mut job) = self.generation.take() else { return; };
+        let result = (|| -> Result<bool, String> {
+            let catalog = SourceCatalog::open_existing(&self.managed_catalog_path()?)?;
+            if catalog.authenticated_export_digest("mexilex", MEXILEX_SNAPSHOT)?
+                .as_deref() != Some(MEXILEX_STUDY_SHA256) {
+                return Err("verified source attestation changed during generation".into());
+            }
+            let batch = catalog.first_meaning_page(
+                "mexilex", MEXILEX_SNAPSHOT, &job.last_entry_id, 64
+            )?;
+            let backend = self.backend.as_mut().ok_or("learner profile closed")?;
+            for candidate in &batch {
+                let tag = candidate.source_tag();
+                if job.source_tags.contains(&tag) {
+                    job.skipped += 1;
+                } else {
+                    backend.add_prechecked_source_candidate(job.deck_id, candidate)
+                        .map_err(|e| format!("entry {}: {e}", candidate.entry_id))?;
+                    job.source_tags.insert(tag);
+                    job.created += 1;
+                }
+                job.processed += 1;
+                job.last_entry_id.clone_from(&candidate.entry_id);
+            }
+            Ok(batch.len() < 64)
+        })();
+        match result {
+            Ok(true) => {
+                self.deck_id = Some(job.deck_id);
+                self.generation_status = format!(
+                    "Completed: {} entries, {} new cards, {} already present.",
+                    job.processed, job.created, job.skipped
+                );
+                self.generation_plan = None;
+                self.generation_confirmed = false;
+                self.refresh();
+                self.refresh_review();
+            }
+            Ok(false) => {
+                self.generation_status = format!(
+                    "{} / {} entries checked · {} new cards · {} existing skipped",
+                    job.processed, job.total, job.created, job.skipped
+                );
+                self.generation = Some(job);
+            }
+            Err(error) => {
+                self.generation_status = format!(
+                    "Stopped after {} entries ({} added, {} skipped): {error}.                      Re-preview to resume safely without duplicates.",
+                    job.processed, job.created, job.skipped
+                );
+                self.generation_plan = None;
+                self.generation_confirmed = false;
+                self.refresh();
+                self.refresh_review();
             }
         }
     }
