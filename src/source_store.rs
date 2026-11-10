@@ -187,23 +187,21 @@ impl SourceCatalog {
             )
             .map_err(|e| e.to_string())?;
         if has_ordinal == 0 {
+            // Migrate once. Opening the large verified catalog for every UI
+            // generation batch must not rescan or write 155,586 senses.
             connection
                 .execute_batch(
-                    "ALTER TABLE senses ADD COLUMN source_ordinal INTEGER NOT NULL DEFAULT -1",
+                    "ALTER TABLE senses ADD COLUMN source_ordinal INTEGER NOT NULL DEFAULT -1;
+                     UPDATE senses AS target SET source_ordinal = (
+                         SELECT COUNT(*) - 1 FROM senses AS prior
+                         WHERE prior.provider=target.provider
+                           AND prior.snapshot=target.snapshot
+                           AND prior.entry_id=target.entry_id
+                           AND prior.rowid <= target.rowid
+                     ) WHERE target.source_ordinal < 0",
                 )
                 .map_err(|e| e.to_string())?;
         }
-        connection
-            .execute_batch(
-                "UPDATE senses AS target SET source_ordinal = (
-                    SELECT COUNT(*) - 1 FROM senses AS prior
-                    WHERE prior.provider=target.provider
-                      AND prior.snapshot=target.snapshot
-                      AND prior.entry_id=target.entry_id
-                      AND prior.rowid <= target.rowid
-                ) WHERE target.source_ordinal < 0",
-            )
-            .map_err(|e| e.to_string())?;
         Ok(Self { connection })
     }
 
